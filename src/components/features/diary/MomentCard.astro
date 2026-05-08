@@ -11,6 +11,7 @@ const relativeTime = formatRelativeTime(
 	hoursAgo,
 	daysAgo,
 );
+const momentImages = moment.images ?? [];
 const exactTime = new Intl.DateTimeFormat("zh-CN", {
 	year: "numeric",
 	month: "2-digit",
@@ -33,21 +34,21 @@ const exactTime = new Intl.DateTimeFormat("zh-CN", {
 
 		<!-- Images -->
 		{
-			moment.images && moment.images.length > 0 && (
+			momentImages.length > 0 && (
 				<div
 					class:list={[
 						"diary-images grid gap-2 mb-3",
-						moment.images.length === 1 && "diary-images-single",
-						moment.images.length === 2 && "diary-images-double",
-						moment.images.length === 3 && "diary-images-triple",
-						moment.images.length >= 4 && "diary-images-grid",
+						momentImages.length === 1 && "diary-images-single",
+						momentImages.length === 2 && "diary-images-double",
+						momentImages.length === 3 && "diary-images-triple",
+						momentImages.length >= 4 && "diary-images-grid",
 					]}
 				>
-					{moment.images.map((image, imgIndex) => (
+					{momentImages.map((image, imgIndex) => (
 						<div
 							class:list={[
 								"relative rounded-lg overflow-hidden cursor-pointer",
-								moment.images.length === 1
+								momentImages.length === 1
 									? "aspect-[16/10] sm:aspect-[16/9]"
 									: "aspect-square",
 							]}

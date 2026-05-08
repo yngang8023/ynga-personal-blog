@@ -98,6 +98,14 @@ const showLessLabel = i18n(I18nKey.showLess);
 
 <script>
 	class WidgetLayout extends HTMLElement {
+		wrapper: HTMLElement | null = null;
+		button: HTMLButtonElement | null = null;
+		label: HTMLElement | null = null;
+		collapsedHeight = "7.5rem";
+		isExpanded = false;
+		handleToggle: (() => void) | null = null;
+		handleTransitionEnd: ((event: TransitionEvent) => void) | null = null;
+
 		connectedCallback() {
 			if (this.dataset.initialized === "true") {
 				return;
@@ -138,11 +146,15 @@ const showLessLabel = i18n(I18nKey.showLess);
 		}
 
 		disconnectedCallback() {
-			this.button?.removeEventListener("click", this.handleToggle);
-			this.wrapper?.removeEventListener(
-				"transitionend",
-				this.handleTransitionEnd,
-			);
+			if (this.handleToggle) {
+				this.button?.removeEventListener("click", this.handleToggle);
+			}
+			if (this.handleTransitionEnd) {
+				this.wrapper?.removeEventListener(
+					"transitionend",
+					this.handleTransitionEnd,
+				);
+			}
 			this.dataset.initialized = "false";
 		}
 
@@ -167,24 +179,26 @@ const showLessLabel = i18n(I18nKey.showLess);
 				return;
 			}
 
+			const { wrapper } = this;
+
 			if (this.isExpanded) {
-				this.wrapper.style.maxHeight = `${this.wrapper.scrollHeight}px`;
+				wrapper.style.maxHeight = `${wrapper.scrollHeight}px`;
 				requestAnimationFrame(() => {
 					this.isExpanded = false;
 					this.syncState();
-					this.wrapper.style.maxHeight = this.collapsedHeight;
+					wrapper.style.maxHeight = this.collapsedHeight;
 				});
 				return;
 			}
 
-			if (this.wrapper.style.maxHeight === "none") {
-				this.wrapper.style.maxHeight = this.collapsedHeight;
+			if (wrapper.style.maxHeight === "none") {
+				wrapper.style.maxHeight = this.collapsedHeight;
 			}
 
 			requestAnimationFrame(() => {
 				this.isExpanded = true;
 				this.syncState();
-				this.wrapper.style.maxHeight = `${this.wrapper.scrollHeight}px`;
+				wrapper.style.maxHeight = `${wrapper.scrollHeight}px`;
 			});
 		}
 	}

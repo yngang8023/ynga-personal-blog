@@ -102,22 +102,24 @@ function toImageArray(
 	return typeof images === "string" && images ? [images] : [];
 }
 
+function isResponsiveImageMap(
+	src: ResponsiveImageSource,
+): src is Exclude<ResponsiveImageSource, string | string[]> {
+	return typeof src === "object" && src !== null && !Array.isArray(src);
+}
+
 export function normalizeResponsiveImageSource(
 	src: ResponsiveImageSource,
 ): BannerImages {
-	if (
-		typeof src === "object" &&
-		src !== null &&
-		!Array.isArray(src) &&
-		("desktop" in src || "mobile" in src)
-	) {
+	if (isResponsiveImageMap(src) && ("desktop" in src || "mobile" in src)) {
 		return {
 			desktop: toImageArray(src.desktop ?? src.mobile),
 			mobile: toImageArray(src.mobile ?? src.desktop),
 		};
 	}
 
-	const allImages = toImageArray(src);
+	const allImages =
+		typeof src === "string" || Array.isArray(src) ? toImageArray(src) : [];
 
 	return {
 		desktop: allImages,

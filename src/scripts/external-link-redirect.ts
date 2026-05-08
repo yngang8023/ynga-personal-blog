@@ -5,11 +5,6 @@ declare global {
 		__hiyngaExternalRedirectInitialized?: boolean;
 		__hiyngaExternalRedirectObserver?: MutationObserver;
 		__hiyngaExternalRedirectSwupHooksBound?: boolean;
-		swup?: {
-			hooks?: {
-				on: (event: string, handler: () => void) => void;
-			};
-		};
 	}
 }
 

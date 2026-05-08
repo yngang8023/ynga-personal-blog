@@ -267,6 +267,17 @@ const defaultPostListLayout = siteConfig.postListLayout?.defaultMode || "list";
 		.right-sidebar-container #right-sidebar {
 			height: fit-content;
 		}
+
+		#toc-inner-wrapper {
+			-ms-overflow-style: none;
+			scrollbar-width: none;
+		}
+
+		#toc-inner-wrapper::-webkit-scrollbar {
+			display: none;
+			width: 0;
+			height: 0;
+		}
 	</style>
 
 	<!-- 侧边栏TOC模式 -->
@@ -288,7 +299,7 @@ const defaultPostListLayout = siteConfig.postListLayout?.defaultMode || "list";
 					>
 						<div
 							id="toc-inner-wrapper"
-							class="fixed top-14 w-(--toc-width) max-h-[calc(100vh-10rem)] overflow-x-hidden overflow-y-auto"
+							class="fixed top-14 w-(--toc-width) max-h-[calc(100vh-10rem)] overflow-x-hidden overflow-y-auto hide-scrollbar"
 						>
 							<div
 								id="toc-container"

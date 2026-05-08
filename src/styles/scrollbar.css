@@ -1,0 +1,99 @@
+@reference "tailwindcss";
+
+:root {
+  --scrollbar-track-bg: color-mix(in oklch, var(--page-bg) 88%, transparent);
+  --scrollbar-track-bg-hover: color-mix(in oklch, var(--page-bg) 80%, var(--primary) 8%);
+  --scrollbar-track-bg-active: color-mix(in oklch, var(--page-bg) 72%, var(--primary) 12%);
+
+  --scrollbar-bg-light: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 72%, white 28%),
+    color-mix(in oklch, var(--primary) 88%, black 12%)
+  );
+  --scrollbar-bg-hover-light: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 84%, white 16%),
+    color-mix(in oklch, var(--primary) 96%, black 4%)
+  );
+  --scrollbar-bg-active-light: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 90%, white 10%),
+    color-mix(in oklch, var(--primary) 100%, black 0%)
+  );
+
+  --scrollbar-bg-dark: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 68%, white 32%),
+    color-mix(in oklch, var(--primary) 88%, black 12%)
+  );
+  --scrollbar-bg-hover-dark: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 82%, white 18%),
+    color-mix(in oklch, var(--primary) 96%, black 4%)
+  );
+  --scrollbar-bg-active-dark: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 90%, white 10%),
+    color-mix(in oklch, var(--primary) 100%, black 0%)
+  );
+
+  --scrollbar-bg: var(--scrollbar-bg-light);
+  --scrollbar-bg-hover: var(--scrollbar-bg-hover-light);
+  --scrollbar-bg-active: var(--scrollbar-bg-active-light);
+}
+
+.scrollbar-base.os-scrollbar {
+  @apply transition-all;
+  pointer-events: unset;
+  --os-size: 10px;
+  --os-padding-perpendicular: 2px;
+  --os-padding-axis: 2px;
+  --os-track-bg: var(--scrollbar-track-bg);
+  --os-track-bg-hover: var(--scrollbar-track-bg-hover);
+  --os-track-bg-active: var(--scrollbar-track-bg-active);
+
+  &.os-scrollbar-horizontal {
+    @apply py-1 px-2 h-4;
+    .os-scrollbar-track .os-scrollbar-handle {
+      @apply rounded-full h-1;
+    }
+    &:hover .os-scrollbar-track .os-scrollbar-handle {
+      @apply h-2;
+    }
+  }
+
+  &.os-scrollbar-vertical {
+    @apply px-1 py-1 w-4;
+    .os-scrollbar-track .os-scrollbar-handle {
+      @apply rounded-full w-1;
+    }
+    &:hover .os-scrollbar-track .os-scrollbar-handle {
+      @apply w-2;
+    }
+  }
+}
+
+.os-scrollbar {
+  &.scrollbar-auto {
+    --os-handle-bg: var(--scrollbar-bg);
+    --os-handle-bg-hover: var(--scrollbar-bg-hover);
+    --os-handle-bg-active: var(--scrollbar-bg-active);
+  }
+  &.scrollbar-dark {
+    --os-handle-bg: var(--scrollbar-bg-dark);
+    --os-handle-bg-hover: var(--scrollbar-bg-hover-dark);
+    --os-handle-bg-active: var(--scrollbar-bg-active-dark);
+  }
+  &.scrollbar-light {
+    --os-handle-bg: var(--scrollbar-bg-light);
+    --os-handle-bg-hover: var(--scrollbar-bg-hover-light);
+    --os-handle-bg-active: var(--scrollbar-bg-active-light);
+  }
+}
+
+html.dark .scrollbar-base.os-scrollbar,
+.dark .scrollbar-base.os-scrollbar {
+  --os-track-bg: color-mix(in oklch, var(--page-bg) 80%, transparent);
+  --os-track-bg-hover: color-mix(in oklch, var(--page-bg) 70%, var(--primary) 10%);
+  --os-track-bg-active: color-mix(in oklch, var(--page-bg) 62%, var(--primary) 14%);
+}

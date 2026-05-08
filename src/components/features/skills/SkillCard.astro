@@ -1,0 +1,459 @@
+---
+import I18nKey from "../../../i18n/i18nKey";
+import { getSkillExperience } from "../../../data/skills";
+import { i18n } from "../../../i18n/translation";
+import Icon from "../../misc/Icon.astro";
+import type { SkillCardProps } from "./types";
+
+const { skill } = Astro.props as SkillCardProps;
+
+const skillColor = skill.color || "#3B82F6";
+
+const getLevelText = (level: string) => {
+	switch (level) {
+		case "expert":
+			return i18n(I18nKey.skillsExpert);
+		case "advanced":
+			return i18n(I18nKey.skillsAdvanced);
+		case "intermediate":
+			return i18n(I18nKey.skillsIntermediate);
+		case "beginner":
+			return i18n(I18nKey.skillsBeginner);
+		default:
+			return level;
+	}
+};
+
+const getLevelWidth = (level: string) => {
+	switch (level) {
+		case "expert":
+			return "100%";
+		case "advanced":
+			return "80%";
+		case "intermediate":
+			return "60%";
+		case "beginner":
+			return "40%";
+		default:
+			return "20%";
+	}
+};
+
+const getLevelTheme = (level: string) => {
+	switch (level) {
+		case "expert":
+			return {
+				bg: "rgba(239, 68, 68, 0.14)",
+				text: "#DC2626",
+			};
+		case "advanced":
+			return {
+				bg: "rgba(249, 115, 22, 0.14)",
+				text: "#EA580C",
+			};
+		case "intermediate":
+			return {
+				bg: "rgba(59, 130, 246, 0.14)",
+				text: "#2563EB",
+			};
+		case "beginner":
+			return {
+				bg: "rgba(34, 197, 94, 0.14)",
+				text: "#16A34A",
+			};
+		default:
+			return {
+				bg: "rgba(59, 130, 246, 0.14)",
+				text: "#2563EB",
+			};
+	}
+};
+
+const formatExperience = (startedAt: string) => {
+	const exp = getSkillExperience(startedAt);
+	const parts: string[] = [];
+	if (exp.years > 0) {
+		parts.push(`${exp.years} ${i18n(I18nKey.skillYears)}`);
+	}
+	if (exp.months > 0) {
+		parts.push(`${exp.months} ${i18n(I18nKey.skillMonths)}`);
+	}
+	return parts.join(" ") || "持续学习中";
+};
+
+const levelTheme = getLevelTheme(skill.level);
+---
+
+<div
+	class="skill-card group relative rounded-[1.2rem] border border-black/10 dark:border-white/10 transition-all duration-300 hover:-translate-y-1"
+	data-category={skill.category}
+	style={`--skill-accent:${skillColor}; --level-bg:${levelTheme.bg}; --level-text:${levelTheme.text};`}
+>
+	<div class="skill-card-glow"></div>
+	<div class="skill-card-inner">
+		<div class="flex items-start gap-4 mb-3">
+			<div
+				class="skill-card-icon"
+			>
+				<Icon
+					icon={skill.icon}
+					class="text-xl"
+					color={skillColor}
+					fallback={skill.name.charAt(0)}
+					loading="eager"
+				/>
+			</div>
+
+			<div class="flex-1 min-w-0">
+				<div class="flex items-center justify-between mb-1">
+					<h3 class="text-lg font-bold text-black/90 dark:text-white/90 truncate group-hover:text-[var(--primary)] transition-colors duration-200 pr-2">
+						{skill.name}
+					</h3>
+					<span class="skill-level-badge">
+						{getLevelText(skill.level)}
+					</span>
+				</div>
+				<p
+					class="text-xs text-black/50 dark:text-white/50 skill-meta-line"
+					data-skill-experience
+					data-skill-started-at={skill.startedAt}
+					data-skill-years-label={i18n(I18nKey.skillYears)}
+					data-skill-months-label={i18n(I18nKey.skillMonths)}
+					data-skill-ongoing-label="持续学习中"
+				>
+					{formatExperience(skill.startedAt)}
+				</p>
+			</div>
+		</div>
+
+		<details class="skill-description-details" data-skill-details>
+			<summary
+				class="skill-description-trigger"
+				aria-label={`查看 ${skill.name} 的完整描述`}
+			>
+				<span class="skill-description-preview" data-skill-preview>
+					{skill.description}
+				</span>
+				<span class="skill-description-hint" data-skill-hint hidden>
+					展开详情
+				</span>
+			</summary>
+			<div class="skill-description-popover">
+				<p>{skill.description}</p>
+			</div>
+		</details>
+
+		<div class="skill-meter">
+			<div
+				class="skill-meter-fill"
+				style={`width: ${getLevelWidth(skill.level)};`}
+			/>
+		</div>
+	</div>
+</div>
+
+<style>
+	.skill-card {
+		animation: fadeInUp 0.5s ease-out forwards;
+		opacity: 0;
+		overflow: visible;
+		z-index: 0;
+	}
+
+	.skill-card.filtered-out {
+		display: none;
+	}
+
+	.skill-card[data-has-popover="true"] {
+		z-index: 1;
+	}
+
+	.skill-card[data-has-popover="true"]:hover,
+	.skill-card[data-has-popover="true"]:focus-within {
+		z-index: 40;
+	}
+
+	.skill-card-inner {
+		position: relative;
+		padding: 1.2rem;
+		border-radius: inherit;
+		background:
+			linear-gradient(160deg, color-mix(in srgb, var(--skill-accent) 8%, white 92%), transparent),
+			color-mix(in oklch, var(--card-bg) 94%, white 6%);
+		box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+		border: 1px solid color-mix(in srgb, var(--skill-accent) 14%, rgba(255, 255, 255, 0.86));
+	}
+
+	.skill-card-glow {
+		position: absolute;
+		inset: auto 10% -0.75rem;
+		height: 1.25rem;
+		background: color-mix(in srgb, var(--skill-accent) 22%, transparent);
+		filter: blur(18px);
+		opacity: 0;
+		transition: opacity 220ms ease;
+		pointer-events: none;
+	}
+
+	.skill-card:hover .skill-card-glow {
+		opacity: 0.9;
+	}
+
+	.skill-card-icon {
+		width: 3.1rem;
+		height: 3.1rem;
+		display: flex;
+		flex-shrink: 0;
+		align-items: center;
+		justify-content: center;
+		border-radius: 1rem;
+		background: color-mix(in srgb, var(--skill-accent) 14%, white 86%);
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--skill-accent) 18%, white 82%);
+	}
+
+	.skill-level-badge {
+		flex-shrink: 0;
+		margin-left: 0.5rem;
+		padding: 0.3rem 0.6rem;
+		font-size: 0.75rem;
+		font-weight: 700;
+		border-radius: 999px;
+		background: var(--level-bg);
+		color: var(--level-text);
+	}
+
+	.skill-meta-line {
+		letter-spacing: 0.01em;
+	}
+
+	.skill-description-details {
+		position: relative;
+		margin-top: 0.2rem;
+		z-index: 2;
+	}
+
+	.skill-description-details:not([data-truncated="true"]) .skill-description-popover {
+		display: none;
+	}
+
+	.skill-description-details:not([data-truncated="true"]) .skill-description-trigger {
+		cursor: default;
+		pointer-events: none;
+	}
+
+	.skill-description-trigger {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.75rem;
+		cursor: pointer;
+		list-style: none;
+		padding: 0.05rem 0;
+		border-radius: 0.9rem;
+		outline: none;
+	}
+
+	.skill-description-trigger::-webkit-details-marker {
+		display: none;
+	}
+
+	.skill-description-details:not([data-truncated="true"]) .skill-description-trigger::-webkit-details-marker {
+		display: none;
+	}
+
+	.skill-description-details[data-disabled] {
+		user-select: text;
+	}
+
+	.skill-description-trigger:focus-visible {
+		box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+	}
+
+	.skill-description-preview,
+	.skill-description-static {
+		font-size: 0.95rem;
+		line-height: 1.72;
+		color: rgba(15, 23, 42, 0.64);
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		min-height: 3.2rem;
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	.skill-description-hint {
+		display: inline-flex;
+		align-items: center;
+		flex-shrink: 0;
+		margin-top: 0.1rem;
+		padding: 0.22rem 0.55rem;
+		border-radius: 999px;
+		background: rgba(15, 23, 42, 0.06);
+		font-size: 0.72rem;
+		font-weight: 700;
+		color: rgba(15, 23, 42, 0.56);
+		white-space: nowrap;
+		transition:
+			background-color 180ms ease,
+			color 180ms ease;
+	}
+
+	.skill-description-details:hover .skill-description-hint,
+	.skill-description-details[open] .skill-description-hint {
+		background: color-mix(in srgb, var(--skill-accent) 16%, white 84%);
+		color: color-mix(in srgb, var(--skill-accent) 76%, black 24%);
+	}
+
+	.skill-description-popover {
+		position: absolute;
+		left: 0;
+		right: 0;
+		top: calc(100% + 0.7rem);
+		z-index: 999;
+		padding: 0.9rem 1rem;
+		border-radius: 1rem;
+		border: 1px solid color-mix(in srgb, var(--skill-accent) 18%, white 82%);
+		background: color-mix(in oklch, var(--card-bg) 96%, white 4%);
+		box-shadow: 0 18px 38px rgba(15, 23, 42, 0.14);
+		opacity: 0;
+		transform: translateY(0.4rem);
+		pointer-events: none;
+		transition:
+			opacity 180ms ease,
+			transform 180ms ease;
+	}
+
+	.skill-description-details[data-popover-placement="top"] .skill-description-popover {
+		top: auto;
+		bottom: calc(100% + 0.7rem);
+		transform: translateY(-0.4rem);
+	}
+
+	.skill-description-popover p {
+		font-size: 0.92rem;
+		line-height: 1.78;
+		color: rgba(15, 23, 42, 0.72);
+	}
+
+	.skill-description-details:hover .skill-description-popover,
+	.skill-description-details:focus-within .skill-description-popover,
+	.skill-description-details[open] .skill-description-popover {
+		opacity: 1;
+		transform: translateY(0);
+		pointer-events: auto;
+	}
+
+	.skill-meter {
+		margin-top: 1rem;
+		width: 100%;
+		height: 0.44rem;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--skill-accent) 12%, rgba(15, 23, 42, 0.06));
+		overflow: hidden;
+	}
+
+	.skill-meter-fill {
+		height: 100%;
+		border-radius: inherit;
+		background:
+			linear-gradient(90deg, color-mix(in srgb, var(--skill-accent) 84%, white 16%), var(--skill-accent));
+		transition: width 420ms ease;
+	}
+
+	:root.dark .skill-card-inner {
+		background:
+			linear-gradient(160deg, color-mix(in srgb, var(--skill-accent) 12%, transparent), transparent),
+			rgba(15, 23, 42, 0.72);
+		border-color: color-mix(in srgb, var(--skill-accent) 22%, rgba(255, 255, 255, 0.12));
+		box-shadow: 0 16px 40px rgba(2, 6, 23, 0.24);
+	}
+
+	:root.dark .skill-card-icon {
+		background: color-mix(in srgb, var(--skill-accent) 18%, rgba(15, 23, 42, 0.82));
+		box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--skill-accent) 18%, rgba(255, 255, 255, 0.12));
+	}
+
+	:root.dark .skill-description-preview,
+	:root.dark .skill-description-static,
+	:root.dark .skill-description-popover p {
+		color: rgba(255, 255, 255, 0.7);
+	}
+
+	:root.dark .skill-description-hint {
+		background: rgba(255, 255, 255, 0.08);
+		color: rgba(255, 255, 255, 0.62);
+	}
+
+	:root.dark .skill-description-popover {
+		background: rgba(15, 23, 42, 0.96);
+		border-color: color-mix(in srgb, var(--skill-accent) 24%, rgba(255, 255, 255, 0.14));
+		box-shadow: 0 18px 38px rgba(2, 6, 23, 0.28);
+	}
+
+	@keyframes fadeInUp {
+		from {
+			opacity: 0;
+			transform: translateY(20px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.skill-card:nth-child(1) { animation-delay: 0.03s; }
+	.skill-card:nth-child(2) { animation-delay: 0.06s; }
+	.skill-card:nth-child(3) { animation-delay: 0.09s; }
+	.skill-card:nth-child(4) { animation-delay: 0.12s; }
+	.skill-card:nth-child(5) { animation-delay: 0.15s; }
+	.skill-card:nth-child(6) { animation-delay: 0.18s; }
+	.skill-card:nth-child(7) { animation-delay: 0.21s; }
+	.skill-card:nth-child(8) { animation-delay: 0.24s; }
+	.skill-card:nth-child(9) { animation-delay: 0.27s; }
+	.skill-card:nth-child(10) { animation-delay: 0.3s; }
+	.skill-card:nth-child(11) { animation-delay: 0.33s; }
+	.skill-card:nth-child(12) { animation-delay: 0.36s; }
+
+	@media (hover: none) {
+		.skill-description-popover {
+			position: static;
+			margin-top: 0.75rem;
+			z-index: auto;
+			opacity: 1;
+			transform: none;
+			pointer-events: auto;
+			display: none;
+		}
+
+		.skill-description-details:hover .skill-description-popover {
+			display: none;
+		}
+
+		.skill-description-details[open] .skill-description-popover {
+			display: block;
+		}
+	}
+
+	@media (max-width: 767px) {
+		.skill-card-inner {
+			padding: 1rem;
+		}
+
+		.skill-description-preview,
+		.skill-description-static {
+			font-size: 0.92rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.skill-card,
+		.skill-card-glow,
+		.skill-meter-fill,
+		.skill-description-popover {
+			animation: none;
+			transition: none;
+		}
+	}
+</style>

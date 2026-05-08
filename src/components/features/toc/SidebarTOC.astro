@@ -1,0 +1,461 @@
+---
+/**
+ * SidebarTOC - 侧边栏目录组件
+ * 基于 Web Component 实现，支持 IntersectionObserver 滚动监听
+ */
+
+import type { MarkdownHeading } from "astro";
+
+import I18nKey from "../../../i18n/i18nKey";
+import { i18n } from "../../../i18n/translation";
+import WidgetEmptyState from "../../widgets/common/WidgetEmptyState.astro";
+
+interface Props {
+	class?: string;
+	headings?: MarkdownHeading[];
+	hideWhenEmpty?: boolean;
+}
+
+const { class: className, headings = [], hideWhenEmpty = false } = Astro.props;
+const showEmptyState = headings.length === 0 && !hideWhenEmpty;
+---
+
+<table-of-contents
+	class:list={[className, "group"]}
+	id="toc"
+	data-hide-when-empty={String(hideWhenEmpty)}
+>
+	<template data-toc-empty-template>
+		<div class="toc-empty-shell">
+			<WidgetEmptyState
+				icon="material-symbols:format-list-bulleted-rounded"
+				title={i18n(I18nKey.tocEmpty)}
+				compact={true}
+			/>
+		</div>
+	</template>
+	{
+		showEmptyState && (
+			<div data-toc-empty-state class="toc-empty-shell">
+				<WidgetEmptyState
+					icon="material-symbols:format-list-bulleted-rounded"
+					title={i18n(I18nKey.tocEmpty)}
+					compact={true}
+				/>
+			</div>
+		)
+	}
+</table-of-contents>
+
+<script>
+	import { JAPANESE_KATAKANA } from "./utils/japanese-katakana";
+	import {
+		extractHeadings,
+		generateTOCItems,
+		getAnchorScrollOffset,
+		getTOCConfig,
+		scrollToHeading,
+	} from "./utils/toc-utils";
+
+	import {
+		calculateActiveHeadingRange,
+		isInRange,
+	} from "./hooks/useTocHighlight";
+
+	import {
+		throttle,
+		calculateActiveIndicatorPosition,
+	} from "./hooks/useTocScroll";
+
+	type ResolvedTOCEntry = {
+		id: string;
+		entry: HTMLAnchorElement;
+		heading: HTMLElement;
+		section: HTMLElement;
+	};
+
+	function resolveTOCEntries(
+		entries: HTMLAnchorElement[],
+	): ResolvedTOCEntry[] {
+		return entries.reduce<ResolvedTOCEntry[]>((resolved, entry) => {
+			const id = decodeURIComponent(entry.hash?.substring(1) || "");
+			if (!id) {
+				entry.remove();
+				return resolved;
+			}
+
+			const heading = document.getElementById(id);
+			const section = heading?.closest("section") || heading?.parentElement;
+
+			if (
+				heading instanceof HTMLElement &&
+				section instanceof HTMLElement
+			) {
+				resolved.push({ id, entry, heading, section });
+			} else {
+				entry.remove();
+			}
+
+			return resolved;
+		}, []);
+	}
+
+	class TableOfContents extends HTMLElement {
+		emptyStateHTML = "";
+		hideWhenEmpty = false;
+		tocEl: HTMLElement | null = null;
+		scrollContainer: HTMLElement | null = null;
+		visibleClass = "visible";
+		observer: IntersectionObserver;
+		anchorNavTarget: HTMLElement | null = null;
+		headingIdxMap = new Map<string, number>();
+		headings: HTMLElement[] = [];
+		sections: HTMLElement[] = [];
+		tocEntries: HTMLAnchorElement[] = [];
+		active: boolean[] = [];
+		activeIndicator: HTMLElement | null = null;
+		navbarHeight = 0;
+
+		constructor() {
+			super();
+			this.observer = new IntersectionObserver(
+				this.markVisibleSection.bind(this),
+				{ threshold: 0 },
+			);
+		}
+
+		markVisibleSection = (entries: IntersectionObserverEntry[]) => {
+			entries.forEach((entry) => {
+				const id = (
+					entry.target as HTMLElement
+				).children[0]?.getAttribute("id");
+				const idx = id ? this.headingIdxMap.get(id) : undefined;
+				if (idx !== undefined) {
+					this.active[idx] = entry.isIntersecting;
+				}
+
+				if (
+					entry.isIntersecting &&
+					this.anchorNavTarget ===
+						(entry.target as HTMLElement).firstChild
+				) {
+					this.anchorNavTarget = null;
+				}
+			});
+
+			if (!this.active.includes(true)) {
+				this.fallback();
+			}
+			this.update();
+		};
+
+		toggleActiveHeading = () => {
+			const { min, max } = calculateActiveHeadingRange(this.active);
+
+			this.tocEntries.forEach((entry, i) => {
+				if (this.active[i]) {
+					entry.classList.add(this.visibleClass);
+				} else {
+					entry.classList.remove(this.visibleClass);
+				}
+			});
+
+			if (min > max) {
+				this.activeIndicator?.setAttribute("style", "opacity: 0");
+			} else {
+				const minEntry = this.tocEntries[min];
+				const maxEntry = this.tocEntries[max];
+				if (minEntry && maxEntry && this.tocEl) {
+					const { top, height } = calculateActiveIndicatorPosition(
+						this.tocEl,
+						minEntry,
+						maxEntry,
+					);
+					this.activeIndicator?.setAttribute(
+						"style",
+						`top: ${top}px; height: ${height}px`,
+					);
+				}
+			}
+		};
+
+		scrollToActiveHeading = throttle(() => {
+			const scrollContainer = this.scrollContainer || this.tocEl;
+			if (this.anchorNavTarget || !this.tocEl || !scrollContainer) return;
+
+			const activeEntries = this.tocEntries.filter((entry) =>
+				entry.classList.contains(this.visibleClass),
+			);
+			if (activeEntries.length === 0) return;
+
+			const topmost = activeEntries[0];
+			const bottommost = activeEntries[activeEntries.length - 1];
+			const tocHeight = scrollContainer.clientHeight;
+
+			const visibleHeight =
+				bottommost.getBoundingClientRect().bottom -
+				topmost.getBoundingClientRect().top;
+
+			let top: number;
+			if (visibleHeight < 0.9 * tocHeight) {
+				top = (topmost as HTMLElement).offsetTop - 32;
+			} else {
+				top = (bottommost as HTMLElement).offsetTop - tocHeight * 0.8;
+			}
+
+			scrollContainer.scrollTo({ top, left: 0, behavior: "smooth" });
+		}, 100);
+
+		update = () => {
+			requestAnimationFrame(() => {
+				this.toggleActiveHeading();
+				this.scrollToActiveHeading();
+			});
+		};
+
+		syncVisibility(hasContent: boolean) {
+			if (this.hideWhenEmpty && !hasContent) {
+				this.style.display = "none";
+				return;
+			}
+
+			this.style.display = "block";
+		}
+
+		fallback = () => {
+			if (!this.sections.length) return;
+
+			for (let i = 0; i < this.sections.length; i++) {
+				const section = this.sections[i];
+				if (!(section instanceof HTMLElement)) {
+					continue;
+				}
+
+				const rect = section.getBoundingClientRect();
+				if (
+					isInRange(rect.top, 0, window.innerHeight) ||
+					isInRange(rect.bottom, 0, window.innerHeight) ||
+					(rect.top < 0 && rect.bottom > window.innerHeight)
+				) {
+					this.active[i] = true;
+				} else if (rect.top > window.innerHeight) {
+					break;
+				}
+			}
+		};
+
+		resetState() {
+			this.sections.forEach((section) => {
+				if (section instanceof HTMLElement) {
+					this.observer.unobserve(section);
+				}
+			});
+			this.headingIdxMap.clear();
+			this.headings = [];
+			this.sections = [];
+			this.tocEntries = [];
+			this.active = [];
+			this.activeIndicator = null;
+		}
+
+		handleAnchorClick = (event: Event) => {
+			const anchor = (event.composedPath() as EventTarget[]).find(
+				(el) => el instanceof HTMLAnchorElement,
+			) as HTMLAnchorElement | undefined;
+
+			if (anchor) {
+				event.preventDefault();
+				const id = decodeURIComponent(anchor.hash?.substring(1) || "");
+				scrollToHeading(id, this.navbarHeight);
+
+				const idx = this.headingIdxMap.get(id);
+				this.anchorNavTarget =
+					idx !== undefined ? this.headings[idx] : null;
+			}
+		};
+
+		connectedCallback() {
+			this.emptyStateHTML =
+				this.querySelector("template[data-toc-empty-template]")
+					?.innerHTML.trim() || "";
+			this.hideWhenEmpty = this.dataset.hideWhenEmpty === "true";
+			this.syncVisibility(!this.hideWhenEmpty);
+
+			const element =
+				document.querySelector(".custom-md") ||
+				document.querySelector(".prose") ||
+				document.querySelector(".markdown-content");
+			let initialized = false;
+
+			const tryInit = () => {
+				if (!initialized) {
+					initialized = true;
+					this.init();
+				}
+			};
+
+			if (element) {
+				element.addEventListener("animationend", tryInit, {
+					once: true,
+				});
+				setTimeout(tryInit, 300);
+			} else {
+				tryInit();
+				setTimeout(tryInit, 300);
+			}
+		}
+
+		init() {
+			this.resetState();
+			this.regenerateTOC();
+			this.tocEl = this;
+			this.navbarHeight = getAnchorScrollOffset();
+			this.scrollContainer =
+				(this.closest("#toc-inner-wrapper") as HTMLElement | null) ||
+				this.tocEl;
+
+			this.tocEl.removeEventListener("click", this.handleAnchorClick, {
+				capture: true,
+			});
+			this.tocEl.addEventListener("click", this.handleAnchorClick, {
+				capture: true,
+			});
+
+			this.activeIndicator = this.querySelector("#active-indicator");
+
+			const tocEntries = Array.from(
+				this.querySelectorAll<HTMLAnchorElement>("a[href^='#']"),
+			);
+
+			if (tocEntries.length === 0) return;
+
+			const resolvedEntries = resolveTOCEntries(tocEntries);
+			if (resolvedEntries.length === 0) {
+				this.renderEmptyState();
+				return;
+			}
+
+			this.tocEntries = resolvedEntries.map(({ entry }) => entry);
+			this.headings = resolvedEntries.map(({ heading }) => heading);
+			this.sections = resolvedEntries.map(({ section }) => section);
+			resolvedEntries.forEach(({ id }, index) => {
+				this.headingIdxMap.set(id, index);
+			});
+			this.active = new Array(this.tocEntries.length).fill(false);
+
+			this.sections.forEach((section) => this.observer.observe(section));
+
+			this.fallback();
+			this.update();
+		}
+
+		renderEmptyState() {
+			this.innerHTML = this.emptyStateHTML;
+			delete this.dataset.loaded;
+			this.syncVisibility(false);
+		}
+
+		regenerateTOC(retryCount = 0) {
+			const isPostPage =
+				window.location.pathname.includes("/posts/") ||
+				document.querySelector(".custom-md, .markdown-content") !==
+					null;
+
+			if (!isPostPage) {
+				this.renderEmptyState();
+				return;
+			}
+
+			const headings = extractHeadings();
+
+			if (headings.length === 0 && retryCount < 3) {
+				setTimeout(() => this.regenerateTOC(retryCount + 1), 120);
+				return;
+			}
+			if (headings.length === 0) {
+				this.renderEmptyState();
+				return;
+			}
+
+			const config = getTOCConfig();
+			const tocItems = generateTOCItems(headings, config);
+
+			let h1Count = 1;
+			const tocHTML = tocItems
+				.map((item) => {
+					const depthClass =
+						item.depth === 0
+							? ""
+							: item.depth === 1
+								? "ml-4"
+								: "ml-8";
+
+					let badgeContent: string;
+					if (item.depth === 0) {
+						badgeContent =
+							config.useJapaneseBadge &&
+							h1Count - 1 < JAPANESE_KATAKANA.length
+								? JAPANESE_KATAKANA[h1Count - 1]
+								: h1Count.toString();
+						h1Count++;
+					} else if (item.depth === 1) {
+						badgeContent =
+							'<div class="transition w-2 h-2 rounded-[0.1875rem] bg-[var(--toc-badge-bg)]"></div>';
+					} else {
+						badgeContent =
+							'<div class="transition w-1.5 h-1.5 rounded-sm bg-black/5 dark:bg-white/10"></div>';
+					}
+
+					return `<a href="#${item.id}" class="px-2 flex gap-2 relative transition w-full min-h-9 rounded-xl hover:bg-[var(--toc-btn-hover)] active:bg-[var(--toc-btn-active)] py-2">
+					<div class="transition w-5 h-5 shrink-0 rounded-lg text-xs flex items-center justify-center font-bold ${depthClass} ${item.depth === 0 ? "bg-[var(--toc-badge-bg)] text-[var(--btn-content)]" : ""}">
+						${badgeContent}
+					</div>
+					<div class="transition text-sm ${item.depth <= 1 ? "text-50" : "text-30"}">${item.text}</div>
+				</a>`;
+				})
+				.join("");
+
+			this.innerHTML =
+				tocHTML +
+				'<div id="active-indicator" style="opacity: 0" class="-z-10 absolute bg-[var(--toc-btn-hover)] left-0 right-0 rounded-xl transition-all group-hover:bg-transparent border-2 border-[var(--toc-btn-hover)] group-hover:border-[var(--toc-btn-active)] border-dashed"></div>';
+			this.dataset.loaded = "true";
+			this.syncVisibility(true);
+		}
+
+		disconnectedCallback() {
+			this.sections.forEach((section) => {
+				if (section instanceof HTMLElement) {
+					this.observer.unobserve(section);
+				}
+			});
+			this.observer.disconnect();
+			this.tocEl?.removeEventListener("click", this.handleAnchorClick);
+		}
+	}
+
+	if (!customElements.get("table-of-contents")) {
+		customElements.define("table-of-contents", TableOfContents);
+	}
+</script>
+
+<style>
+	table-of-contents#toc {
+		max-height: 100%;
+		overflow: auto;
+		position: relative;
+		scroll-behavior: smooth;
+		display: block;
+		scrollbar-width: none;
+		-ms-overflow-style: none;
+	}
+
+	table-of-contents#toc::-webkit-scrollbar {
+		display: none;
+		width: 0;
+		height: 0;
+	}
+
+	.toc-empty-shell {
+		padding: 0.25rem;
+	}
+</style>

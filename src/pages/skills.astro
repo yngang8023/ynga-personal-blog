@@ -1,0 +1,1498 @@
+---
+import { PageHeader } from "@components/features/page-header";
+import { SectionTitle } from "@components/features/section-title";
+import { SkillCard } from "@components/features/skills";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import type { MarkdownHeading } from "astro";
+
+import { siteConfig } from "../config";
+import type { Skill } from "../data/skills";
+import { getSkillExperience, skillsData } from "../data/skills";
+import I18nKey from "../i18n/i18nKey";
+import { i18n } from "../i18n/translation";
+
+if (!siteConfig.featurePages.skills) {
+	return Astro.redirect("/404/");
+}
+
+const categoryMeta = [
+	{
+		key: "backend",
+		label: i18n(I18nKey.skillsBackend),
+		color: "#8B5CF6",
+	},
+	{
+		key: "database",
+		label: i18n(I18nKey.skillsDatabase),
+		color: "#10B981",
+	},
+	{
+		key: "tools",
+		label: i18n(I18nKey.skillsTools),
+		color: "#F59E0B",
+	},
+	{
+		key: "frontend",
+		label: i18n(I18nKey.skillsFrontend),
+		color: "#3B82F6",
+	},
+	{
+		key: "other",
+		label: i18n(I18nKey.skillsOther),
+		color: "#EC4899",
+	},
+] as const;
+
+const levelMeta = [
+	{
+		key: "expert",
+		label: i18n(I18nKey.skillsExpert),
+		color: "#EF4444",
+	},
+	{
+		key: "advanced",
+		label: i18n(I18nKey.skillsAdvanced),
+		color: "#F97316",
+	},
+	{
+		key: "intermediate",
+		label: i18n(I18nKey.skillsIntermediate),
+		color: "#FACC15",
+	},
+	{
+		key: "beginner",
+		label: i18n(I18nKey.skillsBeginner),
+		color: "#22C55E",
+	},
+] as const;
+
+const levelRank: Record<Skill["level"], number> = {
+	expert: 4,
+	advanced: 3,
+	intermediate: 2,
+	beginner: 1,
+};
+
+const sortedSkills = [...skillsData].sort((a, b) => {
+	const levelDiff = levelRank[b.level] - levelRank[a.level];
+	if (levelDiff !== 0) {
+		return levelDiff;
+	}
+
+	const monthDiff =
+		getSkillExperience(b).totalMonths - getSkillExperience(a).totalMonths;
+	if (monthDiff !== 0) {
+		return monthDiff;
+	}
+
+	return a.name.localeCompare(b.name, "zh-CN");
+});
+
+const totalSkills = sortedSkills.length;
+const advancedSkillCount = sortedSkills.filter(
+	(skill) => levelRank[skill.level] >= 3,
+).length;
+
+const groupedSkills = categoryMeta
+	.map((category) => {
+		const items = sortedSkills.filter((skill) => skill.category === category.key);
+		return {
+			...category,
+			items,
+			count: items.length,
+			percentage: totalSkills > 0 ? (items.length / totalSkills) * 100 : 0,
+		};
+	})
+	.filter((group) => group.count > 0);
+
+const levelStats = levelMeta.map((level) => {
+	const count = sortedSkills.filter((skill) => skill.level === level.key).length;
+	return {
+		...level,
+		count,
+		percentage: totalSkills > 0 ? (count / totalSkills) * 100 : 0,
+	};
+});
+
+const levelStatMap = Object.fromEntries(
+	levelStats.map((stat) => [stat.key, stat]),
+) as Record<
+	(typeof levelMeta)[number]["key"],
+	(typeof levelStats)[number]
+>;
+
+const displayLevelStats = [
+	{
+		key: "advanced",
+		label: i18n(I18nKey.skillsAdvanced),
+		color: levelStatMap.advanced.color,
+		count: levelStatMap.expert.count + levelStatMap.advanced.count,
+		percentage:
+			totalSkills > 0
+				? ((levelStatMap.expert.count + levelStatMap.advanced.count) /
+						totalSkills) *
+					100
+				: 0,
+	},
+	{
+		key: "intermediate",
+		label: i18n(I18nKey.skillsIntermediate),
+		color: levelStatMap.intermediate.color,
+		count: levelStatMap.intermediate.count,
+		percentage: levelStatMap.intermediate.percentage,
+	},
+	{
+		key: "beginner",
+		label: i18n(I18nKey.skillsBeginner),
+		color: levelStatMap.beginner.color,
+		count: levelStatMap.beginner.count,
+		percentage: levelStatMap.beginner.percentage,
+	},
+	{
+		key: "novice",
+		label: "入门",
+		color: "#0EA5E9",
+		count: 0,
+		percentage: 0,
+	},
+];
+
+let donutOffset = 0;
+const donutStops = displayLevelStats
+	.map((stat) => {
+		const start = donutOffset;
+		const end = donutOffset + stat.percentage;
+		donutOffset = end;
+		return `${stat.color} ${start}% ${end}%`;
+	})
+	.join(", ");
+
+const donutStyle = `background: conic-gradient(${donutStops || "#E5E7EB 0% 100%"});`;
+
+const title = i18n(I18nKey.skills);
+const subtitle = i18n(I18nKey.skillsSubtitle);
+const heroSpotlight = ["ai-agent", "java", "spring-boot"]
+	.map((id) => sortedSkills.find((skill) => skill.id === id))
+	.filter((skill): skill is Skill => !!skill);
+const skillHeadings: MarkdownHeading[] = groupedSkills.map((group) => ({
+	depth: 2,
+	slug: `skills-${group.key}`,
+	text: group.label,
+}));
+const heroTags = [
+	"AI Agent",
+	"Java 后端集成",
+	"智能体实践",
+];
+const levelLabelMap = Object.fromEntries(
+	levelMeta.map((level) => [level.key, level.label]),
+) as Record<Skill["level"], string>;
+
+const formatExperience = (skill: Pick<Skill, "startedAt">) => {
+	const { years, months } = getSkillExperience(skill);
+	const parts: string[] = [];
+	if (years > 0) {
+		parts.push(`${years} 年`);
+	}
+	if (months > 0) {
+		parts.push(`${months} 个月`);
+	}
+	return parts.join(" ") || "持续学习中";
+};
+---
+
+<MainGridLayout title={title} description={subtitle} headings={skillHeadings}>
+	<script>
+		import("../scripts/right-sidebar-layout.js");
+		import { loadIconify } from "../utils/icon-loader";
+
+		loadIconify().catch((error) => {
+			console.error("Failed to load Iconify:", error);
+		});
+	</script>
+
+	<div
+		class="flex w-full rounded-[var(--radius-large)] overflow-visible relative min-h-32"
+		data-skills-filter-root
+		data-active-filter="all"
+	>
+		<div class="card-base z-10 px-6 sm:px-9 py-6 relative w-full">
+			<PageHeader title={title} subtitle={subtitle} />
+
+			<section class="skills-hero" data-skills-hero>
+				<div class="skills-hero-main">
+					<span class="skills-hero-eyebrow">AI Agent Focus</span>
+					<h2 class="skills-hero-title">
+						把AI Agent当成当前重点深挖的方向，持续把智能体能力接到真实项目里。
+					</h2>
+					<p class="skills-hero-description">
+						现在不只是继续打磨 Java 后端与常见工程化能力，也在持续探索
+						AI Agent、工具调用、工作流编排、提示词设计以及和后端服务协同落地的实现方式，
+						希望把这些能力慢慢沉淀成真正可用、可维护、可持续演进的项目实践。
+					</p>
+
+					<div class="skills-hero-tags">
+						{
+							heroTags.map((tag) => (
+								<span class="skills-hero-tag">{tag}</span>
+							))
+						}
+					</div>
+				</div>
+
+				<div class="skills-hero-spotlights">
+					{
+						heroSpotlight.map((skill) => (
+							<article
+								class="skills-spotlight-card"
+								style={`--spotlight:${skill.color || "#3B82F6"};`}
+							>
+								<div class="skills-spotlight-top">
+									<div>
+										<p class="skills-spotlight-kicker">
+											{levelLabelMap[skill.level]}
+										</p>
+										<h3 class="skills-spotlight-name">{skill.name}</h3>
+									</div>
+									<span
+										class="skills-spotlight-exp"
+										data-skill-experience
+										data-skill-started-at={skill.startedAt}
+										data-skill-years-label="年"
+										data-skill-months-label="个月"
+										data-skill-ongoing-label="持续学习中"
+									>
+										{formatExperience(skill)}
+									</span>
+								</div>
+								<p class="skills-spotlight-text">{skill.description}</p>
+							</article>
+						))
+					}
+				</div>
+			</section>
+
+			<section class="skills-overview-grid">
+				<div class="skills-panel">
+					<div class="skills-panel-head">
+						<span class="skills-panel-dot bg-[var(--primary)]"></span>
+						<h2 class="skills-panel-title">按等级分布</h2>
+					</div>
+
+					<div
+						class="skills-donut-layout"
+						style="display:grid;grid-template-columns:1fr;align-items:center;gap:1.45rem;width:min(100%,46rem);margin-inline:auto;"
+					>
+						<div
+							class="skills-donut-shell"
+							style="display:flex;justify-content:center;align-items:center;width:100%;padding:1rem 0 0.35rem;"
+						>
+							<div class="skills-donut-ring" style={donutStyle}>
+								<div class="skills-donut-core">
+									<strong>{totalSkills}</strong>
+									<span>项技能</span>
+								</div>
+							</div>
+						</div>
+
+						<div
+							class="skills-legend-wrap"
+							style="width:100%;max-width:46rem;margin-inline:auto;padding-inline:clamp(0.5rem,1.4vw,1rem);box-sizing:border-box;"
+						>
+							<div
+								class="skills-legend-grid"
+								style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.1rem;width:100%;"
+							>
+								{
+									displayLevelStats.map((stat) => (
+										<div class="skills-legend-item">
+											<div class="skills-legend-top">
+												<span class="skills-legend-title">{stat.label}</span>
+												<strong class="skills-legend-count">{stat.count}</strong>
+											</div>
+											<div class="skills-legend-bottom">
+												<div class="skills-legend-signal">
+													<span
+														class="skills-legend-dot"
+														style={`background:${stat.color};`}
+													></span>
+													<span class="skills-legend-note">当前分布</span>
+												</div>
+												<span class="skills-legend-percent">
+													{Math.round(stat.percentage)}%
+												</span>
+											</div>
+										</div>
+									))
+								}
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="skills-panel">
+					<div class="skills-panel-head">
+						<span class="skills-panel-dot bg-[oklch(0.7_0.22_300)]"></span>
+						<h2 class="skills-panel-title">按分类分布</h2>
+					</div>
+
+					<div class="skills-category-bars">
+						{
+							groupedSkills.map((group) => (
+								<div class="skills-category-bar-item">
+									<div class="skills-category-bar-head">
+										<div class="skills-category-bar-label">
+											<span>{group.label}</span>
+											<span class="skills-count-chip">{group.count}</span>
+										</div>
+										<span class="skills-category-bar-percent">
+											{Math.round(group.percentage)}%
+										</span>
+									</div>
+									<div class="skills-category-track">
+										<div
+											class="skills-category-fill"
+											style={`width:${group.percentage}%; background:${group.color};`}
+										></div>
+									</div>
+								</div>
+							))
+						}
+					</div>
+
+					<div class="skills-stats-grid">
+						<div class="skills-stat-card bg-[linear-gradient(135deg,rgba(59,130,246,0.12),rgba(125,211,252,0.16))] border-[rgba(59,130,246,0.18)]">
+							<span class="skills-stat-label">熟练掌握</span>
+							<strong class="skills-stat-value text-[oklch(0.58_0.2_255)]">
+								{advancedSkillCount}
+							</strong>
+							<span class="skills-stat-sub">高级及以上</span>
+						</div>
+						<div class="skills-stat-card bg-[linear-gradient(135deg,rgba(34,197,94,0.12),rgba(134,239,172,0.18))] border-[rgba(34,197,94,0.18)]">
+							<span class="skills-stat-label">总技能数</span>
+							<strong class="skills-stat-value text-[oklch(0.62_0.19_145)]">
+								{totalSkills}
+							</strong>
+							<span class="skills-stat-sub">技能展示</span>
+						</div>
+					</div>
+
+					<div class="skills-focus-strip">
+						<div class="skills-focus-item">
+							<span class="skills-focus-label">主线方向</span>
+							<strong class="skills-focus-value">Java 后端开发</strong>
+						</div>
+						<div class="skills-focus-item">
+							<span class="skills-focus-label">当前兴趣</span>
+							<strong class="skills-focus-value">AI Agent / 智能体实践</strong>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<nav
+				class="skills-anchor-nav"
+				aria-label="技能分类筛选"
+				data-skills-filter-nav
+			>
+				<button
+					type="button"
+					class="skills-anchor-chip is-active"
+					style="--chip-accent: var(--primary);"
+					data-filter-chip="all"
+					aria-pressed="true"
+				>
+					<span class="skills-anchor-dot"></span>
+					<span>全部</span>
+					<span class="skills-anchor-count">{totalSkills}</span>
+				</button>
+				{
+					groupedSkills.map((group) => (
+						<button
+							type="button"
+							class="skills-anchor-chip"
+							style={`--chip-accent:${group.color};`}
+							data-filter-chip={group.key}
+							aria-pressed="false"
+						>
+							<span class="skills-anchor-dot"></span>
+							<span>{group.label}</span>
+							<span class="skills-anchor-count">{group.count}</span>
+						</button>
+					))
+				}
+			</nav>
+
+			<section class="skills-sections">
+				{
+					groupedSkills.map((group) => (
+						<section
+							id={`skills-${group.key}`}
+							class="skills-category-section"
+							data-filter-section={group.key}
+						>
+							<SectionTitle title={group.label} count={group.count} />
+							<div class="skills-category-grid">
+								{group.items.map((skill) => <SkillCard skill={skill} />)}
+							</div>
+						</section>
+					))
+				}
+			</section>
+		</div>
+	</div>
+</MainGridLayout>
+
+<script is:inline>
+	(() => {
+		const initSkillsFilter = (root) => {
+			if (!(root instanceof HTMLElement)) return;
+
+			const nav = root.querySelector("[data-skills-filter-nav]");
+			if (!(nav instanceof HTMLElement) || nav.dataset.filterBound === "true") {
+				return;
+			}
+
+			const chips = Array.from(
+				root.querySelectorAll("[data-filter-chip]"),
+			).filter((chip) => chip instanceof HTMLButtonElement);
+			const sections = Array.from(
+				root.querySelectorAll("[data-filter-section]"),
+			).filter((section) => section instanceof HTMLElement);
+
+			if (chips.length === 0 || sections.length === 0) {
+				return;
+			}
+
+			const applyFilter = (filterKey) => {
+				const nextFilter = filterKey || "all";
+				root.dataset.activeFilter = nextFilter;
+
+				chips.forEach((chip) => {
+					const isActive = chip.dataset.filterChip === nextFilter;
+					chip.classList.toggle("is-active", isActive);
+					chip.setAttribute("aria-pressed", isActive ? "true" : "false");
+				});
+
+				sections.forEach((section) => {
+					const shouldShow =
+						nextFilter === "all" ||
+						section.dataset.filterSection === nextFilter;
+					section.toggleAttribute("hidden", !shouldShow);
+				});
+
+				requestAnimationFrame(() => {
+					initSkillDescriptionDetails();
+					updateSkillDescriptionPlacement();
+				});
+			};
+
+			nav.addEventListener("click", (event) => {
+				const target = event.target;
+				if (!(target instanceof Element)) return;
+
+				const chip = target.closest("[data-filter-chip]");
+				if (!(chip instanceof HTMLButtonElement)) return;
+
+				const selectedFilter = chip.dataset.filterChip || "all";
+				const currentFilter = root.dataset.activeFilter || "all";
+				const nextFilter =
+					selectedFilter === currentFilter && selectedFilter !== "all"
+						? "all"
+						: selectedFilter;
+
+				applyFilter(nextFilter);
+			});
+
+			nav.dataset.filterBound = "true";
+			applyFilter(root.dataset.activeFilter || "all");
+		};
+
+		const bootSkillsFilter = () => {
+			document
+				.querySelectorAll("[data-skills-filter-root]")
+				.forEach((root) => initSkillsFilter(root));
+		};
+
+		const updateSkillsHeroLayout = () => {
+			document.querySelectorAll("[data-skills-hero]").forEach((hero) => {
+				if (!(hero instanceof HTMLElement)) return;
+
+				const main = hero.querySelector(".skills-hero-main");
+				const mainWidth =
+					main instanceof HTMLElement ? main.clientWidth : hero.clientWidth;
+				const heroWidth = hero.clientWidth;
+
+				let layout = "compact";
+				if (mainWidth >= 580 || heroWidth >= 1240) {
+					layout = "wide";
+				} else if (mainWidth >= 460 || heroWidth >= 980) {
+					layout = "balanced";
+				}
+
+				hero.dataset.heroLayout = layout;
+			});
+		};
+
+		const observeSkillsHeroLayout = () => {
+			if (typeof ResizeObserver === "undefined") {
+				updateSkillsHeroLayout();
+				return;
+			}
+
+			window.__skillsHeroLayoutObserver?.disconnect();
+
+			const observer = new ResizeObserver(() => {
+				updateSkillsHeroLayout();
+			});
+
+			document.querySelectorAll("[data-skills-hero]").forEach((hero) => {
+				if (!(hero instanceof HTMLElement)) return;
+				observer.observe(hero);
+
+				const main = hero.querySelector(".skills-hero-main");
+				if (main instanceof HTMLElement) {
+					observer.observe(main);
+				}
+			});
+
+			window.__skillsHeroLayoutObserver = observer;
+			updateSkillsHeroLayout();
+		};
+
+		const parseSkillStartedAt = (startedAt) => {
+			const [yearText, monthText, dayText = "1"] = startedAt.split("-");
+			const year = Number(yearText);
+			const month = Number(monthText);
+			const day = Number(dayText);
+
+			if (
+				!Number.isFinite(year) ||
+				!Number.isFinite(month) ||
+				!Number.isFinite(day)
+			) {
+				return null;
+			}
+
+			return { year, month, day };
+		};
+
+		const getSkillExperienceFromDate = (startedAt, now = new Date()) => {
+			const parsed = parseSkillStartedAt(startedAt);
+			if (!parsed) {
+				return { years: 0, months: 0 };
+			}
+
+			let totalMonths =
+				(now.getFullYear() - parsed.year) * 12 +
+				(now.getMonth() + 1 - parsed.month);
+
+			if (now.getDate() < parsed.day) {
+				totalMonths -= 1;
+			}
+
+			totalMonths = Math.max(0, totalMonths);
+
+			return {
+				years: Math.floor(totalMonths / 12),
+				months: totalMonths % 12,
+			};
+		};
+
+		const updateRuntimeSkillExperience = () => {
+			document.querySelectorAll("[data-skill-experience]").forEach((element) => {
+				if (!(element instanceof HTMLElement)) return;
+
+				const startedAt = element.dataset.skillStartedAt;
+				if (!startedAt) return;
+
+				const yearsLabel = element.dataset.skillYearsLabel || "年";
+				const monthsLabel = element.dataset.skillMonthsLabel || "个月";
+				const ongoingLabel =
+					element.dataset.skillOngoingLabel || "持续学习中";
+				const { years, months } = getSkillExperienceFromDate(startedAt);
+				const parts = [];
+
+				if (years > 0) {
+					parts.push(`${years} ${yearsLabel}`);
+				}
+
+				if (months > 0) {
+					parts.push(`${months} ${monthsLabel}`);
+				}
+
+				element.textContent = parts.join(" ") || ongoingLabel;
+			});
+		};
+
+		const initSkillDescriptionDetails = () => {
+			document.querySelectorAll("[data-skill-details]").forEach((details) => {
+				if (!(details instanceof HTMLDetailsElement)) return;
+
+				const preview = details.querySelector("[data-skill-preview]");
+				const hint = details.querySelector("[data-skill-hint]");
+				const card = details.closest(".skill-card");
+				if (!(preview instanceof HTMLElement) || !(hint instanceof HTMLElement)) {
+					return;
+				}
+
+				const isTruncated =
+					preview.scrollHeight - preview.clientHeight > 1 ||
+					preview.scrollWidth - preview.clientWidth > 1;
+
+				details.dataset.truncated = isTruncated ? "true" : "false";
+				if (card instanceof HTMLElement) {
+					card.setAttribute("data-has-popover", isTruncated ? "true" : "false");
+				}
+				hint.hidden = !isTruncated;
+				details.toggleAttribute("data-disabled", !isTruncated);
+
+				if (!isTruncated) {
+					details.open = false;
+				}
+			});
+		};
+
+		const updateSkillDescriptionPlacement = () => {
+			document.querySelectorAll("[data-skill-details]").forEach((details) => {
+				if (!(details instanceof HTMLDetailsElement)) return;
+
+				const popover = details.querySelector(".skill-description-popover");
+				if (!(popover instanceof HTMLElement)) return;
+
+				if (details.dataset.truncated !== "true") {
+					details.dataset.popoverPlacement = "bottom";
+					return;
+				}
+
+				details.dataset.popoverPlacement = "bottom";
+
+				const triggerRect = details.getBoundingClientRect();
+				const popoverHeight = Math.max(
+					popover.offsetHeight,
+					popover.scrollHeight,
+					0,
+				);
+				const gap = 20;
+				const viewportHeight = window.innerHeight;
+				const spaceAbove = triggerRect.top;
+				const spaceBelow = viewportHeight - triggerRect.bottom;
+				const needsTopPlacement =
+					spaceBelow < popoverHeight + gap && spaceAbove > spaceBelow;
+
+				details.dataset.popoverPlacement = needsTopPlacement
+					? "top"
+					: "bottom";
+			});
+		};
+
+		const initSkillDetailsAccordion = () => {
+			document.querySelectorAll("[data-skill-details]").forEach((details) => {
+				if (!(details instanceof HTMLDetailsElement)) return;
+				if (details.dataset.accordionBound === "true") return;
+
+				details.addEventListener("click", (event) => {
+					if (details.dataset.truncated === "true") return;
+					event.preventDefault();
+				});
+
+				details.addEventListener("keydown", (event) => {
+					if (details.dataset.truncated === "true") return;
+					if (event.key === "Enter" || event.key === " ") {
+						event.preventDefault();
+					}
+				});
+
+				details.addEventListener("mouseenter", () => {
+					if (details.dataset.truncated !== "true") return;
+					updateSkillDescriptionPlacement();
+				});
+
+				details.addEventListener("focusin", () => {
+					if (details.dataset.truncated !== "true") return;
+					updateSkillDescriptionPlacement();
+				});
+
+				details.addEventListener("toggle", () => {
+					if (!details.open) return;
+					if (details.dataset.truncated !== "true") {
+						details.open = false;
+						return;
+					}
+
+					document.querySelectorAll("[data-skill-details]").forEach((other) => {
+						if (!(other instanceof HTMLDetailsElement)) return;
+						if (other === details) return;
+						other.open = false;
+					});
+
+					updateSkillDescriptionPlacement();
+				});
+
+				details.dataset.accordionBound = "true";
+			});
+
+			if (document.documentElement.dataset.skillDetailsOutsideBound === "true") {
+				return;
+			}
+
+			document.addEventListener("click", (event) => {
+				const target = event.target;
+				if (!(target instanceof Element)) return;
+				if (target.closest("[data-skill-details]")) return;
+
+				document.querySelectorAll("[data-skill-details]").forEach((details) => {
+					if (details instanceof HTMLDetailsElement) {
+						details.open = false;
+					}
+				});
+			});
+
+			document.documentElement.dataset.skillDetailsOutsideBound = "true";
+		};
+
+		const bootSkillsPageUi = () => {
+			bootSkillsFilter();
+			requestAnimationFrame(() => {
+				updateSkillsHeroLayout();
+				observeSkillsHeroLayout();
+				updateRuntimeSkillExperience();
+				initSkillDescriptionDetails();
+				updateSkillDescriptionPlacement();
+				initSkillDetailsAccordion();
+			});
+		};
+
+		if (document.readyState === "loading") {
+			document.addEventListener("DOMContentLoaded", bootSkillsPageUi, {
+				once: true,
+			});
+		} else {
+			bootSkillsPageUi();
+		}
+
+		window.addEventListener("resize", () => {
+			updateSkillsHeroLayout();
+			updateRuntimeSkillExperience();
+			initSkillDescriptionDetails();
+			updateSkillDescriptionPlacement();
+		});
+		window.addEventListener("load", () => {
+			updateSkillsHeroLayout();
+			updateRuntimeSkillExperience();
+			initSkillDescriptionDetails();
+			updateSkillDescriptionPlacement();
+		});
+		document.fonts?.ready.then(() => {
+			updateSkillsHeroLayout();
+			updateRuntimeSkillExperience();
+			initSkillDescriptionDetails();
+			updateSkillDescriptionPlacement();
+		});
+		document.addEventListener("astro:page-load", bootSkillsPageUi);
+		document.addEventListener("swup:contentReplaced", bootSkillsPageUi);
+	})();
+</script>
+
+<style>
+	.skills-hero {
+		position: relative;
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.25rem;
+		align-items: start;
+		margin-bottom: 1.5rem;
+		padding: 1.4rem;
+		border-radius: calc(var(--radius-large) + 0.35rem);
+		border: 1px solid color-mix(in oklch, var(--line-divider) 80%, white 20%);
+		background:
+			radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 34%),
+			radial-gradient(circle at bottom right, rgba(244, 114, 182, 0.12), transparent 36%),
+			linear-gradient(
+				145deg,
+				color-mix(in oklch, var(--card-bg) 95%, white 5%),
+				color-mix(in oklch, var(--card-bg) 88%, white 12%)
+			);
+		box-shadow: 0 20px 48px rgba(15, 23, 42, 0.08);
+		overflow: hidden;
+	}
+
+	.skills-hero-main {
+		position: relative;
+		z-index: 1;
+		min-width: 0;
+		display: grid;
+		align-content: start;
+	}
+
+	.skills-hero-eyebrow {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.38rem 0.78rem;
+		border-radius: 999px;
+		font-size: 0.76rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		font-weight: 800;
+		color: rgba(37, 99, 235, 0.95);
+		background: rgba(191, 219, 254, 0.72);
+	}
+
+	.skills-hero-title {
+		margin-top: 0.9rem;
+		font-size: clamp(1.62rem, 1.75vw + 1rem, 2.56rem);
+		line-height: 1.12;
+		font-weight: 900;
+		max-width: none;
+		width: 100%;
+		text-wrap: pretty;
+		word-break: normal;
+		overflow-wrap: normal;
+		hyphens: none;
+		letter-spacing: -0.03em;
+		color: rgba(15, 23, 42, 0.94);
+	}
+
+	.skills-hero[data-hero-layout="compact"] .skills-hero-title {
+		font-size: clamp(1.58rem, 1.4vw + 1rem, 2.18rem);
+	}
+
+	.skills-hero[data-hero-layout="wide"] .skills-hero-title {
+		font-size: clamp(1.78rem, 1.9vw + 1rem, 2.72rem);
+	}
+
+	.skills-hero-description {
+		margin-top: 0.95rem;
+		max-width: 65ch;
+		font-size: 1rem;
+		line-height: 1.85;
+		text-wrap: pretty;
+		color: rgba(15, 23, 42, 0.68);
+	}
+
+	.skills-hero-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.7rem;
+		margin-top: 1.2rem;
+	}
+
+	.skills-hero-tag {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.58rem 0.92rem;
+		border-radius: 999px;
+		border: 1px solid rgba(59, 130, 246, 0.16);
+		background: rgba(255, 255, 255, 0.72);
+		font-size: 0.92rem;
+		font-weight: 700;
+		color: rgba(15, 23, 42, 0.82);
+		backdrop-filter: blur(10px);
+	}
+
+	.skills-hero-spotlights {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0.9rem;
+		align-content: start;
+		min-width: 0;
+	}
+
+	.skills-spotlight-card {
+		--spotlight: #3B82F6;
+		position: relative;
+		min-width: 0;
+		padding: 1rem 1.05rem;
+		border-radius: 1.15rem;
+		background:
+			linear-gradient(135deg, color-mix(in srgb, var(--spotlight) 11%, white 89%), transparent),
+			color-mix(in oklch, var(--card-bg) 92%, white 8%);
+		border: 1px solid color-mix(in srgb, var(--spotlight) 18%, white 82%);
+		box-shadow: 0 14px 32px rgba(15, 23, 42, 0.05);
+	}
+
+	.skills-spotlight-top {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.skills-spotlight-kicker {
+		font-size: 0.76rem;
+		font-weight: 800;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: color-mix(in srgb, var(--spotlight) 80%, black 20%);
+	}
+
+	.skills-spotlight-name {
+		margin-top: 0.22rem;
+		font-size: 1.12rem;
+		font-weight: 800;
+		color: rgba(15, 23, 42, 0.9);
+	}
+
+	.skills-spotlight-exp {
+		flex-shrink: 0;
+		padding: 0.32rem 0.62rem;
+		border-radius: 999px;
+		font-size: 0.76rem;
+		font-weight: 700;
+		color: rgba(15, 23, 42, 0.66);
+		background: rgba(255, 255, 255, 0.72);
+	}
+
+	.skills-spotlight-text {
+		margin-top: 0.72rem;
+		font-size: 0.92rem;
+		line-height: 1.72;
+		color: rgba(15, 23, 42, 0.7);
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+
+	.skills-overview-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.25rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.skills-panel {
+		border-radius: calc(var(--radius-large) + 0.25rem);
+		border: 1px solid color-mix(in oklch, var(--line-divider) 80%, white 20%);
+		background:
+			linear-gradient(
+				180deg,
+				color-mix(in oklch, var(--card-bg) 92%, white 8%),
+				var(--card-bg)
+			);
+		padding: 1.5rem;
+		box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+	}
+
+	.skills-panel-head {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 1.25rem;
+	}
+
+	.skills-panel-dot {
+		width: 0.85rem;
+		height: 0.85rem;
+		border-radius: 999px;
+		flex-shrink: 0;
+	}
+
+	.skills-panel-title {
+		font-size: 1.75rem;
+		line-height: 1.15;
+		font-weight: 800;
+		color: rgba(15, 23, 42, 0.92);
+	}
+
+	:root.dark .skills-panel-title {
+		color: rgba(255, 255, 255, 0.92);
+	}
+
+	.skills-donut-layout {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.45rem;
+		align-items: center;
+		width: 100%;
+	}
+
+	.skills-donut-shell {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		padding: 1rem 0 0.35rem;
+		width: 100%;
+	}
+
+	.skills-donut-ring {
+		width: min(100%, clamp(16rem, 31vw, 21rem));
+		aspect-ratio: 1;
+		border-radius: 999px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		position: relative;
+	}
+
+	.skills-donut-core {
+		width: 58%;
+		aspect-ratio: 1;
+		border-radius: 999px;
+		background: var(--card-bg);
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+	}
+
+	.skills-donut-core strong {
+		font-size: 2.25rem;
+		line-height: 1;
+		font-weight: 800;
+		color: rgba(15, 23, 42, 0.92);
+	}
+
+	.skills-donut-core span {
+		margin-top: 0.35rem;
+		font-size: 0.95rem;
+		color: rgba(15, 23, 42, 0.54);
+	}
+
+	:root.dark .skills-donut-core strong {
+		color: rgba(255, 255, 255, 0.92);
+	}
+
+	:root.dark .skills-donut-core span {
+		color: rgba(255, 255, 255, 0.54);
+	}
+
+	.skills-legend-wrap {
+		width: 100%;
+		padding-inline: clamp(0.35rem, 1.2vw, 1rem);
+	}
+
+	.skills-legend-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.95rem;
+		width: 100%;
+	}
+
+	.skills-legend-item {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0.75rem;
+		padding: 1rem 1.15rem 0.95rem;
+		border-radius: 1rem;
+		background: color-mix(in oklch, var(--btn-regular-bg) 88%, white 12%);
+		min-width: 0;
+	}
+
+	.skills-legend-top,
+	.skills-legend-bottom {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.skills-legend-title {
+		font-size: 1.2rem;
+		line-height: 1.2;
+		font-weight: 800;
+		color: rgba(15, 23, 42, 0.92);
+		padding-right: 0.5rem;
+	}
+
+	.skills-legend-count {
+		font-size: 1.45rem;
+		line-height: 1;
+		font-weight: 800;
+		color: rgba(15, 23, 42, 0.9);
+	}
+
+	.skills-legend-signal {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55rem;
+	}
+
+	.skills-legend-dot {
+		width: 0.85rem;
+		height: 0.85rem;
+		border-radius: 999px;
+	}
+
+	.skills-legend-note {
+		font-size: 0.88rem;
+		font-weight: 600;
+		color: rgba(15, 23, 42, 0.58);
+	}
+
+	.skills-legend-percent {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: rgba(15, 23, 42, 0.56);
+		flex-shrink: 0;
+	}
+
+	:root.dark .skills-legend-title,
+	:root.dark .skills-legend-count {
+		color: rgba(255, 255, 255, 0.92);
+	}
+
+	:root.dark .skills-legend-note,
+	:root.dark .skills-legend-percent {
+		color: rgba(255, 255, 255, 0.62);
+	}
+
+	.skills-category-bars {
+		display: grid;
+		gap: 1rem;
+	}
+
+	.skills-category-bar-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		margin-bottom: 0.45rem;
+	}
+
+	.skills-category-bar-label {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.65rem;
+		font-size: 1rem;
+		font-weight: 700;
+		color: rgba(15, 23, 42, 0.9);
+	}
+
+	.skills-count-chip {
+		padding: 0.25rem 0.6rem;
+		border-radius: 999px;
+		background: rgba(244, 114, 182, 0.14);
+		color: rgba(190, 24, 93, 0.88);
+		font-size: 0.82rem;
+		font-weight: 700;
+	}
+
+	.skills-category-bar-percent {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: rgba(15, 23, 42, 0.62);
+	}
+
+	.skills-category-track {
+		height: 0.9rem;
+		border-radius: 999px;
+		background: rgba(244, 114, 182, 0.14);
+		overflow: hidden;
+	}
+
+	.skills-category-fill {
+		height: 100%;
+		border-radius: inherit;
+		transition: width 320ms ease;
+	}
+
+	.skills-stats-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1rem;
+		margin-top: 1.5rem;
+	}
+
+	.skills-stat-card {
+		padding: 1.1rem 1rem;
+		border-radius: 1.1rem;
+		border: 1px solid transparent;
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		min-height: 8rem;
+	}
+
+	.skills-stat-label,
+	.skills-stat-sub {
+		font-size: 0.95rem;
+		color: rgba(15, 23, 42, 0.62);
+	}
+
+	.skills-stat-value {
+		font-size: clamp(2rem, 4vw, 2.5rem);
+		line-height: 1;
+		font-weight: 800;
+	}
+
+	.skills-focus-strip {
+		margin-top: 1rem;
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0.75rem;
+	}
+
+	.skills-focus-item {
+		border-radius: 1rem;
+		padding: 0.95rem 1rem;
+		background: color-mix(in oklch, var(--btn-regular-bg) 90%, white 10%);
+		border: 1px solid rgba(15, 23, 42, 0.05);
+	}
+
+	.skills-focus-label {
+		display: block;
+		font-size: 0.85rem;
+		color: rgba(15, 23, 42, 0.52);
+		margin-bottom: 0.3rem;
+	}
+
+	.skills-focus-value {
+		font-size: 1rem;
+		font-weight: 700;
+		color: rgba(15, 23, 42, 0.9);
+	}
+
+	.skills-anchor-nav {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		margin-bottom: 2rem;
+	}
+
+	.skills-anchor-chip {
+		--chip-accent: var(--primary);
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.7rem 1rem;
+		border-radius: 999px;
+		background: color-mix(in oklch, var(--btn-regular-bg) 88%, white 12%);
+		border: 1px solid color-mix(in oklch, var(--chip-accent) 24%, white 76%);
+		color: rgba(15, 23, 42, 0.82);
+		font-size: 0.95rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			transform 180ms ease,
+			border-color 180ms ease,
+			background-color 180ms ease,
+			box-shadow 180ms ease,
+			color 180ms ease;
+	}
+
+	.skills-anchor-chip:hover {
+		transform: translateY(-1px);
+		border-color: color-mix(in oklch, var(--chip-accent) 48%, white 52%);
+	}
+
+	.skills-anchor-chip.is-active {
+		background: color-mix(in oklch, var(--chip-accent) 14%, white 86%);
+		border-color: color-mix(in oklch, var(--chip-accent) 55%, white 45%);
+		box-shadow: 0 10px 26px color-mix(in srgb, var(--chip-accent) 18%, transparent);
+		color: color-mix(in srgb, var(--chip-accent) 66%, black 34%);
+	}
+
+	.skills-anchor-chip:focus-visible {
+		outline: 2px solid color-mix(in oklch, var(--chip-accent) 55%, white 45%);
+		outline-offset: 2px;
+	}
+
+	.skills-anchor-dot {
+		width: 0.55rem;
+		height: 0.55rem;
+		border-radius: 999px;
+		background: var(--chip-accent);
+	}
+
+	.skills-anchor-count {
+		padding: 0.12rem 0.45rem;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.72);
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: rgba(15, 23, 42, 0.6);
+	}
+
+	.skills-anchor-chip.is-active .skills-anchor-count {
+		background: rgba(255, 255, 255, 0.82);
+		color: color-mix(in srgb, var(--chip-accent) 72%, black 28%);
+	}
+
+	:root.dark .skills-hero {
+		background:
+			radial-gradient(circle at top left, rgba(59, 130, 246, 0.2), transparent 34%),
+			radial-gradient(circle at bottom right, rgba(244, 114, 182, 0.16), transparent 38%),
+			linear-gradient(145deg, rgba(17, 24, 39, 0.96), rgba(15, 23, 42, 0.88));
+		border-color: rgba(148, 163, 184, 0.16);
+		box-shadow: 0 20px 48px rgba(2, 6, 23, 0.32);
+	}
+
+	:root.dark .skills-hero-eyebrow {
+		color: rgba(191, 219, 254, 0.96);
+		background: rgba(37, 99, 235, 0.24);
+	}
+
+	:root.dark .skills-hero-title,
+	:root.dark .skills-spotlight-name,
+	:root.dark .skills-category-bar-label,
+	:root.dark .skills-focus-value,
+	:root.dark .skills-anchor-chip {
+		color: rgba(255, 255, 255, 0.92);
+	}
+
+	:root.dark .skills-hero-description,
+	:root.dark .skills-spotlight-text,
+	:root.dark .skills-category-bar-percent,
+	:root.dark .skills-stat-label,
+	:root.dark .skills-stat-sub,
+	:root.dark .skills-focus-label,
+	:root.dark .skills-anchor-count {
+		color: rgba(255, 255, 255, 0.64);
+	}
+
+	:root.dark .skills-hero-tag,
+	:root.dark .skills-spotlight-exp {
+		background: rgba(15, 23, 42, 0.56);
+		color: rgba(255, 255, 255, 0.84);
+	}
+
+	:root.dark .skills-spotlight-card {
+		background:
+			linear-gradient(135deg, color-mix(in srgb, var(--spotlight) 18%, transparent), transparent),
+			rgba(15, 23, 42, 0.58);
+		border-color: color-mix(in srgb, var(--spotlight) 26%, rgba(255, 255, 255, 0.16));
+	}
+
+	:root.dark .skills-anchor-chip {
+		background: rgba(15, 23, 42, 0.5);
+	}
+
+	:root.dark .skills-anchor-chip.is-active {
+		background: color-mix(in srgb, var(--chip-accent) 24%, rgba(15, 23, 42, 0.76));
+		color: rgba(255, 255, 255, 0.94);
+	}
+
+	.skills-sections {
+		display: grid;
+		gap: 2rem;
+		position: relative;
+		z-index: 1;
+		padding-bottom: clamp(1rem, 2vw, 1.8rem);
+	}
+
+	.skills-category-section {
+		scroll-margin-top: calc(var(--sidebar-sticky-top) + 1rem);
+	}
+
+	.skills-category-section:last-child {
+		padding-bottom: clamp(0.5rem, 1.4vw, 1rem);
+	}
+
+	.skills-category-section[hidden] {
+		display: none !important;
+	}
+
+	.skills-category-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1rem;
+		position: relative;
+		z-index: 1;
+	}
+
+	@media (min-width: 768px) {
+		.skills-hero {
+			grid-template-columns: minmax(0, 1.52fr) minmax(18.2rem, 0.92fr);
+			padding: 1.75rem;
+			gap: 1.5rem;
+		}
+
+		.skills-overview-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.skills-category-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 1.25rem;
+		}
+	}
+
+	@media (min-width: 1024px) {
+		.skills-focus-strip {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+
+	@media (max-width: 767px) {
+		.skills-hero {
+			padding: 1.1rem;
+		}
+
+		.skills-hero-title {
+			max-width: none;
+			font-size: clamp(1.5rem, 5.5vw, 2.02rem);
+			line-height: 1.14;
+		}
+
+		.skills-hero-description {
+			font-size: 0.95rem;
+			line-height: 1.72;
+		}
+
+		.skills-spotlight-top {
+			flex-direction: column;
+			gap: 0.55rem;
+		}
+
+		.skills-panel {
+			padding: 1.15rem;
+		}
+
+		.skills-panel-title {
+			font-size: 1.35rem;
+		}
+
+		.skills-donut-ring {
+			width: min(100%, 16rem);
+		}
+
+		.skills-legend-wrap {
+			padding-inline: 0;
+		}
+
+		.skills-legend-grid {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 0.8rem;
+		}
+
+		.skills-legend-item {
+			padding: 0.88rem 0.9rem 0.82rem;
+		}
+
+		.skills-legend-title {
+			font-size: 1rem;
+		}
+
+		.skills-legend-count {
+			font-size: 1.2rem;
+		}
+
+		.skills-legend-note,
+		.skills-legend-percent {
+			font-size: 0.82rem;
+		}
+
+		.skills-stats-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.skills-anchor-nav {
+			gap: 0.5rem;
+		}
+
+		.skills-anchor-chip {
+			padding: 0.6rem 0.85rem;
+			font-size: 0.88rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.skills-category-fill,
+		.skills-anchor-chip {
+			transition: none;
+		}
+	}
+</style>

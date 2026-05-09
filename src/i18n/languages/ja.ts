@@ -329,6 +329,7 @@ export const ja: Translation = {
 	[Key.siteStatsCategoryCount]: "カテゴリー",
 	[Key.siteStatsTagCount]: "タグ",
 	[Key.siteStatsTotalWords]: "文字数の合計",
+	[Key.siteStatsTotalViews]: "総閲覧数",
 	[Key.siteStatsRunningDays]: "稼働日数",
 	[Key.siteStatsLastUpdate]: "最終更新",
 	[Key.siteStatsDaysAgo]: "{days}日前",
@@ -375,6 +376,7 @@ export const ja: Translation = {
 	// ページビューの統計
 	[Key.pageViewsLoading]: "統計を読み込み中...",
 	[Key.pageViewsUnavailable]: "統計は利用できません",
+	[Key.pageViewsLabel]: "閲覧数",
 
 	// レイアウト切り替えボタン
 	[Key.switchToGridMode]: "グリッド表示に切り替え",

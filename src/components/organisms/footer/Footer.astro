@@ -2,6 +2,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { Icon } from "astro-icon/components";
 import { footerConfig, profileConfig } from "../../../config";
 import { url } from "../../../utils/url-utils";
 
@@ -69,11 +70,23 @@ if (footerConfig.enable) {
 			transform 0.2s ease;
 	}
 
+	:root.dark .footer-record {
+		background: color-mix(in oklab, rgb(255 255 255 / 0.07) 78%, var(--primary) 22%);
+		border-color: color-mix(in oklab, rgb(255 255 255 / 0.2) 55%, var(--primary) 45%);
+		color: rgb(255 255 255 / 0.9);
+	}
+
 	.footer-record:hover {
 		color: var(--primary);
 		border-color: color-mix(in oklab, var(--primary) 38%, transparent);
 		background: color-mix(in oklab, var(--btn-hover-bg) 90%, white 10%);
 		transform: translateY(-1px);
+	}
+
+	:root.dark .footer-record:hover {
+		color: rgb(255 255 255 / 0.98);
+		border-color: color-mix(in oklab, rgb(255 255 255 / 0.34) 50%, var(--primary) 50%);
+		background: color-mix(in oklab, rgb(255 255 255 / 0.12) 70%, var(--primary) 30%);
 	}
 
 	.footer-record-badge {
@@ -88,10 +101,129 @@ if (footerConfig.enable) {
 		font-weight: 600;
 	}
 
+	:root.dark .footer-record-badge {
+		background: color-mix(in oklab, var(--primary) 22%, rgb(255 255 255 / 0.08));
+		color: rgb(255 224 193 / 0.98);
+	}
+
 	.footer-record-police-icon {
 		width: 0.95rem;
 		height: 0.95rem;
 		flex-shrink: 0;
+	}
+
+	.footer-site-stats {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.75rem;
+		margin: 0.2rem auto 0.95rem;
+		padding: 0.75rem 1rem;
+		border-radius: 1.1rem;
+		border: 1px dashed color-mix(in oklab, var(--primary) 18%, transparent);
+		background:
+			linear-gradient(
+				135deg,
+				color-mix(in oklab, var(--btn-regular-bg) 90%, white 10%),
+				color-mix(in oklab, var(--card-bg, white) 94%, var(--primary) 6%)
+			);
+		color: color-mix(in oklab, var(--text-color, rgb(15 23 42 / 0.82)) 78%, var(--primary) 22%);
+		font-size: 0.84rem;
+		line-height: 1.35;
+		width: fit-content;
+		max-width: 100%;
+		box-shadow: 0 10px 24px rgb(15 23 42 / 0.04);
+	}
+
+	:root.dark .footer-site-stats {
+		background:
+			linear-gradient(
+				135deg,
+				color-mix(in oklab, rgb(255 255 255 / 0.08) 72%, var(--primary) 28%),
+				color-mix(in oklab, rgb(255 255 255 / 0.04) 78%, var(--primary) 22%)
+			);
+		border-color: color-mix(in oklab, rgb(255 255 255 / 0.18) 55%, var(--primary) 45%);
+		color: rgb(255 255 255 / 0.9);
+		box-shadow: 0 12px 28px rgb(0 0 0 / 0.16);
+	}
+
+	.footer-site-stats-icon {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.65rem;
+		height: 1.65rem;
+		border-radius: 9999px;
+		background: color-mix(in oklab, var(--primary) 14%, transparent);
+		color: var(--primary);
+		flex-shrink: 0;
+	}
+
+	:root.dark .footer-site-stats-icon {
+		background: color-mix(in oklab, rgb(255 255 255 / 0.12) 62%, var(--primary) 38%);
+		color: rgb(255 224 193 / 0.98);
+	}
+
+	.footer-site-stats-icon :global(svg) {
+		width: 1rem;
+		height: 1rem;
+	}
+
+	.footer-site-stats-label {
+		font-weight: 600;
+		letter-spacing: 0.01em;
+		color: color-mix(in oklab, var(--primary) 72%, var(--text-color, rgb(15 23 42 / 0.85)) 28%);
+	}
+
+	:root.dark .footer-site-stats-label {
+		color: rgb(255 244 235 / 0.96);
+	}
+
+	.footer-site-stats-metrics {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		align-items: center;
+		gap: 0.45rem;
+		min-width: 0;
+	}
+
+	.footer-site-stat-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.32rem 0.62rem;
+		border-radius: 9999px;
+		background: color-mix(in oklab, var(--card-bg, white) 90%, var(--primary) 10%);
+		border: 1px solid color-mix(in oklab, var(--primary) 10%, transparent);
+		white-space: nowrap;
+	}
+
+	:root.dark .footer-site-stat-chip {
+		background: color-mix(in oklab, rgb(255 255 255 / 0.08) 72%, transparent);
+		border-color: color-mix(in oklab, rgb(255 255 255 / 0.16) 52%, var(--primary) 48%);
+	}
+
+	.footer-site-stat-name {
+		color: color-mix(in oklab, var(--text-color, rgb(15 23 42 / 0.6)) 78%, transparent);
+	}
+
+	:root.dark .footer-site-stat-name {
+		color: rgb(255 255 255 / 0.78);
+	}
+
+	.footer-site-stat-value {
+		font-weight: 600;
+		color: color-mix(in oklab, var(--primary) 68%, var(--text-color, rgb(15 23 42 / 0.86)) 32%);
+		font-variant-numeric: tabular-nums;
+	}
+
+	:root.dark .footer-site-stat-value {
+		color: rgb(255 232 211 / 0.98);
+	}
+
+	.footer-site-stats.is-loading .footer-site-stat-value {
+		opacity: 0.72;
 	}
 
 	@media (max-width: 767px) {
@@ -106,6 +238,56 @@ if (footerConfig.enable) {
 			border-radius: 1rem;
 			padding: 0.55rem 0.9rem;
 		}
+
+		.footer-site-stats {
+			gap: 0.45rem;
+			margin: 0.1rem auto 0.8rem;
+			padding: 0.58rem 0.68rem;
+			border-radius: 0.95rem;
+			font-size: 0.76rem;
+			line-height: 1.25;
+			width: fit-content;
+			max-width: min(100%, 22rem);
+			box-shadow: 0 8px 18px rgb(15 23 42 / 0.035);
+			flex-wrap: nowrap;
+		}
+
+		.footer-site-stats-icon {
+			width: 1.35rem;
+			height: 1.35rem;
+		}
+
+		.footer-site-stats-icon :global(svg) {
+			width: 0.82rem;
+			height: 0.82rem;
+		}
+
+		.footer-site-stats-label {
+			display: none;
+		}
+
+		.footer-site-stats-metrics {
+			gap: 0.3rem;
+			flex-wrap: nowrap;
+			overflow-x: auto;
+			scrollbar-width: none;
+			-webkit-overflow-scrolling: touch;
+			max-width: 100%;
+		}
+
+		.footer-site-stats-metrics::-webkit-scrollbar {
+			display: none;
+		}
+
+		.footer-site-stat-chip {
+			gap: 0.24rem;
+			padding: 0.2rem 0.42rem;
+			font-size: 0.72rem;
+		}
+
+		.footer-site-stat-name {
+			letter-spacing: -0.01em;
+		}
 	}
 </style>
 <!--<div class="transition bg-[oklch(92%_0.01_var(--hue))] dark:bg-black rounded-2xl py-8 mt-4 mb-8 flex flex-col items-center justify-center px-6">-->
@@ -114,6 +296,39 @@ if (footerConfig.enable) {
 >
 	<div class="transition text-50 text-sm text-center">
 		{customFooterHtml && <div class="mb-2" set:html={customFooterHtml} />}
+
+		<div class="footer-site-stats">
+			<span class="footer-site-stats-icon" aria-hidden="true">
+				<Icon name="material-symbols:query-stats-rounded" />
+			</span>
+			<span class="footer-site-stats-label">本站统计</span>
+			<div class="footer-site-stats-metrics">
+				<span class="footer-site-stat-chip">
+					<span class="footer-site-stat-name">浏览量</span>
+					<span
+						class="footer-site-stat-value"
+						data-footer-stat="pageviews"
+						>--</span
+					>
+				</span>
+				<span class="footer-site-stat-chip">
+					<span class="footer-site-stat-name">访客数</span>
+					<span
+						class="footer-site-stat-value"
+						data-footer-stat="visitors"
+						>--</span
+					>
+				</span>
+				<span class="footer-site-stat-chip">
+					<span class="footer-site-stat-name">访问次数</span>
+					<span
+						class="footer-site-stat-value"
+						data-footer-stat="visits"
+						>--</span
+					>
+				</span>
+			</div>
+		</div>
 
 		<div class="mb-2">
 			<span class="block md:inline">
@@ -161,3 +376,177 @@ if (footerConfig.enable) {
 		</div>
 	</div>
 </div>
+
+<script is:inline>
+	function initFooterSiteStats() {
+		const getContainers = () =>
+			Array.from(document.querySelectorAll(".footer-site-stats"));
+		const containers = getContainers();
+
+		if (containers.length === 0) {
+			return;
+		}
+
+		const state =
+			window.__mizukiFooterSiteStatsState ||
+			(window.__mizukiFooterSiteStatsState = {
+				fetching: false,
+				lastValues: null,
+				render: null,
+			});
+
+		const renderPlaceholder = () => {
+			getContainers().forEach((container) => {
+				const pageviewsText = container.querySelector(
+					'[data-footer-stat="pageviews"]',
+				);
+				const visitorsText = container.querySelector(
+					'[data-footer-stat="visitors"]',
+				);
+				const visitsText = container.querySelector(
+					'[data-footer-stat="visits"]',
+				);
+
+				if (pageviewsText) {
+					pageviewsText.textContent = "--";
+				}
+				if (visitorsText) {
+					visitorsText.textContent = "--";
+				}
+				if (visitsText) {
+					visitsText.textContent = "--";
+				}
+				container.classList.add("is-loading");
+			});
+		};
+
+		const applyStats = (values) => {
+			getContainers().forEach((container) => {
+				const pageviewsText = container.querySelector(
+					'[data-footer-stat="pageviews"]',
+				);
+				const visitorsText = container.querySelector(
+					'[data-footer-stat="visitors"]',
+				);
+				const visitsText = container.querySelector(
+					'[data-footer-stat="visits"]',
+				);
+
+				if (pageviewsText) {
+					pageviewsText.textContent = String(values.pageviews);
+				}
+				if (visitorsText) {
+					visitorsText.textContent = String(values.visitors);
+				}
+				if (visitsText) {
+					visitsText.textContent = String(values.visits);
+				}
+				container.classList.remove("is-loading");
+			});
+		};
+
+		state.render = (values) => {
+			if (values) {
+				applyStats(values);
+			} else {
+				renderPlaceholder();
+			}
+		};
+
+		if (state.lastValues) {
+			state.render(state.lastValues);
+		} else {
+			state.render(null);
+		}
+
+		if (!state.refresh) {
+			state.refresh = async () => {
+				if (state.fetching) {
+					return;
+				}
+
+				state.fetching = true;
+				const maxRetries = 8;
+				const retryDelay = 700;
+
+				try {
+					for (let attempt = 0; attempt <= maxRetries; attempt++) {
+						if (!window.oddmisc?.getSiteStats) {
+							if (attempt < maxRetries) {
+								await new Promise((resolve) =>
+									window.setTimeout(resolve, retryDelay),
+								);
+								continue;
+							}
+							break;
+						}
+
+						try {
+							const stats = await window.oddmisc.getSiteStats();
+							const values = {
+								pageviews: stats.pageviews ?? 0,
+								visitors: stats.visitors ?? 0,
+								visits: stats.visits ?? 0,
+							};
+
+							if (
+								values.pageviews === 0 &&
+								values.visitors === 0 &&
+								values.visits === 0 &&
+								attempt < maxRetries
+							) {
+								window.oddmisc.clearCache?.();
+								await new Promise((resolve) =>
+									window.setTimeout(resolve, retryDelay),
+								);
+								continue;
+							}
+
+							state.lastValues = values;
+							state.render?.(values);
+							return;
+						} catch (error) {
+							if (attempt < maxRetries) {
+								await new Promise((resolve) =>
+									window.setTimeout(resolve, retryDelay),
+								);
+								continue;
+							}
+
+							console.error(
+								"Error fetching footer site stats:",
+								error,
+							);
+						}
+					}
+
+					if (state.lastValues) {
+						state.render?.(state.lastValues);
+					} else {
+						state.render?.(null);
+					}
+				} finally {
+					state.fetching = false;
+				}
+			};
+		}
+
+		state.refresh();
+	}
+
+	if (document.readyState === "loading") {
+		document.addEventListener("DOMContentLoaded", initFooterSiteStats, {
+			once: true,
+		});
+	} else {
+		initFooterSiteStats();
+	}
+
+	window.addEventListener("mizuki:umami-ready", () => {
+		initFooterSiteStats();
+	});
+
+	document.addEventListener("astro:page-load", () => {
+		initFooterSiteStats();
+	});
+</script>

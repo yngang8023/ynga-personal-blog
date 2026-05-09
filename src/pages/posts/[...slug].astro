@@ -10,7 +10,11 @@ import {
 	RelatedPosts,
 	ShareCard,
 } from "@components/features/posts";
-import { ReadingTime, WordCount } from "@components/features/posts/atoms";
+import {
+	PageViews,
+	ReadingTime,
+	WordCount,
+} from "@components/features/posts/atoms";
 import License from "@components/misc/License.astro";
 import Markdown from "@components/misc/Markdown.astro";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
@@ -186,6 +190,8 @@ const jsonLd = {
 		: siteConfig.lang.replace("_", "-"),
 	// TODO include cover image here
 };
+
+const postPath = Astro.url.pathname;
 ---
 
 <MainGridLayout
@@ -233,6 +239,9 @@ const jsonLd = {
 						variant="card"
 					/>
 				</div>
+				<div class="flex flex-row items-center">
+					<PageViews id={entry.id} />
+				</div>
 			</div>
 
 			<!-- title -->
@@ -260,7 +269,9 @@ const jsonLd = {
 					tags={entry.data.tags}
 					category={entry.data.category || undefined}
 					id={entry.id}
+					path={postPath}
 					showEncrypted={isEncrypted}
+					showPageViews={false}
 				/>
 				{
 					(!entry.data.image ||
@@ -347,14 +358,14 @@ const jsonLd = {
 		</div>
 	</div>
 
-	<!-- 评论 -->
-	<Comment post={entry} />
-
 	{
 		siteConfig.showLastModified && (
 			<LastModified updatedDate={reliableLastModifiedDate} />
 		)
 	}
+
+	<!-- 评论 -->
+	<Comment post={entry} />
 
 	<PostNavigation
 		prevSlug={entry.data.nextSlug}

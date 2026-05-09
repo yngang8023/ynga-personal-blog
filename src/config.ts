@@ -23,6 +23,15 @@ import { LinkPreset } from "./types/config";
 // 定义站点语言
 const SITE_LANG = "zh_CN"; // 语言代码，例如：'en', 'zh_CN', 'ja' 等。
 const SITE_TIMEZONE = 8; //设置你的网站时区 from -12 to 12 default in UTC+8
+
+export const umamiConfig = {
+	enable: true,
+	trackInDev: false, // 是否在开发环境下启用统计
+	shareUrl: "https://cloud.umami.is/analytics/us/share/VXfzKN9KrGekRNdd",
+	scriptUrl: "https://cloud.umami.is/script.js",
+	websiteId: "c32f806f-e719-4b51-89e7-64b7cd3085cb",
+};
+
 export const siteConfig: SiteConfig = {
 	title: "HiYngaの随✏️记",
 	subtitle:
@@ -293,6 +302,12 @@ export const navBarConfig: NavBarConfig = {
 					external: true,
 					icon: "simple-icons:gitee",
 				},
+				{
+					name: "数据统计",
+					url: umamiConfig.shareUrl,
+					external: true,
+					icon: "material-symbols:query-stats",
+				},
 			],
 		},
 		{
@@ -389,6 +404,11 @@ export const profileConfig: ProfileConfig = {
 			icon: "fa7-brands:github",
 			url: "https://github.com/yngang8023",
 		},
+		{
+			name: "RSS",
+			icon: "material-symbols:rss-feed-rounded",
+			url: "/rss/",
+		},
 	],
 };
 
@@ -435,8 +455,8 @@ export const expressiveCodeConfig: ExpressiveCodeConfig = {
 };
 
 export const commentConfig: CommentConfig = {
-	enable: false, // 启用评论功能。当设置为 false 时，评论组件将不会显示在文章区域。
-	system: "twikoo", // 评论系统选择: "twikoo" | "giscus"
+	enable: true, // 启用评论功能。当设置为 false 时，评论组件将不会显示在文章区域。
+	system: "waline", // 评论系统选择: "twikoo" | "giscus" | "waline"
 	twikoo: {
 		envId: "",
 		lang: SITE_LANG,
@@ -454,6 +474,48 @@ export const commentConfig: CommentConfig = {
 		theme: "preferred_color_scheme",
 		lang: SITE_LANG,
 		loading: "lazy",
+	},
+	waline: {
+		serverURL: "https://ynga-blog-waline.vercel.app/",
+		lang: "zh-CN",
+		meta: ["nick", "mail", "link"],
+		requiredMeta: ["nick", "mail"],
+		wordLimit: [5, 1000],
+		pageSize: 10,
+		commentSorting: "latest",
+		dark: ".dark",
+		login: "enable",
+		noCopyright: false,
+		noRss: false,
+		reaction: [
+			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f44d.svg",
+			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f970.svg",
+			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f389.svg",
+			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f525.svg",
+			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f31f.svg",
+			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f44f.svg",
+			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f917.svg",
+			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f92f.svg",
+		],
+		emoji: [
+			"//unpkg.com/@waline/emojis@1.4.0/bmoji",
+			"//unpkg.com/@waline/emojis@1.4.0/qq",
+			"//unpkg.com/@waline/emojis@1.4.0/weibo",
+			"//unpkg.com/@waline/emojis@1.4.0/tieba",
+			"//unpkg.com/@waline/emojis@1.4.0/bilibili",
+			"//unpkg.com/@waline/emojis@1.4.0/alus",
+		],
+		pageview: true,
+		comment: true,
+		search: false,
+		turnstileKey:
+			import.meta.env.PUBLIC_WALINE_TURNSTILE_KEY || undefined,
+		locale: {
+			placeholder:
+				"欢迎留下你的想法，也可以分享这篇内容带给你的感受。",
+			sofa: "还没有评论，来坐第一个沙发吧。",
+			reactionTitle: "你认为这篇文章怎么样？",
+		},
 	},
 };
 
@@ -479,11 +541,16 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	showFloatingPlayer: true, // 显示悬浮播放器 UI
 	floatingEntryMode: "fab", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
 	// floatingEntryMode: "default", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
-	mode: "local", // 音乐播放器模式，可选 "local" 或 "meting"
-	meting_api:
-		"https://meting.mysqil.com/api?server=:server&type=:type&id=:id&auth=:auth&r=:r", // Meting API 地址
+	mode: "meting", // 音乐播放器模式，可选 "local" 或 "meting"
+	meting_api: [
+		"https://meting-api-alpha-snowy.vercel.app/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
+		"https://meting.mysqil.com/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
+		"https://api.injahow.cn/meting/?server=:server&type=:type&id=:id&auth=:auth&r=:r",
+		"https://meting-api-omega.vercel.app/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
+	], // Meting API 地址，按顺序自动兜底切换
 	// id: "3778678", // 歌单ID
-	id: "14164869977", // 歌单ID
+	// id: "14164869977", // 歌单ID
+	id: "2996592506", // 歌单ID
 	server: "netease", // 音乐源服务器。有的meting的api源支持更多平台,一般来说,netease=网易云音乐, tencent=QQ音乐, kugou=酷狗音乐, xiami=虾米音乐, baidu=百度音乐
 	type: "playlist", // 播单类型
 };
@@ -712,4 +779,6 @@ export const widgetConfigs = {
 	randomPosts: randomPostsConfig,
 } as const;
 
-// umamiConfig相关配置已移动至astro.config.mjs中,统计脚本请自行在Layout.astro文件的<head>中插入
+// Umami 统计分为两层：
+// 1. Layout.astro 中注入官方 tracking script，负责真实上报访问量
+// 2. UmamiStatsRuntime.astro 负责读取分享统计数据，并兼容注入到 window.oddmisc 接口

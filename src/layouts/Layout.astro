@@ -4,7 +4,12 @@ import MusicPlayer from "@components/widgets/music-player/MusicPlayer.svelte";
 import ExternalLinkModal from "@components/widgets/common/ExternalLinkModal.svelte";
 import Pio from "@components/features/pio/Pio.svelte"; // 使用 Svelte 版本的 Pio 组件
 import { PageProgressBar } from "@components/control/PageProgressBar";
-import { pioConfig, profileConfig, siteConfig } from "@/config";
+import {
+	pioConfig,
+	profileConfig,
+	siteConfig,
+	umamiConfig,
+} from "@/config";
 
 const BANNER_HEIGHT = 35;
 const BANNER_HEIGHT_EXTEND = 30;
@@ -22,6 +27,8 @@ import "../styles/panel-animations.css";
 // 导入新提取的 Head 组件
 import AnalyticsScripts from "./partials/AnalyticsScripts.astro";
 import HeadTags from "./partials/HeadTags.astro";
+import UmamiStatsRuntime from "./partials/UmamiStatsRuntime.astro";
+import WalineRuntime from "./partials/WalineRuntime.astro";
 
 interface Props {
 	title?: string;
@@ -68,6 +75,9 @@ const navbarTransparentMode =
 // 判断是否应该显示顶部高光效果（只在full和semifull模式下显示）
 const shouldShowTopHighlight =
 	navbarTransparentMode === "full" || navbarTransparentMode === "semifull";
+const shouldLoadUmamiScript =
+	umamiConfig.enable &&
+	(import.meta.env.PROD || umamiConfig.trackInDev);
 
 // 获取默认banner图片的辅助函数
 const getDefaultBanner = (): string => {
@@ -193,6 +203,20 @@ if (siteConfig.font) {
 			setOGTypeArticle={setOGTypeArticle}
 			configHue={configHue}
 		/>
+
+		{
+			shouldLoadUmamiScript && (
+				<script
+					is:inline
+					defer
+					src={umamiConfig.scriptUrl}
+					data-website-id={umamiConfig.websiteId}
+				></script>
+			)
+		}
+
+		<UmamiStatsRuntime />
+		<WalineRuntime />
 
 		<!-- defines global css variables. This will be applied to <html> <body> and some other elements idk why -->
 		<slot name="head" />

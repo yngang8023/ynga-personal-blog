@@ -98,6 +98,9 @@ const { remarkPluginFrontmatter } = await render(entry);
 			showOnlyBasicMeta={true}
 			words={remarkPluginFrontmatter.words}
 			showWordCount={true}
+			id={entry.id}
+			showPageViews={true}
+			path={url}
 		/>
 
 		<div

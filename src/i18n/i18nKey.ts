@@ -298,6 +298,7 @@ enum I18nKey {
 	siteStatsCategoryCount = "siteStatsCategoryCount",
 	siteStatsTagCount = "siteStatsTagCount",
 	siteStatsTotalWords = "siteStatsTotalWords",
+	siteStatsTotalViews = "siteStatsTotalViews",
 	siteStatsRunningDays = "siteStatsRunningDays",
 	siteStatsLastUpdate = "siteStatsLastUpdate",
 	siteStatsDaysAgo = "siteStatsDaysAgo",
@@ -343,6 +344,7 @@ enum I18nKey {
 	// 页面访问量统计
 	pageViewsLoading = "pageViewsLoading",
 	pageViewsUnavailable = "pageViewsUnavailable",
+	pageViewsLabel = "pageViewsLabel",
 
 	// 布局切换按钮
 	switchToGridMode = "switchToGridMode",

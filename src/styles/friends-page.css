@@ -1,0 +1,540 @@
+#friend-search:focus {
+	box-shadow: 0 0 0 3px var(--primary) / 0.1;
+}
+
+.filter-container {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.filter-tag {
+	padding: 0.5rem 1rem;
+	border: 1px solid var(--line-divider);
+	border-radius: var(--radius-large);
+	background: var(--btn-regular-bg);
+	color: var(--btn-content);
+	font-size: 0.875rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	white-space: nowrap;
+}
+
+.filter-tag:hover:not(.active) {
+	background: var(--btn-hover-bg);
+	border-color: var(--primary);
+	transform: translateY(-1px);
+}
+
+.filter-tag.active {
+	background: var(--primary);
+	color: white;
+	border-color: var(--primary);
+}
+
+.filter-tag.active:hover {
+	background: var(--primary) !important;
+	color: white !important;
+	border-color: var(--primary) !important;
+	transform: translateY(-1px);
+}
+
+.friends-guide {
+	display: grid;
+	gap: 1.5rem;
+}
+
+.friends-guide-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 1.5rem;
+}
+
+.friends-guide-card {
+	border-radius: 1.35rem;
+	padding: 1.2rem;
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in oklab, var(--card-bg) 94%, white 6%),
+			color-mix(in oklab, var(--card-bg) 88%, var(--primary) 12%)
+		);
+	border: 1px solid color-mix(in oklab, var(--line-divider) 78%, white 22%);
+	box-shadow:
+		0 14px 30px rgb(15 23 42 / 0.05),
+		inset 0 1px 0 rgb(255 255 255 / 0.72);
+	backdrop-filter: blur(12px);
+}
+
+.dark .friends-guide-card {
+	background:
+		linear-gradient(
+			180deg,
+			color-mix(in oklab, var(--card-bg) 94%, white 6%),
+			color-mix(in oklab, var(--card-bg) 82%, var(--primary) 18%)
+		);
+	border-color: color-mix(in oklab, var(--line-divider) 82%, white 18%);
+	box-shadow:
+		0 18px 38px rgb(0 0 0 / 0.15),
+		inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.friends-guide-card-head {
+	display: flex;
+	align-items: center;
+	gap: 0.85rem;
+	margin-bottom: 1rem;
+	min-height: 2.7rem;
+}
+
+.friends-guide-card-title-wrap {
+	display: flex;
+	align-items: center;
+	min-height: 2.7rem;
+}
+
+.friends-guide-card-head h2 {
+	margin: 0;
+	font-size: 1.15rem;
+	font-weight: 800;
+	color: rgb(51 65 85 / 0.96);
+	letter-spacing: 0.02em;
+}
+
+.dark .friends-guide-card-head h2 {
+	color: rgb(255 255 255 / 0.94);
+}
+
+.friends-guide-card-head p {
+	margin: 0.3rem 0 0;
+	font-size: 0.9rem;
+	color: rgb(71 85 105 / 0.76);
+	line-height: 1.75;
+}
+
+.dark .friends-guide-card-head p {
+	color: rgb(255 255 255 / 0.72);
+}
+
+.friends-guide-icon {
+	width: 2.7rem;
+	height: 2.7rem;
+	border-radius: 0.9rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	font-size: 1.15rem;
+	font-weight: 700;
+	color: rgb(2 132 199);
+	background: rgb(224 242 254 / 0.95);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.82),
+		0 8px 18px rgb(14 165 233 / 0.12);
+}
+
+.friends-guide-icon-alt {
+	color: rgb(5 150 105);
+	background: rgb(220 252 231 / 0.95);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.82),
+		0 10px 22px rgb(16 185 129 / 0.14);
+}
+
+.friends-guide-icon-note {
+	color: rgb(249 115 22);
+	background: rgb(255 237 213 / 0.96);
+	box-shadow:
+		inset 0 1px 0 rgb(255 255 255 / 0.82),
+		0 10px 22px rgb(249 115 22 / 0.14);
+}
+
+.friends-site-profile {
+	display: flex;
+	align-items: center;
+	gap: 0.85rem;
+	padding: 0.9rem 1rem;
+	border-radius: 1.05rem;
+	background: color-mix(in oklab, var(--btn-regular-bg) 90%, white 10%);
+	border: 1px solid color-mix(in oklab, var(--line-divider) 80%, white 20%);
+	margin-bottom: 1rem;
+}
+
+.dark .friends-site-profile {
+	background: color-mix(in oklab, var(--btn-regular-bg) 92%, white 8%);
+	border-color: color-mix(in oklab, var(--line-divider) 84%, white 16%);
+}
+
+.friends-site-avatar {
+	width: 4.3rem;
+	height: 4.3rem;
+	border-radius: 1rem;
+	object-fit: cover;
+	flex-shrink: 0;
+	box-shadow: 0 10px 20px rgb(148 163 184 / 0.14);
+}
+
+.friends-site-meta h3 {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 800;
+	color: rgb(30 41 59 / 0.95);
+}
+
+.dark .friends-site-meta h3 {
+	color: rgb(255 255 255 / 0.94);
+}
+
+.friends-site-meta p {
+	margin: 0.2rem 0 0;
+	font-size: 0.84rem;
+	line-height: 1.7;
+	color: rgb(71 85 105 / 0.76);
+}
+
+.dark .friends-site-meta p {
+	color: rgb(255 255 255 / 0.72);
+}
+
+.friends-copy-list {
+	display: grid;
+	gap: 0.7rem;
+}
+
+.friends-copy-item {
+	padding: 0.85rem 0.95rem;
+	border-radius: 1rem;
+	background: color-mix(in oklab, var(--btn-regular-bg) 90%, white 10%);
+	border: 1px solid color-mix(in oklab, var(--line-divider) 80%, white 20%);
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 0.75rem;
+	min-width: 0;
+}
+
+.dark .friends-copy-item {
+	background: color-mix(in oklab, var(--btn-regular-bg) 92%, white 8%);
+	border-color: color-mix(in oklab, var(--line-divider) 84%, white 16%);
+}
+
+.friends-copy-main {
+	min-width: 0;
+	overflow: hidden;
+}
+
+.friends-copy-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.74rem;
+	color: rgb(100 116 139 / 0.86);
+	margin-bottom: 0.25rem;
+}
+
+.dark .friends-copy-label {
+	color: rgb(255 255 255 / 0.6);
+}
+
+.friends-copy-label-icon {
+	font-size: 0.95rem;
+	color: rgb(14 165 233 / 0.95);
+}
+
+.friends-copy-value {
+	font-size: 0.84rem;
+	line-height: 1.65;
+	color: rgb(30 41 59 / 0.95);
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.dark .friends-copy-value {
+	color: rgb(255 255 255 / 0.88);
+}
+
+.friends-copy-button {
+	width: 2.15rem;
+	height: 2.15rem;
+	border-radius: 0.75rem;
+	border: 1px solid transparent;
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	color: rgb(71 85 105 / 0.8);
+	background: color-mix(in oklab, var(--card-bg) 88%, white 12%);
+	transition:
+		transform 0.2s ease,
+		background-color 0.2s ease,
+		color 0.2s ease,
+		border-color 0.2s ease;
+}
+
+.friends-copy-button:hover {
+	color: rgb(2 132 199);
+	border-color: rgb(14 165 233 / 0.18);
+	background: rgb(224 242 254 / 0.96);
+	transform: translateY(-1px);
+}
+
+.dark .friends-copy-button {
+	color: rgb(255 255 255 / 0.7);
+	background: color-mix(in oklab, var(--card-bg) 88%, white 12%);
+}
+
+.friends-copy-button.is-copied {
+	color: rgb(5 150 105);
+	border-color: rgb(16 185 129 / 0.18);
+	background: rgb(220 252 231 / 0.96);
+}
+
+.friends-copy-icon {
+	width: 1rem;
+	height: 1rem;
+	display: block;
+	position: absolute;
+	inset: 0;
+	margin: auto;
+	transition:
+		opacity 0.18s ease,
+		transform 0.18s ease;
+}
+
+.friends-copy-icon-default {
+	opacity: 1;
+	transform: scale(1);
+}
+
+.friends-copy-icon-success {
+	opacity: 0;
+	transform: scale(0.72);
+}
+
+.friends-copy-button.is-copied .friends-copy-icon-default {
+	opacity: 0;
+	transform: scale(0.72);
+}
+
+.friends-copy-button.is-copied .friends-copy-icon-success {
+	opacity: 1;
+	transform: scale(1);
+}
+
+.friends-step-list {
+	display: grid;
+	gap: 0.95rem;
+}
+
+.friends-step-item {
+	display: grid;
+	grid-template-columns: 2.35rem 1fr;
+	gap: 0.8rem;
+	align-items: start;
+}
+
+.friends-step-index {
+	width: 2.35rem;
+	height: 2.35rem;
+	border-radius: 999px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.95rem;
+	font-weight: 800;
+	color: white;
+	background: linear-gradient(135deg, rgb(16 185 129), rgb(5 150 105));
+	box-shadow: 0 10px 18px rgb(16 185 129 / 0.16);
+}
+
+.friends-step-content h3 {
+	margin: 0 0 0.2rem;
+	font-size: 0.98rem;
+	font-weight: 800;
+	color: rgb(51 65 85 / 0.96);
+}
+
+.dark .friends-step-content h3 {
+	color: rgb(255 255 255 / 0.94);
+}
+
+.friends-step-content p {
+	margin: 0;
+	font-size: 0.85rem;
+	line-height: 1.75;
+	color: rgb(71 85 105 / 0.76);
+	word-break: break-word;
+}
+
+.friends-step-content p + p {
+	margin-top: 0.48rem;
+}
+
+.dark .friends-step-content p {
+	color: rgb(255 255 255 / 0.72);
+}
+
+.friends-step-content a {
+	color: rgb(245 158 11);
+	text-decoration-line: underline;
+	text-decoration-style: dashed;
+	text-decoration-color: rgb(245 158 11 / 0.7);
+	text-underline-offset: 0.18em;
+	text-decoration-thickness: 1px;
+	border-bottom: none;
+	transition:
+		color 0.2s ease,
+		text-decoration-color 0.2s ease;
+}
+
+.friends-step-content a:hover {
+	color: rgb(234 88 12);
+	text-decoration-color: rgb(234 88 12 / 0.92);
+}
+
+.friends-apply-template {
+	margin-top: 0.75rem;
+	padding: 0.85rem 0.95rem;
+	border-radius: 1rem;
+	background: color-mix(in oklab, var(--btn-regular-bg) 90%, white 10%);
+	border: 1px solid color-mix(in oklab, var(--line-divider) 80%, white 20%);
+}
+
+.dark .friends-apply-template {
+	background: color-mix(in oklab, var(--btn-regular-bg) 92%, white 8%);
+	border-color: color-mix(in oklab, var(--line-divider) 84%, white 16%);
+}
+
+.friends-apply-template-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 0.55rem;
+}
+
+.friends-apply-template-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.78rem;
+	font-weight: 700;
+	color: rgb(51 65 85 / 0.88);
+}
+
+.dark .friends-apply-template-title {
+	color: rgb(255 255 255 / 0.86);
+}
+
+.friends-apply-template-title svg {
+	font-size: 0.95rem;
+	color: rgb(5 150 105);
+}
+
+.friends-apply-template pre {
+	margin: 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+	font-size: 0.8rem;
+	line-height: 1.75;
+	color: rgb(51 65 85 / 0.92);
+	font-family:
+		"JetBrains Mono",
+		"Fira Code",
+		"SFMono-Regular",
+		monospace;
+}
+
+.dark .friends-apply-template pre {
+	color: rgb(255 255 255 / 0.82);
+}
+
+.friends-note-list {
+	margin: 0;
+	display: grid;
+	gap: 0.65rem;
+}
+
+.friends-note-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.65rem;
+}
+
+.friends-note-dot {
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 999px;
+	flex-shrink: 0;
+	margin-top: 0.48rem;
+	background: linear-gradient(135deg, rgb(249 115 22), rgb(245 158 11));
+	box-shadow: 0 0 0 4px rgb(255 237 213 / 0.7);
+}
+
+.friends-note-item p {
+	margin: 0;
+	font-size: 0.86rem;
+	line-height: 1.8;
+	color: rgb(51 65 85 / 0.92);
+}
+
+.dark .friends-note-item p {
+	color: rgb(255 255 255 / 0.84);
+}
+
+@media (max-width: 1024px) {
+	.friends-guide-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 640px) {
+	.friends-guide-card {
+		padding: 1rem;
+		border-radius: 1.15rem;
+	}
+
+	.friends-guide-card-head h2 {
+		font-size: 1.05rem;
+	}
+
+	.friends-site-profile {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.friends-site-avatar {
+		width: 4rem;
+		height: 4rem;
+	}
+
+	.friends-step-item {
+		grid-template-columns: 2.2rem 1fr;
+		gap: 0.7rem;
+	}
+
+	.friends-step-index {
+		width: 2.2rem;
+		height: 2.2rem;
+		font-size: 0.9rem;
+	}
+
+	.friends-step-content h3 {
+		font-size: 0.95rem;
+	}
+
+	.friends-copy-item {
+		padding: 0.8rem 0.85rem;
+	}
+
+	.friends-copy-button {
+		width: 2rem;
+		height: 2rem;
+	}
+}

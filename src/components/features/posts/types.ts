@@ -21,6 +21,8 @@ export interface PostMetaProps {
 	words?: number;
 	minutes?: number;
 	showWordCount?: boolean;
+	showPageViews?: boolean;
+	path?: string;
 }
 
 export interface PostPageProps {

@@ -1,0 +1,122 @@
+---
+import { Icon } from "astro-icon/components";
+
+import I18nKey from "@/i18n/i18nKey";
+import { i18n } from "@/i18n/translation";
+---
+
+<div class="flex items-center article-page-views-card">
+	<div class="h-6 w-6 rounded-md bg-black/5 dark:bg-white/10 text-black/50 dark:text-white/50 flex items-center justify-center mr-2">
+		<Icon name="material-symbols:visibility-outline-rounded" class="text-xl" />
+	</div>
+	<div class="text-sm article-page-views-card-text">
+		{i18n(I18nKey.pageViewsLabel)} --
+	</div>
+</div>
+
+<script is:inline define:vars={{ pageViewsText: i18n(I18nKey.pageViewsLabel) }}>
+	function ensureArticlePageViewsCardManager() {
+		if (window.__mizukiArticlePageViewsCardManager) {
+			return window.__mizukiArticlePageViewsCardManager;
+		}
+
+		const manager = {
+			fetching: false,
+			refresh: async (attempt = 0) => {
+				const maxRetries = 8;
+				const retryDelay = 700;
+				const containers = Array.from(
+					document.querySelectorAll(".article-page-views-card"),
+				);
+
+				if (containers.length === 0 || manager.fetching) {
+					return;
+				}
+
+				if (!window.oddmisc?.getStats) {
+					if (attempt < maxRetries) {
+						window.setTimeout(
+							() => manager.refresh(attempt + 1),
+							retryDelay,
+						);
+					}
+					return;
+				}
+
+				manager.fetching = true;
+
+				try {
+					await Promise.all(
+						containers.map(async (container) => {
+							const id = container?.dataset.pageId;
+							if (!id) {
+								return;
+							}
+
+							const stats = await window.oddmisc.getStats(
+								window.location.pathname,
+							);
+							const pageViews = stats.pageviews ?? 0;
+							const display = container.querySelector(
+								".article-page-views-card-text",
+							);
+							if (display) {
+								display.textContent = `${pageViewsText} ${pageViews}`;
+							}
+
+							window.setTimeout(async () => {
+								try {
+									const latestStats =
+										await window.oddmisc.getStats(
+											window.location.pathname,
+										);
+									const latestViews =
+										latestStats.pageviews ?? pageViews;
+									if (display) {
+										display.textContent = `${pageViewsText} ${latestViews}`;
+									}
+								} catch {
+									// keep current value if follow-up refresh fails
+								}
+							}, 1600);
+						}),
+					);
+				} catch (error) {
+					if (attempt < maxRetries) {
+						manager.fetching = false;
+						window.setTimeout(
+							() => manager.refresh(attempt + 1),
+							retryDelay,
+						);
+						return;
+					}
+
+					console.error("Error fetching article page views:", error);
+				} finally {
+					manager.fetching = false;
+				}
+			},
+		};
+
+		window.__mizukiArticlePageViewsCardManager = manager;
+		return manager;
+	}
+
+	const articlePageViewsCardManager = ensureArticlePageViewsCardManager();
+
+	if (document.readyState === "loading") {
+		document.addEventListener("DOMContentLoaded", () =>
+			articlePageViewsCardManager.refresh(),
+		);
+	} else {
+		articlePageViewsCardManager.refresh();
+	}
+
+	window.addEventListener("mizuki:umami-ready", () => {
+		articlePageViewsCardManager.refresh();
+	});
+
+	document.addEventListener("astro:page-load", () => {
+		articlePageViewsCardManager.refresh();
+	});
+</script>

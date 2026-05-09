@@ -10,6 +10,7 @@ import {
 	getTagList,
 } from "../../../utils/content-utils";
 import { resolvePostLastModifiedDate } from "../../../utils/post-last-modified";
+import { getPostUrl } from "../../../utils/url-utils";
 import WidgetLayout from "../common/WidgetLayout.astro";
 
 interface Props {
@@ -27,6 +28,7 @@ const relativeTimeLocale = (siteConfig.lang || "en").replaceAll("_", "-");
 const posts = await getSortedPosts();
 const categories = await getCategoryList();
 const tags = await getTagList();
+const postPaths = posts.map((post) => getPostUrl(post));
 
 // 计算总字数
 let totalWords = 0;
@@ -99,6 +101,13 @@ const stats = [
 		formatted: true,
 	},
 	{
+		icon: "material-symbols:local-library-outline-rounded",
+		label: i18n(I18nKey.siteStatsTotalViews),
+		value: "--",
+		dynamic: true,
+		id: "total-views",
+	},
+	{
 		icon: "material-symbols:calendar-clock-outline",
 		label: i18n(I18nKey.siteStatsRunningDays),
 		value: 0, // 将由客户端更新
@@ -161,6 +170,7 @@ const stats = [
 		siteStartDate,
 		lastActivityTimestamp,
 		relativeTimeLocale,
+		postPaths,
 	}}
 >
 	function updateDynamicStats() {
@@ -243,9 +253,68 @@ const stats = [
 		}
 	}
 
+	async function updateUmamiStats(attempt = 0) {
+		const maxRetries = 8;
+		const retryDelay = 700;
+
+		const totalViewsElements = document.querySelectorAll(
+			'[data-stat-id="total-views"]',
+		);
+		if (totalViewsElements.length === 0) {
+			return;
+		}
+
+		if (!window.oddmisc?.getSiteStats) {
+			if (attempt < maxRetries) {
+				window.setTimeout(
+					() => updateUmamiStats(attempt + 1),
+					retryDelay,
+				);
+			}
+			return;
+		}
+
+		try {
+			const pageviewsList = await Promise.all(
+				postPaths.map(async (path) => {
+					const stats = await window.oddmisc.getStats(path);
+					return stats.pageviews ?? 0;
+				}),
+			);
+			const totalViews = pageviewsList.reduce(
+				(sum, views) => sum + views,
+				0,
+			);
+
+			totalViewsElements.forEach((element) => {
+				element.textContent = totalViews.toLocaleString();
+			});
+		} catch (error) {
+			if (attempt < maxRetries) {
+				window.setTimeout(
+					() => updateUmamiStats(attempt + 1),
+					retryDelay,
+				);
+				return;
+			}
+
+			console.error("Error fetching total views:", error);
+		}
+	}
+
 	// 页面加载时更新
 	updateDynamicStats();
+	updateUmamiStats();
 
 	// 最后活动需要按分钟刷新，运行天数顺带一起更新即可
 	setInterval(updateDynamicStats, 60 * 1000);
+
+	window.addEventListener("mizuki:umami-ready", () => {
+		updateUmamiStats();
+	});
+
+	document.addEventListener("astro:page-load", () => {
+		updateDynamicStats();
+		updateUmamiStats();
+	});
 </script>

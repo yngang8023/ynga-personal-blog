@@ -295,9 +295,10 @@ export interface PermalinkConfig {
 
 export interface CommentConfig {
 	enable: boolean; // 是否启用评论功能
-	system?: "twikoo" | "giscus"; // 评论系统选择
+	system?: "twikoo" | "giscus" | "waline"; // 评论系统选择
 	twikoo?: TwikooConfig;
 	giscus?: GiscusConfig;
+	waline?: WalineConfig;
 }
 
 export interface GiscusConfig {
@@ -319,6 +320,31 @@ interface TwikooConfig {
 	envId: string;
 	region?: string;
 	lang?: string;
+}
+
+export interface WalineConfig {
+	serverURL: string;
+	lang?: string;
+	meta?: ("nick" | "mail" | "link")[];
+	requiredMeta?: ("nick" | "mail" | "link")[];
+	wordLimit?: number | [number, number];
+	pageSize?: number;
+	commentSorting?: "latest" | "oldest" | "hottest";
+	dark?: string | boolean;
+	login?: "enable" | "disable" | "force";
+	noCopyright?: boolean;
+	noRss?: boolean;
+	reaction?: string[] | boolean;
+	emoji?:
+		| boolean
+		| (`//${string}` | `http://${string}` | `https://${string}`)[];
+	search?: boolean;
+	imageUploader?: boolean;
+	pageview?: boolean | string;
+	comment?: boolean | string;
+	recaptchaV3Key?: string;
+	turnstileKey?: string;
+	locale?: Record<string, string>;
 }
 
 export type LIGHT_DARK_MODE = typeof LIGHT_MODE | typeof DARK_MODE;
@@ -369,7 +395,7 @@ export interface MusicPlayerConfig {
 	showFloatingPlayer: boolean; // 是否显示悬浮播放器 UI
 	floatingEntryMode?: "default" | "fab"; // 悬浮入口模式：默认独立播放器或集成到 FAB 组
 	mode: "meting" | "local"; // 音乐播放器模式
-	meting_api: string; // Meting API 地址
+	meting_api: string | string[]; // Meting API 地址，支持单个地址或按顺序兜底的地址数组
 	id: string; // 歌单ID
 	server: string; // 音乐源服务器
 	type: string; // 音乐类型

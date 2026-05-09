@@ -44,6 +44,18 @@ function getAssetPath(path: string): string {
 	return `/${path}`;
 }
 
+function normalizeMetingApis(metingApi: string | string[] | undefined): string[] {
+	if (Array.isArray(metingApi)) {
+		return metingApi.map((item) => item.trim()).filter(Boolean);
+	}
+
+	if (typeof metingApi === "string" && metingApi.trim()) {
+		return [metingApi.trim()];
+	}
+
+	return [];
+}
+
 class MusicPlayerStore {
 	private audio: HTMLAudioElement | null = null;
 	private state: MusicPlayerState;
@@ -247,16 +259,14 @@ class MusicPlayerStore {
 
 	private async loadPlaylist(): Promise<void> {
 		const mode = musicPlayerConfig.mode ?? "meting";
-		const meting_api =
-			musicPlayerConfig.meting_api ??
-			"https://www.bilibili.uno/api?server=:server&type=:type&id=:id&auth=:auth&r=:r";
+		const metingApis = normalizeMetingApis(musicPlayerConfig.meting_api);
 		const meting_id = musicPlayerConfig.id ?? "14164869977";
 		const meting_server = musicPlayerConfig.server ?? "netease";
 		const meting_type = musicPlayerConfig.type ?? "playlist";
 
 		if (mode === "meting") {
 			await this.fetchMetingPlaylist(
-				meting_api,
+				metingApis,
 				meting_server,
 				meting_type,
 				meting_id,
@@ -267,34 +277,59 @@ class MusicPlayerStore {
 	}
 
 	private async fetchMetingPlaylist(
-		api: string,
+		apis: string[],
 		server: string,
 		type: string,
 		id: string,
 	): Promise<void> {
-		if (!api || !id) {
+		if (!apis.length || !id) {
 			return;
 		}
 
 		this.state.isLoading = true;
 		this.broadcastState();
 
-		const apiUrl = api
-			.replace(":server", server)
-			.replace(":type", type)
-			.replace(":id", id)
-			.replace(":auth", "")
-			.replace(":r", Date.now().toString());
-
 		try {
-			const res = await fetch(apiUrl);
-			if (!res.ok) {
-				throw new Error("meting api error");
+			let list: any[] | null = null;
+			let lastError: unknown = null;
+
+			for (const api of apis) {
+				const apiUrl = api
+					.replace(":server", server)
+					.replace(":type", type)
+					.replace(":id", id)
+					.replace(":auth", "")
+					.replace(":r", Date.now().toString());
+
+				try {
+					const res = await fetch(apiUrl, {
+						cache: "no-store",
+					});
+					if (!res.ok) {
+						throw new Error(`meting api error: ${res.status}`);
+					}
+
+					const json = await res.json();
+					if (!Array.isArray(json) || json.length === 0) {
+						throw new Error("meting api returned empty playlist");
+					}
+
+					list = json;
+					break;
+				} catch (error) {
+					lastError = error;
+					console.warn("[MusicPlayer] Meting API 请求失败，切换下一个源:", {
+						api,
+						error,
+					});
+				}
 			}
-			const list: any[] = await res.json();
-			this.state.playlist = list.map((song) =>
-				this.convertMetingSong(song),
-			);
+
+			if (!list) {
+				throw lastError ?? new Error("all meting api sources failed");
+			}
+
+			this.state.playlist = list.map((song) => this.convertMetingSong(song));
 			this.state.isLoading = false;
 
 			if (this.state.playlist.length > 0) {

@@ -39,7 +39,7 @@ export const zh_CN: Translation = {
 	[Key.announcement]: "公告",
 	[Key.announcementClose]: "关闭",
 
-	[Key.comments]: "评论",
+	[Key.comments]: "文章评论",
 	[Key.friends]: "友链",
 	[Key.friendsSubtitle]: "发现更多优质网站",
 	[Key.friendsSearchPlaceholder]: "搜索友链名称或描述...",
@@ -310,6 +310,7 @@ export const zh_CN: Translation = {
 	[Key.siteStatsCategoryCount]: "分类",
 	[Key.siteStatsTagCount]: "标签",
 	[Key.siteStatsTotalWords]: "总字数",
+	[Key.siteStatsTotalViews]: "总阅读量",
 	[Key.siteStatsRunningDays]: "运行天数",
 	[Key.siteStatsLastUpdate]: "最后活动",
 	[Key.siteStatsDaysAgo]: "{days} 天前",
@@ -356,6 +357,7 @@ export const zh_CN: Translation = {
 	// 页面访问量统计
 	[Key.pageViewsLoading]: "统计加载中...",
 	[Key.pageViewsUnavailable]: "统计不可用",
+	[Key.pageViewsLabel]: "浏览量",
 
 	// 布局切换按钮
 	[Key.switchToGridMode]: "切换到网格模式",

@@ -1,0 +1,248 @@
+---
+title: "友情链接"
+description: "与优秀的朋友们一起成长"
+---
+
+import { Icon } from "astro-icon/components";
+
+export const site = {
+	name: "HiYngaの随✏️记",
+	desc: "做好自己、珍惜当下、展望未来。",
+	url: "https://ynga.kingcola-icg.cn/",
+	avatar: "https://ynga.kingcola-icg.cn/assets/home/home.webp",
+	rss: "https://ynga.kingcola-icg.cn/rss.xml",
+};
+
+export const applyTemplate = `站点名称：你的站点名称
+站点描述：一句简短的站点介绍
+站点链接：你的站点首页链接
+头像链接：你的站点头像或 Logo 链接`;
+
+export const notes = [
+	{
+		title: "互换原则",
+		content: "建议先将本站添加到你的友链页，确认展示正常后再提交申请。",
+	},
+	{
+		title: "内容偏好",
+		content: "更欢迎原创内容为主、持续更新、有个人表达气息的博客或记录型网站。",
+	},
+	{
+		title: "站点要求",
+		content: "建议支持 HTTPS，页面可正常访问，头像、描述、站点名称尽量完整清晰。",
+	},
+	{
+		title: "链接维护",
+		content: "若网站长期无法访问、内容失效明显或停止维护，后续可能会整理或移除。",
+	},
+];
+
+<div class="friends-guide not-prose">
+	<div class="friends-guide-grid">
+		<section class="friends-guide-card">
+			<div class="friends-guide-card-head">
+				<div class="friends-guide-icon">
+					<Icon name="material-symbols:person-rounded" />
+				</div>
+				<div class="friends-guide-card-title-wrap">
+					<h2>本站信息</h2>
+				</div>
+			</div>
+
+			<div class="friends-site-profile">
+				<img src={site.avatar} alt={`${site.name} 头像`} class="friends-site-avatar" />
+				<div class="friends-site-meta">
+					<h3>{site.name}</h3>
+					<p>{site.desc}</p>
+				</div>
+			</div>
+
+			<div class="friends-copy-list">
+				{[
+					{
+						label: "站点名称",
+						value: site.name,
+						icon: "material-symbols:badge-outline-rounded",
+					},
+					{
+						label: "站点描述",
+						value: site.desc,
+						icon: "material-symbols:edit-note-rounded",
+					},
+					{
+						label: "站点链接",
+						value: site.url,
+						icon: "material-symbols:link-rounded",
+					},
+					{
+						label: "头像链接",
+						value: site.avatar,
+						icon: "material-symbols:image-outline-rounded",
+					},
+					{
+						label: "RSS 地址",
+						value: site.rss,
+						icon: "material-symbols:rss-feed-rounded",
+					},
+				].map((item) => (
+					<div class="friends-copy-item">
+						<div class="friends-copy-main">
+							<div class="friends-copy-label">
+								<Icon name={item.icon} class="friends-copy-label-icon" />
+								<span>{item.label}</span>
+							</div>
+							<div class="friends-copy-value">{item.value}</div>
+						</div>
+						<button
+							type="button"
+							class="friends-copy-button"
+							data-copy={item.value}
+							aria-label={`复制${item.label}`}
+							title={`复制${item.label}`}
+						>
+							<svg
+								class="friends-copy-icon friends-copy-icon-default"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+								aria-hidden="true"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+								></path>
+							</svg>
+							<svg
+								class="friends-copy-icon friends-copy-icon-success"
+								fill="none"
+								stroke="currentColor"
+								viewBox="0 0 24 24"
+								aria-hidden="true"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2.4"
+									d="M5 13l4 4L19 7"
+								></path>
+							</svg>
+						</button>
+					</div>
+				))}
+			</div>
+		</section>
+
+		<section class="friends-guide-card">
+			<div class="friends-guide-card-head">
+				<div class="friends-guide-icon friends-guide-icon-alt">
+					<Icon name="material-symbols:draw-outline-rounded" />
+				</div>
+				<div class="friends-guide-card-title-wrap">
+					<h2>申请友链</h2>
+				</div>
+			</div>
+
+			<div class="friends-step-list">
+				<div class="friends-step-item">
+					<div class="friends-step-index">1</div>
+					<div class="friends-step-content">
+						<h3>先添加本站信息</h3>
+						<p>
+							建议先将左侧的本站信息添加到你的友链页面，确认展示无误后再提交申请，这样我回访时也能更快核对资料。
+						</p>
+					</div>
+				</div>
+
+				<div class="friends-step-item">
+					<div class="friends-step-index">2</div>
+					<div class="friends-step-content">
+						<h3>提交申请信息</h3>
+						<p>通过填写<a href="https://f.kdocs.cn/g/zfMloTk6/" target="_blank" rel="noopener noreferrer">友链收集表单</a>申请。</p>
+						<p>
+							提交时把站点名称、简介、首页链接和头像链接写完整即可；如果有特别想让我先看的内容，也可以补一句。
+						</p>
+						<div class="friends-apply-template">
+							<div class="friends-apply-template-head">
+								<div class="friends-apply-template-title">
+									<Icon name="material-symbols:article-outline-rounded" />
+									<span>填写申请内容包括</span>
+								</div>
+								<button
+									type="button"
+									class="friends-copy-button"
+									data-copy={applyTemplate}
+									aria-label="复制申请模板"
+									title="复制申请模板"
+								>
+									<svg
+										class="friends-copy-icon friends-copy-icon-default"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+										aria-hidden="true"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+										></path>
+									</svg>
+									<svg
+										class="friends-copy-icon friends-copy-icon-success"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+										aria-hidden="true"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2.4"
+											d="M5 13l4 4L19 7"
+										></path>
+									</svg>
+								</button>
+							</div>
+							<pre>{applyTemplate}</pre>
+						</div>
+					</div>
+				</div>
+
+				<div class="friends-step-item">
+					<div class="friends-step-index">3</div>
+					<div class="friends-step-content">
+						<h3>等待回访与审核</h3>
+						<p>
+							我会更偏向长期更新、内容真实、访问稳定、风格真诚的个人博客或记录型网站，确认信息无误后会尽快添加。
+						</p>
+					</div>
+				</div>
+			</div>
+		</section>
+	</div>
+
+	<section class="friends-guide-card friends-notes-card">
+		<div class="friends-guide-card-head">
+			<div class="friends-guide-icon friends-guide-icon-note">
+				<Icon name="material-symbols:info-outline-rounded" />
+			</div>
+			<div class="friends-guide-card-title-wrap">
+				<h2>注意事项</h2>
+			</div>
+		</div>
+
+		<div class="friends-note-list">
+			{notes.map((item) => (
+				<div class="friends-note-item">
+					<div class="friends-note-dot" aria-hidden="true"></div>
+					<p>
+						<strong>{item.title}</strong>：{item.content}
+					</p>
+				</div>
+			))}
+		</div>
+	</section>
+</div>

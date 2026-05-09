@@ -1,0 +1,320 @@
+---
+import { commentConfig } from "@/config";
+---
+
+{
+	commentConfig.enable &&
+		commentConfig.system === "waline" &&
+		commentConfig.waline?.serverURL && (
+			<>
+				<script
+					is:inline
+					define:vars={{
+						walineRuntimeConfig: commentConfig.waline,
+					}}
+				>
+					window.__mizukiWalineConfig = walineRuntimeConfig;
+				</script>
+
+				<script>
+					import { init } from "@waline/client";
+					import katex from "katex";
+					import "katex/dist/katex.min.css";
+
+					const CONTAINER_ID = "waline";
+					const WRAPPER_ID = "waline-container";
+					const ROOT_MARGIN = "240px";
+					const PREVIEW_RETRY_DELAY = 120;
+					const PREVIEW_RETRY_LIMIT = 10;
+
+					const getRuntimeConfig = () =>
+						window.__mizukiWalineConfig || null;
+
+					const getCurrentPath = () => window.location.pathname;
+
+					const getCommentEditors = () =>
+						Array.from(
+							document.querySelectorAll<HTMLElement>(
+								`#${CONTAINER_ID} .wl-comment`,
+							),
+						);
+
+					const getPreviewButton = (
+						commentEditor: ParentNode,
+					): HTMLButtonElement | null =>
+						commentEditor.querySelector<HTMLButtonElement>(
+							".wl-actions button.wl-action:last-of-type",
+						);
+
+					const getPreviewPanel = (
+						commentEditor: ParentNode,
+					): HTMLElement | null =>
+						commentEditor.querySelector<HTMLElement>(".wl-preview");
+
+					const getEditorTextarea = (
+						commentEditor: ParentNode,
+					): HTMLTextAreaElement | null =>
+						commentEditor.querySelector<HTMLTextAreaElement>(
+							".wl-editor",
+						);
+
+					const isPreviewVisible = (previewPanel: HTMLElement) =>
+						getComputedStyle(previewPanel).display !== "none";
+
+					const togglePreviewForEditor = (
+						commentEditor: HTMLElement,
+					) => {
+						const previewButton = getPreviewButton(commentEditor);
+						const previewPanel = getPreviewPanel(commentEditor);
+						const textarea = getEditorTextarea(commentEditor);
+
+						if (!previewButton || !previewPanel || !textarea) {
+							return false;
+						}
+
+						const hasContent = textarea.value.trim().length > 0;
+						const isActive =
+							previewButton.classList.contains("active") &&
+							isPreviewVisible(previewPanel);
+
+						if (hasContent !== isActive) {
+							previewButton.click();
+						}
+
+						const nextState =
+							previewButton.classList.contains("active") &&
+							isPreviewVisible(previewPanel);
+
+						return hasContent ? nextState : !nextState;
+					};
+
+					const syncPreviewVisibility = (attempt = 0) => {
+						const commentEditors = getCommentEditors();
+
+						if (!commentEditors.length) {
+							if (attempt < PREVIEW_RETRY_LIMIT) {
+								window.setTimeout(
+									() =>
+										syncPreviewVisibility(attempt + 1),
+									PREVIEW_RETRY_DELAY,
+								);
+							}
+							return;
+						}
+
+						const allReady = commentEditors.every(
+							togglePreviewForEditor,
+						);
+
+						if (!allReady && attempt < PREVIEW_RETRY_LIMIT) {
+							window.setTimeout(
+								() =>
+									syncPreviewVisibility(attempt + 1),
+								PREVIEW_RETRY_DELAY,
+							);
+						}
+					};
+
+					const getOptions = () => {
+						const config = getRuntimeConfig();
+						if (!config) {
+							return null;
+						}
+
+						const normalizedConfig = { ...config };
+
+						// Waline 的 Vue 组件会对 imageUploader 做 Function 类型校验。
+						// 当配置为 false 时虽然语义上表示禁用，但会触发开发警告，
+						// 这里在运行时移除该字段，实际隐藏交由样式控制。
+						if (normalizedConfig.imageUploader === false) {
+							delete normalizedConfig.imageUploader;
+						}
+
+						if (!normalizedConfig.turnstileKey) {
+							delete normalizedConfig.turnstileKey;
+						}
+
+						if (!normalizedConfig.recaptchaV3Key) {
+							delete normalizedConfig.recaptchaV3Key;
+						}
+
+						return {
+							...normalizedConfig,
+							texRenderer: (
+								blockMode: boolean,
+								tex: string,
+							) =>
+								katex.renderToString(tex, {
+									displayMode: blockMode,
+									throwOnError: false,
+								}),
+							el: `#${CONTAINER_ID}`,
+							path: getCurrentPath(),
+						};
+					};
+
+					const runtime: NonNullable<
+						Window["__mizukiWalineRuntime"]
+					> = window.__mizukiWalineRuntime || {
+						instance: null,
+						observer: null,
+						previewObserver: null,
+						initialized: false,
+						loading: false,
+						initAttemptedPath: "",
+						previewTimer: null,
+						bound: false,
+						schedulePreviewEnable: () => {
+							if (runtime.previewTimer !== null) {
+								window.clearTimeout(runtime.previewTimer);
+							}
+
+							runtime.previewTimer = window.setTimeout(() => {
+								runtime.previewTimer = null;
+								syncPreviewVisibility();
+							}, 40);
+						},
+						observePreviewDefaults: () => {
+							const container =
+								document.getElementById(CONTAINER_ID);
+
+							runtime.previewObserver?.disconnect();
+							runtime.previewObserver = null;
+
+							if (!container) {
+								return;
+							}
+
+							runtime.previewObserver = new MutationObserver(
+								() => {
+									runtime.schedulePreviewEnable();
+								},
+							);
+							runtime.previewObserver.observe(container, {
+								childList: true,
+								subtree: true,
+							});
+
+							runtime.schedulePreviewEnable();
+						},
+						mount: async () => {
+							const container =
+								document.getElementById(CONTAINER_ID);
+							const options = getOptions();
+
+							if (!container || !options || runtime.loading) {
+								return;
+							}
+
+							runtime.loading = true;
+
+							try {
+								runtime.previewObserver?.disconnect();
+								runtime.previewObserver = null;
+
+								if (runtime.previewTimer !== null) {
+									window.clearTimeout(runtime.previewTimer);
+									runtime.previewTimer = null;
+								}
+
+								if (runtime.instance) {
+									runtime.instance.destroy();
+									runtime.instance = null;
+								}
+
+								container.innerHTML = "";
+								runtime.instance = init(options);
+								runtime.initialized = true;
+								runtime.initAttemptedPath = getCurrentPath();
+								runtime.observePreviewDefaults();
+							} catch (error) {
+								console.error("[Waline] 初始化失败:", error);
+							} finally {
+								runtime.loading = false;
+							}
+						},
+						destroy: () => {
+							runtime.observer?.disconnect();
+							runtime.observer = null;
+							runtime.previewObserver?.disconnect();
+							runtime.previewObserver = null;
+							if (runtime.previewTimer !== null) {
+								window.clearTimeout(runtime.previewTimer);
+								runtime.previewTimer = null;
+							}
+							runtime.instance?.destroy();
+							runtime.instance = null;
+							runtime.initialized = false;
+						},
+						setupLazyLoad: () => {
+							const wrapper =
+								document.getElementById(WRAPPER_ID);
+							if (!wrapper) {
+								runtime.destroy();
+								return;
+							}
+
+							runtime.observer?.disconnect();
+							runtime.observer = new IntersectionObserver(
+								(entries) => {
+									if (entries[0]?.isIntersecting) {
+										runtime.observer?.disconnect();
+										runtime.observer = null;
+										runtime.mount();
+									}
+								},
+								{ rootMargin: ROOT_MARGIN },
+							);
+
+							runtime.observer.observe(wrapper);
+						},
+						refresh: () => {
+							const wrapper =
+								document.getElementById(WRAPPER_ID);
+							if (!wrapper) {
+								runtime.destroy();
+								return;
+							}
+
+							if (
+								runtime.initialized &&
+								runtime.initAttemptedPath === getCurrentPath()
+							) {
+								return;
+							}
+
+							runtime.setupLazyLoad();
+						},
+					};
+
+					window.__mizukiWalineRuntime = runtime;
+
+					const scheduleRefresh = () => {
+						window.setTimeout(() => runtime.refresh(), 160);
+					};
+
+					if (!runtime.bound) {
+						document.addEventListener(
+							"mizuki:page:loaded",
+							scheduleRefresh,
+						);
+						document.addEventListener(
+							"astro:page-load",
+							scheduleRefresh,
+						);
+						runtime.bound = true;
+					}
+
+					if (document.readyState === "loading") {
+						document.addEventListener(
+							"DOMContentLoaded",
+							scheduleRefresh,
+							{ once: true },
+						);
+					} else {
+						scheduleRefresh();
+					}
+				</script>
+			</>
+		)
+}

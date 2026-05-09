@@ -27,6 +27,8 @@ interface Props {
 	showWordCount?: boolean;
 	showReadingTime?: boolean;
 	showEncrypted?: boolean;
+	showPageViews?: boolean;
+	path?: string;
 }
 
 const {
@@ -45,6 +47,8 @@ const {
 	showWordCount = false,
 	showReadingTime = false,
 	showEncrypted = false,
+	showPageViews = true,
+	path,
 } = Astro.props;
 ---
 
@@ -91,12 +95,12 @@ const {
         </div>
     )}
     
-    {!isHome && id && (
-        <div class="flex items-center umami-page-views hidden" data-id={id}>
+    {!isHome && id && showPageViews && (
+        <div class="flex items-center umami-page-views hidden" data-id={id} data-path={path}>
             <div class="meta-icon">
                 <Icon name="material-symbols:visibility-outline-rounded" class="text-xl"></Icon>
             </div>
-            <span class="text-50 text-sm font-medium page-views-display">{i18n(I18nKey.pageViewsLoading)}</span>
+            <span class="text-50 text-sm font-medium page-views-display">{i18n(I18nKey.pageViewsLabel)} --</span>
         </div>
     )}
 
@@ -104,48 +108,90 @@ const {
         <EncryptedBadge />
     )}
     
-    {!isHome && id && (
+    {!isHome && id && showPageViews && (
 <script is:inline define:vars={{
-    pageViewsText: i18n(I18nKey.profileStatsPageViews),
-    visitsText: i18n(I18nKey.profileStatsVisits)
+    pageViewsText: i18n(I18nKey.pageViewsLabel)
 }}>
-    function generateStatsText(pageViews, visits) {
-        return `${pageViewsText} ${pageViews} · ${visitsText} ${visits}`;
-    }
-
-    async function fetchPageViews() {
-        const container = document.querySelector('.umami-page-views');
-        
-        if (!window.oddmisc) {
-            container?.classList.add('hidden');
-            return;
+    function ensurePageViewsManager() {
+        if (window.__mizukiPageViewsManager) {
+            return window.__mizukiPageViewsManager;
         }
 
-        const id = container?.dataset.id;
-        if (!id) {return;}
+        const manager = {
+            fetching: false,
+            refresh: async (attempt = 0) => {
+                const maxRetries = 8;
+                const retryDelay = 700;
+                const containers = Array.from(document.querySelectorAll('.umami-page-views'));
 
-        try {
-            const stats = await window.oddmisc.getStats(`/posts/${id}/`);
-            const pageViews = stats.pageviews || 0;
-            const visits = stats.visits || 0;
+                if (containers.length === 0 || manager.fetching) {
+                    return;
+                }
 
-            if (pageViews === 0 && visits === 0) {
-                container?.classList.add('hidden');
-                return;
+                if (!window.oddmisc?.getStats) {
+                    if (attempt < maxRetries) {
+                        window.setTimeout(() => manager.refresh(attempt + 1), retryDelay);
+                    }
+                    return;
+                }
+
+                manager.fetching = true;
+
+                try {
+                    await Promise.all(containers.map(async (container) => {
+                        const statsPath = container?.dataset.path;
+                        if (!statsPath) {
+                            return;
+                        }
+
+                        const stats = await window.oddmisc.getStats(statsPath);
+                        const pageViews = stats.pageviews ?? 0;
+
+                        container.classList.remove('hidden');
+                        const display = container.querySelector('.page-views-display');
+                        if (display) {
+                            display.textContent = `${pageViewsText} ${pageViews}`;
+                        }
+                    }));
+                } catch (error) {
+                    if (attempt < maxRetries) {
+                        manager.fetching = false;
+                        window.setTimeout(() => manager.refresh(attempt + 1), retryDelay);
+                        return;
+                    }
+
+                    console.error('Error fetching page views:', error);
+                    containers.forEach((container) => {
+                        const display = container.querySelector('.page-views-display');
+                        container.classList.remove('hidden');
+                        if (display) {
+                            display.textContent = `${pageViewsText} --`;
+                        }
+                    });
+                } finally {
+                    manager.fetching = false;
+                }
             }
+        };
 
-            container?.classList.remove('hidden');
-            container.querySelector('.page-views-display').textContent = generateStatsText(pageViews, visits);
-        } catch (error) {
-            console.error('Error fetching page views:', error);
-            container?.classList.add('hidden');
-        }
+        window.__mizukiPageViewsManager = manager;
+        return manager;
     }
+
+    const pageViewsManager = ensurePageViewsManager();
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', fetchPageViews);
+        document.addEventListener('DOMContentLoaded', () => pageViewsManager.refresh());
     } else {
-        fetchPageViews();
+        pageViewsManager.refresh();
     }
+
+    window.addEventListener('mizuki:umami-ready', () => {
+        pageViewsManager.refresh();
+    });
+
+    document.addEventListener('astro:page-load', () => {
+        pageViewsManager.refresh();
+    });
 </script>
 )}

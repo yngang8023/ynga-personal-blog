@@ -312,6 +312,7 @@ export const zh_TW: Translation = {
 	[Key.siteStatsCategoryCount]: "分類",
 	[Key.siteStatsTagCount]: "標籤",
 	[Key.siteStatsTotalWords]: "總字數",
+	[Key.siteStatsTotalViews]: "總閱讀量",
 	[Key.siteStatsRunningDays]: "運行天數",
 	[Key.siteStatsLastUpdate]: "最後活動",
 	[Key.siteStatsDaysAgo]: "{days} 天前",
@@ -358,6 +359,7 @@ export const zh_TW: Translation = {
 	// 頁面瀏覽統計
 	[Key.pageViewsLoading]: "統計載入中...",
 	[Key.pageViewsUnavailable]: "統計不可用",
+	[Key.pageViewsLabel]: "閱讀量",
 
 	// 布局切換按鈕
 	[Key.switchToGridMode]: "切換到網格模式",

@@ -44,6 +44,27 @@ declare global {
 	interface Window {
 		swup: Swup | undefined;
 		closeAnnouncement: () => void;
+		oddmisc?: {
+			getStats: (path?: string) => Promise<{
+				pageviews: number;
+				visitors: number;
+				visits: number;
+			}>;
+			getSiteStats: () => Promise<{
+				pageviews: number;
+				visitors: number;
+				visits: number;
+			}>;
+			getPageStats: (path?: string) => Promise<{
+				pageviews: number;
+				visitors: number;
+				visits: number;
+			}>;
+			clearCache: () => void;
+			umami?: {
+				clearCache: () => void;
+			};
+		};
 		pagefind: {
 			search: (query: string) => Promise<{
 				results: {
@@ -87,6 +108,72 @@ declare global {
 		__mizukiRightSidebarResizeHandler?: () => void;
 		__mizukiRightSidebarSwupHooked?: boolean;
 		__mizukiRightSidebarManagerInitialized?: boolean;
+		__siteStatsFetching?: boolean;
+		__mizukiUmamiRuntimeReady?: boolean;
+		__mizukiFooterSiteStatsState?: {
+			fetching: boolean;
+			lastValues: {
+				pageviews: number;
+				visitors: number;
+				visits: number;
+			} | null;
+			render: ((values: {
+				pageviews: number;
+				visitors: number;
+				visits: number;
+			} | null) => void) | null;
+			refresh?: () => Promise<void>;
+		};
+		__mizukiPageViewsManager?: {
+			fetching: boolean;
+			refresh: (attempt?: number) => Promise<void>;
+		};
+		__mizukiArticlePageViewsCardManager?: {
+			fetching: boolean;
+			refresh: (attempt?: number) => Promise<void>;
+		};
+		__mizukiWalineConfig?: {
+			serverURL: string;
+			lang?: string;
+			meta?: ("nick" | "mail" | "link")[];
+			requiredMeta?: ("nick" | "mail" | "link")[];
+			wordLimit?: number | [number, number];
+			pageSize?: number;
+			commentSorting?: "latest" | "oldest" | "hottest";
+			dark?: string | boolean;
+			login?: "enable" | "disable" | "force";
+			noCopyright?: boolean;
+			noRss?: boolean;
+			reaction?: string[] | boolean;
+			emoji?:
+				| boolean
+				| (`//${string}` | `http://${string}` | `https://${string}`)[];
+			search?: boolean;
+			imageUploader?: boolean;
+			pageview?: boolean | string;
+			comment?: boolean | string;
+			recaptchaV3Key?: string;
+			turnstileKey?: string;
+			locale?: Record<string, string>;
+		};
+		__mizukiWalineRuntime?: {
+			instance: {
+				destroy: () => void;
+			} | null;
+			observer: IntersectionObserver | null;
+			previewObserver: MutationObserver | null;
+			initialized: boolean;
+			loading: boolean;
+			initAttemptedPath: string;
+			previewTimer: number | null;
+			bound: boolean;
+			schedulePreviewEnable: () => void;
+			observePreviewDefaults: () => void;
+			mount: () => Promise<void>;
+			destroy: () => void;
+			setupLazyLoad: () => void;
+			refresh: () => void;
+		};
 	}
 
 	interface Fancybox {

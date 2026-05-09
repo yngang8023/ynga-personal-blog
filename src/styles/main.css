@@ -7,11 +7,13 @@
 /* 导入动画样式 */
 @import "./transition.css";
 @import "./animation-enhancements.css";
+@import "./friends-page.css";
 /* 导入渐变按钮样式 */
 @import "./gradient-buttons.css";
 /* 导入 Banner 和网格布局样式 */
 @import "./banner.css";
 @import "./scrollbar.css";
+@import "@waline/client/style";
 /* 加密内容样式已移除，现在直接使用非加密文章的样式 */
 
 @plugin "@tailwindcss/typography";
@@ -331,6 +333,352 @@ html.dark::-webkit-scrollbar-thumb:hover,
     background: var(--card-bg-transparent) !important;
     backdrop-filter: blur(8px) !important;
     -webkit-backdrop-filter: blur(8px) !important;
+  }
+
+  .waline-container {
+    --waline-theme-color: var(--primary);
+    --waline-active-color: color-mix(in oklch, var(--primary) 80%, white 20%);
+    --waline-color: color-mix(in oklch, black 76%, var(--card-bg) 24%);
+    --waline-bg-color: color-mix(in oklch, var(--card-bg) 92%, white 8%);
+    --waline-bg-color-light: color-mix(in oklch, var(--card-bg) 84%, white 16%);
+    --waline-bg-color-hover: color-mix(in oklch, var(--card-bg) 72%, white 28%);
+    --waline-border-color: color-mix(in oklch, black 10%, var(--card-bg) 90%);
+    --waline-info-bg-color: color-mix(in oklch, var(--card-bg) 82%, white 18%);
+    --waline-info-color: color-mix(in oklch, black 45%, var(--card-bg) 55%);
+    --waline-disable-bg-color: color-mix(in oklch, var(--card-bg) 88%, white 12%);
+    --waline-disable-color: color-mix(in oklch, black 35%, var(--card-bg) 65%);
+    --waline-bq-color: color-mix(in oklch, var(--card-bg) 80%, white 20%);
+    --waline-avatar-radius: 1rem;
+    --waline-box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  }
+
+  :root.dark .waline-container,
+  .dark .waline-container {
+    --waline-theme-color: var(--primary);
+    --waline-active-color: color-mix(in oklch, var(--primary) 82%, white 18%);
+    --waline-color: rgba(255, 255, 255, 0.86);
+    --waline-bg-color: color-mix(in oklch, var(--card-bg) 92%, black 8%);
+    --waline-bg-color-light: color-mix(in oklch, var(--card-bg) 82%, black 18%);
+    --waline-bg-color-hover: color-mix(in oklch, var(--card-bg) 70%, black 30%);
+    --waline-border-color: rgba(255, 255, 255, 0.12);
+    --waline-info-bg-color: color-mix(in oklch, var(--card-bg) 78%, black 22%);
+    --waline-info-color: rgba(255, 255, 255, 0.6);
+    --waline-disable-bg-color: color-mix(in oklch, var(--card-bg) 75%, black 25%);
+    --waline-disable-color: rgba(255, 255, 255, 0.35);
+    --waline-bq-color: color-mix(in oklch, var(--card-bg) 76%, black 24%);
+    --waline-box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+  }
+
+  .waline-container .wl-panel,
+  .waline-container .wl-card,
+  .waline-container .wl-empty {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .waline-container .wl-panel,
+  .waline-container .wl-card {
+    border-radius: 1rem;
+  }
+
+  .waline-container .wl-editor,
+  .waline-container .wl-input {
+    line-height: 1.75;
+  }
+
+  .waline-container .wl-header,
+  .waline-container .wl-card,
+  .waline-container .wl-card-item:last-child > .wl-card {
+    border-color: var(--waline-border-color);
+  }
+
+  .waline-container .wl-power,
+  .waline-container .wl-sort li,
+  .waline-container .wl-card .wl-time,
+  .waline-container .wl-card .wl-meta > span {
+    color: var(--waline-info-color);
+  }
+
+  .waline-container .wl-count {
+    font-size: 1.1rem;
+  }
+
+  .comment-panel-card {
+    overflow: visible;
+    position: relative;
+    z-index: 2;
+  }
+
+  .comment-panel-card .waline-container,
+  .comment-panel-card .waline-container [data-waline],
+  .comment-panel-card .waline-container .wl-panel,
+  .comment-panel-card .waline-container .wl-footer,
+  .comment-panel-card .waline-container .wl-reaction,
+  .comment-panel-card .waline-container .wl-reaction-list {
+    overflow: visible;
+  }
+
+  .comment-panel-card .waline-container .wl-reaction,
+  .comment-panel-card .waline-container .wl-reaction-list,
+  .comment-panel-card .waline-container .wl-reaction-item,
+  .comment-panel-card .waline-container .wl-reaction-img {
+    overflow: visible !important;
+  }
+
+  .comment-panel-card .waline-container .wl-panel {
+    position: relative;
+    z-index: 8;
+    isolation: isolate;
+    border-radius: 1.25rem;
+    border: 1px solid color-mix(in oklch, var(--primary) 10%, var(--waline-border-color) 90%);
+    box-shadow:
+      0 22px 48px rgba(15, 23, 42, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.66);
+  }
+
+  .waline-container .wl-actions {
+    gap: 0.25rem;
+    align-items: center;
+  }
+
+  .waline-container .wl-footer {
+    position: relative;
+    align-items: center;
+    z-index: 4;
+  }
+
+  .waline-container .wl-actions > a,
+  .waline-container .wl-action,
+  .waline-container label[for="wl-image-upload"] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.875rem;
+    height: 1.875rem;
+    margin: 0;
+    padding: 0;
+    line-height: 1;
+    vertical-align: middle;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  .waline-container .wl-actions > a svg,
+  .waline-container .wl-action svg,
+  .waline-container label[for="wl-image-upload"] svg,
+  .waline-container .wl-actions > a img,
+  .waline-container .wl-action img,
+  .waline-container label[for="wl-image-upload"] img {
+    display: block;
+    width: 1.35rem;
+    height: 1.35rem;
+    flex-shrink: 0;
+  }
+
+  .waline-container .wl-actions > a,
+  .waline-container .wl-action {
+    font-size: 0;
+  }
+
+  .waline-container .wl-actions > a:first-child svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    transform: translateY(5px);
+  }
+
+  .waline-container .wl-actions > .wl-action:not(:first-child) svg,
+  .waline-container .wl-actions > a:not(:first-child) svg {
+    transform: translateY(0);
+  }
+
+  .waline-container .wl-actions > a {
+    color: var(--waline-color);
+  }
+
+  .waline-container .wl-actions > a:hover {
+    color: var(--waline-theme-color);
+  }
+
+  .waline-container #wl-image-upload,
+  .waline-container label[for="wl-image-upload"] {
+    display: none !important;
+  }
+
+  .comment-panel-card .waline-container .wl-emoji-popup,
+  .comment-panel-card .waline-container .wl-gif-popup {
+    z-index: 120;
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+  }
+
+  .comment-panel-card .waline-container .wl-meta-head,
+  .comment-panel-card .waline-container .wl-cards,
+  .comment-panel-card .waline-container .wl-empty,
+  .comment-panel-card .waline-container .wl-meta-foot {
+    position: relative;
+    z-index: 1;
+  }
+
+  .waline-container .wl-reaction-title,
+  .waline-container .wl-count,
+  .waline-container .wl-count a,
+  .waline-container .wl-empty,
+  .waline-container .wl-preview,
+  .waline-container .wl-login-info {
+    color: var(--waline-color);
+  }
+
+  .waline-container .wl-editor::placeholder,
+  .waline-container .wl-input::placeholder {
+    color: color-mix(in oklch, var(--waline-info-color) 88%, transparent 12%);
+    opacity: 1;
+  }
+
+  .dark .waline-container .wl-editor::placeholder,
+  .dark .waline-container .wl-input::placeholder,
+  :root.dark .waline-container .wl-editor::placeholder,
+  :root.dark .waline-container .wl-input::placeholder {
+    color: rgba(255, 255, 255, 0.42);
+  }
+
+  .waline-container .wl-count {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .waline-container .wl-count .wl-num {
+    color: var(--waline-theme-color);
+    font-weight: 700;
+  }
+
+  .waline-container .wl-reaction {
+    margin-bottom: 1.55rem;
+    padding-bottom: 0.95rem;
+    position: relative;
+    z-index: 30;
+    overflow: visible;
+  }
+
+  .waline-container .wl-reaction-title {
+    font-weight: 700;
+    margin-bottom: 0.65rem;
+    color: color-mix(in oklch, var(--waline-color) 92%, var(--primary) 8%);
+    letter-spacing: 0.02em;
+  }
+
+  .waline-container .wl-reaction-list {
+    position: relative;
+    z-index: 31;
+    overflow: visible;
+    gap: 1.1rem;
+    padding: 0.9rem 0.75rem 1.45rem;
+  }
+
+  .waline-container .wl-reaction-item {
+    position: relative;
+    z-index: 1;
+    transition: transform 0.25s ease;
+  }
+
+  .waline-container .wl-reaction-item:hover,
+  .waline-container .wl-reaction-item.active {
+    z-index: 40;
+  }
+
+  .waline-container .wl-reaction-item:hover {
+    transform: translateY(-3px);
+  }
+
+  .waline-container .wl-reaction-img {
+    overflow: visible;
+    width: 3.25rem;
+    height: 3.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .waline-container .wl-reaction-item img {
+    display: block;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 18px rgba(15, 23, 42, 0.08));
+    transform-origin: center;
+  }
+
+  .comment-panel-card .waline-container .wl-reaction + .wl-panel {
+    margin-top: 0.95rem;
+  }
+
+  .waline-container .wl-reaction-item:hover img,
+  .waline-container .wl-reaction-item.active img {
+    transform: scale(1.22);
+  }
+
+  .waline-container .wl-reaction-votes {
+    z-index: 3;
+    box-shadow:
+      0 8px 16px rgba(15, 23, 42, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .waline-container .wl-header {
+    border-bottom-style: dashed;
+  }
+
+  .waline-container .wl-header label {
+    color: color-mix(in oklch, var(--waline-color) 82%, var(--primary) 18%);
+    font-weight: 600;
+  }
+
+  .waline-container .wl-header input {
+    color: var(--waline-color);
+  }
+
+  .waline-container .wl-editor {
+    border-radius: 0.9rem;
+  }
+
+  .waline-container .wl-editor:focus,
+  .waline-container .wl-input:focus {
+    background: color-mix(in oklch, var(--waline-bg-color-light) 82%, var(--primary) 18%);
+  }
+
+  .waline-container .wl-empty {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+  }
+
+  .waline-container .wl-sort li {
+    transition: color 0.2s ease;
+  }
+
+  .waline-container .wl-power {
+    opacity: 0.8;
+  }
+
+  .dark .waline-container .wl-panel,
+  :root.dark .waline-container .wl-panel {
+    box-shadow:
+      0 22px 52px rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  @media (max-width: 640px) {
+    .waline-container .wl-reaction-list {
+      gap: 0.75rem;
+      padding: 0.7rem 0.25rem 1.2rem;
+    }
+
+    .waline-container .wl-reaction-img {
+      width: 2.7rem;
+      height: 2.7rem;
+    }
+
+    .waline-container .wl-reaction-votes {
+      inset-inline-end: -7px;
+      top: -8px;
+    }
   }
 
   .wallpaper-transparent .float-panel {

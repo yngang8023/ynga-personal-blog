@@ -326,6 +326,7 @@ export const en: Translation = {
 	[Key.siteStatsCategoryCount]: "Categories",
 	[Key.siteStatsTagCount]: "Tags",
 	[Key.siteStatsTotalWords]: "Total Words",
+	[Key.siteStatsTotalViews]: "Total Views",
 	[Key.siteStatsRunningDays]: "Running Days",
 	[Key.siteStatsLastUpdate]: "Last Activity",
 	[Key.siteStatsDaysAgo]: "{days} days ago",
@@ -372,6 +373,7 @@ export const en: Translation = {
 	// Page Views Stats
 	[Key.pageViewsLoading]: "Loading stats...",
 	[Key.pageViewsUnavailable]: "Stats unavailable",
+	[Key.pageViewsLabel]: "Views",
 
 	// Layout Switch Button
 	[Key.switchToGridMode]: "Switch to Grid Mode",

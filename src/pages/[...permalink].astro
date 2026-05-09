@@ -14,6 +14,7 @@ import {
 	PostMeta,
 	PostNavigation,
 } from "@components/features/posts";
+import { PageViews } from "@components/features/posts/atoms";
 import License from "@components/misc/License.astro";
 import Markdown from "@components/misc/Markdown.astro";
 import I18nKey from "@i18n/i18nKey";
@@ -37,6 +38,8 @@ import { permalinkConfig } from "@/config";
 
 import { profileConfig, siteConfig } from "../config";
 import { formatDateToYYYYMMDD } from "../utils/date-utils";
+
+const postPath = Astro.url.pathname;
 
 export async function getStaticPaths() {
 	const blogEntries = await getSortedPosts();
@@ -170,9 +173,12 @@ const jsonLd = {
 									remarkPluginFrontmatter.minutes === 1
 										? I18nKey.minuteCount
 										: I18nKey.minutesCount,
-								)
+							)
 						}
 					</div>
+				</div>
+				<div class="flex flex-row items-center">
+					<PageViews id={entry.id} />
 				</div>
 			</div>
 
@@ -201,6 +207,8 @@ const jsonLd = {
 					tags={entry.data.tags}
 					category={entry.data.category || undefined}
 					id={entry.id}
+					path={postPath}
+					showPageViews={false}
 				/>
 				{
 					(!entry.data.image ||
@@ -256,14 +264,14 @@ const jsonLd = {
 		</div>
 	</div>
 
-	<!-- 评论 -->
-	<Comment post={entry} />
-
 	{
 		siteConfig.showLastModified && (
 			<LastModified updatedDate={reliableLastModifiedDate} />
 		)
 	}
+
+	<!-- 评论 -->
+	<Comment post={entry} />
 
 	<PostNavigation
 		prevSlug={entry.data.nextSlug}

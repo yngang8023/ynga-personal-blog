@@ -30,11 +30,13 @@
 		var tagFilters = document.querySelectorAll(".filter-tag");
 		var friendCards = document.querySelectorAll(".friend-card");
 		var copyButtons = document.querySelectorAll(".copy-link-btn");
+		var guideCopyButtons = document.querySelectorAll(".friends-copy-button");
 
 		console.log("[Friends Global] Found elements:", {
 			cards: friendCards.length,
 			filters: tagFilters.length,
 			copyButtons: copyButtons.length,
+			guideCopyButtons: guideCopyButtons.length,
 		});
 
 		// 从页面获取复制成功文本
@@ -170,6 +172,41 @@
 					clickHandler,
 				]);
 			})(copyButtons[i]);
+		}
+
+		// 复制说明区内容
+		for (var k = 0; k < guideCopyButtons.length; k++) {
+			((button) => {
+				var resetTimer = null;
+				var clickHandler = () => {
+					var copyValue = button.getAttribute("data-copy");
+					if (!copyValue) return;
+
+					if (navigator.clipboard && navigator.clipboard.writeText) {
+						navigator.clipboard
+							.writeText(copyValue)
+							.then(() => {
+								if (resetTimer) {
+									clearTimeout(resetTimer);
+								}
+								button.classList.add("is-copied");
+								resetTimer = setTimeout(() => {
+									button.classList.remove("is-copied");
+									resetTimer = null;
+								}, 1600);
+							})
+							.catch((err) => {
+								console.error("[Friends Global] Guide copy failed:", err);
+							});
+					}
+				};
+				button.addEventListener("click", clickHandler);
+				window.friendsPageState.eventListeners.push([
+					button,
+					"click",
+					clickHandler,
+				]);
+			})(guideCopyButtons[k]);
 		}
 
 		window.friendsPageState.initialized = true;

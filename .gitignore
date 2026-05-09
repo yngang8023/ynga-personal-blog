@@ -54,3 +54,4 @@ src/data/bilibili-data.json
 
 # Lighthouse CI
 .lighthouseci/
+.playwright-mcp/

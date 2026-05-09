@@ -9,7 +9,7 @@ import {
 	getSortedPosts,
 	getTagList,
 } from "../../../utils/content-utils";
-import { resolvePostLastModifiedDate } from "../../../utils/post-last-modified";
+import { resolveLatestPostActivityDate } from "../../../utils/post-last-modified";
 import { getPostUrl } from "../../../utils/url-utils";
 import WidgetLayout from "../common/WidgetLayout.astro";
 
@@ -65,17 +65,8 @@ function formatNumber(num: number): string {
 	return num.toLocaleString();
 }
 
-// 获取最新发布的文章，并基于该文章的真实活动时间生成统计数据
-const latestPost = posts.reduce<typeof posts[number] | null>((latest, post) => {
-	if (!latest) {
-		return post;
-	}
-	return post.data.published > latest.data.published ? post : latest;
-}, null);
-
-const lastActivityDate = latestPost
-	? await resolvePostLastModifiedDate(latestPost)
-	: null;
+// 基于文章 frontmatter 的 updated/published 生成全站最近活动时间
+const lastActivityDate = resolveLatestPostActivityDate(posts);
 const lastActivityTimestamp = lastActivityDate?.getTime() ?? null;
 
 const stats = [

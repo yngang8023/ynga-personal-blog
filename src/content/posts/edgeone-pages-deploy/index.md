@@ -1,6 +1,7 @@
 ---
-title: 我是怎么把 Mizuki 博客部署到 EdgeOne Pages 的
+title: 将 Mizuki 博客部署到 EdgeOne Pages 的详细教程
 published: 2026-05-08
+updated: 2026-05-08T20:00:00+08:00
 description: 以我自己的博客为例，完整记录一次从本地修改、上传 GitHub、通过 GitHub Actions，到接入腾讯云 EdgeOne Pages、绑定自定义域名并开启 HTTPS 的全过程。
 image: "./images/cover.png"
 tags: [Mizuki, GitHub, EdgeOne Pages, 部署教程]

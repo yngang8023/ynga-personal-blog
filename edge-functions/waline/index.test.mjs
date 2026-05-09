@@ -1,0 +1,56 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { onRequest } from "./proxy.js";
+
+test("waline proxy strips upstream encoding headers before returning response", async () => {
+	const originalFetch = global.fetch;
+	let fetchCall;
+
+	global.fetch = async (...args) => {
+		fetchCall = args;
+		return new Response(JSON.stringify({ ok: true }), {
+			status: 200,
+			headers: {
+				"content-type": "application/json",
+				"content-encoding": "gzip",
+				"content-length": "128",
+				"transfer-encoding": "chunked",
+			},
+		});
+	};
+
+	try {
+		const request = new Request(
+			"https://ynga.kingcola-icg.cn/waline/api/comment/2?lang=zh-CN",
+			{
+				method: "PUT",
+				headers: {
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({ comment: "patched" }),
+			},
+		);
+
+		const response = await onRequest({
+			request,
+			env: {},
+		});
+
+		assert.ok(fetchCall);
+		assert.equal(fetchCall[1]?.method, "PUT");
+		assert.equal(fetchCall[1]?.headers.get("accept-encoding"), "identity");
+		assert.equal(response.status, 200);
+		assert.equal(response.headers.get("x-waline-proxy"), "edgeone-pages");
+		assert.match(
+			response.headers.get("cache-control") ?? "",
+			/no-transform/,
+		);
+		assert.equal(response.headers.get("content-encoding"), null);
+		assert.equal(response.headers.get("content-length"), null);
+		assert.equal(response.headers.get("transfer-encoding"), null);
+		assert.deepEqual(await response.json(), { ok: true });
+	} finally {
+		global.fetch = originalFetch;
+	}
+});

@@ -476,7 +476,7 @@ export const commentConfig: CommentConfig = {
 		loading: "lazy",
 	},
 	waline: {
-		serverURL: "https://ynga-blog-waline.vercel.app/",
+		serverURL: "https://ynga.kingcola-icg.cn/waline/",
 		lang: "zh-CN",
 		meta: ["nick", "mail", "link"],
 		requiredMeta: ["nick", "mail"],
@@ -488,14 +488,14 @@ export const commentConfig: CommentConfig = {
 		noCopyright: false,
 		noRss: false,
 		reaction: [
-			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f44d.svg",
-			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f970.svg",
-			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f389.svg",
-			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f525.svg",
-			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f31f.svg",
-			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f44f.svg",
-			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f917.svg",
-			"https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f92f.svg",
+			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f44d.png",
+			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f970.png",
+			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f389.png",
+			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f525.png",
+			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f31f.png",
+			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f44f.png",
+			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f917.png",
+			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f92f.png",
 		],
 		emoji: [
 			"//unpkg.com/@waline/emojis@1.4.0/bmoji",
@@ -541,10 +541,10 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	// floatingEntryMode: "default", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
 	mode: "meting", // 音乐播放器模式，可选 "local" 或 "meting"
 	meting_api: [
-		"https://meting-api-alpha-snowy.vercel.app/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
+		// "https://meting-api-alpha-snowy.vercel.app/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
 		"https://meting.mysqil.com/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
 		"https://api.injahow.cn/meting/?server=:server&type=:type&id=:id&auth=:auth&r=:r",
-		"https://meting-api-omega.vercel.app/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
+		// "https://meting-api-omega.vercel.app/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
 	], // Meting API 地址，按顺序自动兜底切换
 	// id: "3778678", // 歌单ID
 	// id: "14164869977", // 歌单ID

@@ -6,12 +6,38 @@ import { i18n } from "@/i18n/translation";
 
 interface Props {
 	path: string;
+	title?: string;
+	commentLabel?: string;
+	pageViewsLabel?: string;
+	placeholder?: string;
+	sofa?: string;
+	reactionTitle?: string;
+	reaction?: boolean;
+	showPageViewsStat?: boolean;
+	showCommentStat?: boolean;
 }
 
-const { path } = Astro.props;
+const {
+	path,
+	title = i18n(I18nKey.comments),
+	commentLabel = i18n(I18nKey.comments),
+	pageViewsLabel = i18n(I18nKey.pageViewsLabel),
+	placeholder,
+	sofa,
+	reactionTitle,
+	reaction = true,
+	showPageViewsStat = true,
+	showCommentStat = true,
+} = Astro.props;
 ---
 
-<div class="waline-comment-shell">
+<div
+	class="waline-comment-shell"
+	data-waline-placeholder={placeholder}
+	data-waline-sofa={sofa}
+	data-waline-reaction-title={reactionTitle}
+	data-waline-reaction={String(reaction)}
+>
 	<div class="waline-comment-header">
 		<div class="waline-comment-title">
 			<span
@@ -23,35 +49,43 @@ const { path } = Astro.props;
 					class="text-[1.65rem] text-[var(--primary)]"
 				/>
 			</span>
-			<span>{i18n(I18nKey.comments)}</span>
+			<span>{title}</span>
 		</div>
 		<div class="waline-comment-stats">
-			<div class="waline-comment-stat">
-				<span
-					class="waline-comment-stat-icon flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[var(--enter-btn-bg)]"
-					aria-hidden="true"
-				>
-					<Icon
-						name="material-symbols:visibility-outline-rounded"
-						class="text-[1rem] text-[var(--primary)]"
-					/>
-				</span>
-				<span>{i18n(I18nKey.pageViewsLabel)}</span>
-				<span class="waline-pageview-count" data-path={path}>--</span>
-			</div>
-			<div class="waline-comment-stat">
-				<span
-					class="waline-comment-stat-icon flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[var(--enter-btn-bg)]"
-					aria-hidden="true"
-				>
-					<Icon
-						name="material-symbols:chat-bubble-outline-rounded"
-						class="text-[1rem] text-[var(--primary)]"
-					/>
-				</span>
-				<span>{i18n(I18nKey.comments)}</span>
-				<span class="waline-comment-count" data-path={path}>--</span>
-			</div>
+			{
+				showPageViewsStat && (
+					<div class="waline-comment-stat">
+						<span
+							class="waline-comment-stat-icon flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[var(--enter-btn-bg)]"
+							aria-hidden="true"
+						>
+							<Icon
+								name="material-symbols:visibility-outline-rounded"
+								class="text-[1rem] text-[var(--primary)]"
+							/>
+						</span>
+						<span>{pageViewsLabel}</span>
+						<span class="waline-pageview-count" data-path={path}>--</span>
+					</div>
+				)
+			}
+			{
+				showCommentStat && (
+					<div class="waline-comment-stat">
+						<span
+							class="waline-comment-stat-icon flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[var(--enter-btn-bg)]"
+							aria-hidden="true"
+						>
+							<Icon
+								name="material-symbols:chat-bubble-outline-rounded"
+								class="text-[1rem] text-[var(--primary)]"
+							/>
+						</span>
+						<span>{commentLabel}</span>
+						<span class="waline-comment-count" data-path={path}>--</span>
+					</div>
+				)
+			}
 		</div>
 	</div>
 	<div id="waline-container" class="waline-container">

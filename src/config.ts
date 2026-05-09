@@ -484,7 +484,7 @@ export const commentConfig: CommentConfig = {
 		pageSize: 10,
 		commentSorting: "latest",
 		dark: ".dark",
-		login: "enable",
+		login: "force",
 		noCopyright: false,
 		noRss: false,
 		reaction: [
@@ -508,8 +508,6 @@ export const commentConfig: CommentConfig = {
 		pageview: true,
 		comment: true,
 		search: false,
-		turnstileKey:
-			import.meta.env.PUBLIC_WALINE_TURNSTILE_KEY || undefined,
 		locale: {
 			placeholder:
 				"欢迎留下你的想法，也可以分享这篇内容带给你的感受。",

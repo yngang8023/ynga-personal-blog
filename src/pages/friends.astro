@@ -1,10 +1,11 @@
 ---
+import Comment from "@components/comment/Waline.astro";
 import FriendCard from "@components/features/friends/FriendCard.astro";
 import { PageHeader } from "@components/features/page-header";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import { getEntry, render } from "astro:content";
 
-import { siteConfig } from "../config";
+import { commentConfig, siteConfig } from "../config";
 import { getFriendsList } from "../data/friends";
 import I18nKey from "../i18n/i18nKey";
 import { i18n } from "../i18n/translation";
@@ -24,6 +25,8 @@ if (!friendsPost) {
 const { Content } = await render(friendsPost);
 const friendsList = getFriendsList();
 const allTags = Array.from(new Set(friendsList.flatMap((item) => item.tags)));
+const showFriendsComment =
+	commentConfig?.enable && commentConfig.system === "waline";
 ---
 
 <MainGridLayout
@@ -121,6 +124,23 @@ const allTags = Array.from(new Set(friendsList.flatMap((item) => item.tags)));
 			<div class="mt-8">
 				<Content />
 			</div>
+
+			{
+				showFriendsComment && (
+					<div class="mt-8 card-base comment-panel-card p-6">
+						<Comment
+							path="/friends/"
+							title="友链留言"
+							commentLabel="留言数"
+							pageViewsLabel="页面浏览"
+							placeholder="如果你想申请友链，可以在这里留言并附上站点名称、简介、链接和头像地址。"
+							sofa="还没有友链留言，欢迎在这里留下你的申请或想说的话。"
+							reactionTitle=""
+							reaction={false}
+						/>
+					</div>
+				)
+			}
 
 			<!-- 隐藏元素用于传递 i18n 文本到全局脚本 -->
 			<div id="friends-copy-success-text" style="display: none;">

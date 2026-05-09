@@ -32,6 +32,9 @@ import { commentConfig } from "@/config";
 
 					const getCurrentPath = () => window.location.pathname;
 
+					const getCommentShell = () =>
+						document.querySelector(".waline-comment-shell");
+
 					const getCommentEditors = () =>
 						Array.from(
 							document.querySelectorAll<HTMLElement>(
@@ -122,6 +125,18 @@ import { commentConfig } from "@/config";
 						}
 
 						const normalizedConfig = { ...config };
+						const shell = getCommentShell();
+						const placeholder =
+							shell?.getAttribute("data-waline-placeholder") ||
+							undefined;
+						const sofa =
+							shell?.getAttribute("data-waline-sofa") ||
+							undefined;
+						const reactionTitle =
+							shell?.getAttribute("data-waline-reaction-title") ||
+							undefined;
+						const reactionEnabled =
+							shell?.getAttribute("data-waline-reaction");
 
 						// Waline 的 Vue 组件会对 imageUploader 做 Function 类型校验。
 						// 当配置为 false 时虽然语义上表示禁用，但会触发开发警告，
@@ -136,6 +151,31 @@ import { commentConfig } from "@/config";
 
 						if (!normalizedConfig.recaptchaV3Key) {
 							delete normalizedConfig.recaptchaV3Key;
+						}
+
+						if (placeholder) {
+							normalizedConfig.locale = {
+								...(normalizedConfig.locale || {}),
+								placeholder,
+							};
+						}
+
+						if (sofa) {
+							normalizedConfig.locale = {
+								...(normalizedConfig.locale || {}),
+								sofa,
+							};
+						}
+
+						if (reactionTitle) {
+							normalizedConfig.locale = {
+								...(normalizedConfig.locale || {}),
+								reactionTitle,
+							};
+						}
+
+						if (reactionEnabled === "false") {
+							normalizedConfig.reaction = false;
 						}
 
 						return {

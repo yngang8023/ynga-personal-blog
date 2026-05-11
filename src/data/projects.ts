@@ -1,6 +1,8 @@
 // Project data configuration file
 // Used to manage data for the project display page
 
+import yngaPersonalBlogCover from "../content/posts/edgeone-pages-deploy/images/cover.png?url";
+
 export interface Project {
 	id: string;
 	title: string;
@@ -22,6 +24,22 @@ export interface Project {
 }
 
 export const projectsData: Project[] = [
+	{
+		id: "ynga-personal-blog",
+		title: "HiYngaの随✏️记",
+		description:
+			"当前这个开源个人博客项目，基于 Astro 与 Mizuki 持续深度定制，并结合 Firefly 的一些实用思路来完善图表渲染、内容创作和整体阅读体验。",
+		image: yngaPersonalBlogCover,
+		category: "web",
+		techStack: ["Astro", "TypeScript", "Tailwind CSS", "Markdown"],
+		status: "completed",
+		visitUrl: "https://ynga.kingcola-icg.cn/",
+		sourceCode: "https://github.com/yngang8023/ynga-personal-blog",
+		sourceLabel: "GitHub",
+		sourceIcon: "mdi:github",
+		featured: true,
+		tags: ["个人博客", "开源项目", "内容创作"],
+	},
 	{
 		id: "kingcola-icg-official-website",
 		title: "KingCola学生团队官网",

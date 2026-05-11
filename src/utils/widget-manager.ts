@@ -170,11 +170,30 @@ export class WidgetManager {
 	 * @param component 组件配置
 	 * @param itemCount 组件内容项数量
 	 */
-	isCollapsed(component: WidgetComponentConfig, itemCount: number): boolean {
-		if (!component.responsive?.collapseThreshold) {
+	isCollapsed(
+		component: WidgetComponentConfig | undefined,
+		itemCount: number,
+	): boolean {
+		const threshold = component?.responsive?.collapseThreshold;
+		if (!threshold) {
 			return false;
 		}
-		return itemCount >= component.responsive.collapseThreshold;
+		return itemCount > threshold;
+	}
+
+	/**
+	 * 获取组件自定义属性
+	 * @param component 组件配置
+	 * @param key 属性名
+	 * @param fallback 兜底值
+	 */
+	getCustomProp<T>(
+		component: WidgetComponentConfig | undefined,
+		key: string,
+		fallback: T,
+	): T {
+		const value = component?.customProps?.[key];
+		return value === undefined ? fallback : (value as T);
 	}
 
 	/**

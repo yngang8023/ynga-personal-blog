@@ -20,6 +20,10 @@ export class FancyboxHandler {
 	private boundSelectors: string[] = [];
 	private initialized = false;
 	private websiteCardLogoCleanup: (() => void) | null = null;
+	private articleGalleryResizeCleanup: (() => void) | null = null;
+	private articleGalleryResizeTimer: number | null = null;
+	private readonly articleGallerySelector =
+		'[data-fancybox="article-gallery"]';
 
 	/**
 	 * 初始化 Fancybox
@@ -42,8 +46,11 @@ export class FancyboxHandler {
 			return;
 		}
 
-		this.bindImageSelectors();
+		this.bindArticleGallery();
+		this.bindAlbumLinks();
+		this.bindSingleFancybox();
 		this.bindWebsiteCardLogoPreview();
+		this.bindArticleGalleryResizeSync();
 		this.initialized = true;
 	}
 
@@ -71,7 +78,7 @@ export class FancyboxHandler {
 	/**
 	 * 绑定图片选择器
 	 */
-	private bindImageSelectors(): void {
+	private bindAlbumLinks(): void {
 		if (!this.Fancybox) {
 			return;
 		}
@@ -97,10 +104,115 @@ export class FancyboxHandler {
 			},
 		});
 		this.boundSelectors.push(FANCYBOX_SELECTORS.albumLinks);
+	}
 
+	private bindSingleFancybox(): void {
+		if (!this.Fancybox) {
+			return;
+		}
+
+		const commonConfig = getDefaultFancyboxConfig();
 		// 绑定单独的 fancybox 图片
 		this.Fancybox.bind(FANCYBOX_SELECTORS.singleFancybox, commonConfig);
 		this.boundSelectors.push(FANCYBOX_SELECTORS.singleFancybox);
+	}
+
+	private bindArticleGallery(): void {
+		if (!this.Fancybox) {
+			return;
+		}
+
+		this.syncArticleGalleryImages();
+
+		const commonConfig = getDefaultFancyboxConfig();
+		this.Fancybox.bind(this.articleGallerySelector, {
+			...commonConfig,
+			Carousel: {
+				transition: "slide",
+				preload: 2,
+			},
+		});
+		this.boundSelectors.push(this.articleGallerySelector);
+	}
+
+	private bindArticleGalleryResizeSync(): void {
+		if (this.articleGalleryResizeCleanup) {
+			this.articleGalleryResizeCleanup();
+		}
+
+		const handleResize = () => {
+			if (this.articleGalleryResizeTimer !== null) {
+				window.clearTimeout(this.articleGalleryResizeTimer);
+			}
+
+			this.articleGalleryResizeTimer = window.setTimeout(() => {
+				this.articleGalleryResizeTimer = null;
+				this.refreshArticleGalleryBinding();
+			}, 120);
+		};
+
+		window.addEventListener("resize", handleResize);
+		this.articleGalleryResizeCleanup = () => {
+			window.removeEventListener("resize", handleResize);
+			this.articleGalleryResizeCleanup = null;
+		};
+	}
+
+	private refreshArticleGalleryBinding(): void {
+		if (!this.Fancybox) {
+			return;
+		}
+
+		this.Fancybox.unbind(this.articleGallerySelector);
+		this.syncArticleGalleryImages();
+		this.Fancybox.bind(this.articleGallerySelector, {
+			...getDefaultFancyboxConfig(),
+			Carousel: {
+				transition: "slide",
+				preload: 2,
+			},
+		});
+	}
+
+	private isElementVisible(element: HTMLElement): boolean {
+		if (!element.isConnected) {
+			return false;
+		}
+
+		const rects = element.getClientRects();
+		if (rects.length === 0) {
+			return false;
+		}
+
+		const style = getComputedStyle(element);
+		return style.display !== "none" && style.visibility !== "hidden";
+	}
+
+	private syncArticleGalleryImages(): void {
+		const articleImages = Array.from(
+			document.querySelectorAll<HTMLElement>(
+				".custom-md img:not(.wc-logo-image), #post-cover img",
+			),
+		);
+
+		for (const image of articleImages) {
+			const currentFancybox = image.getAttribute("data-fancybox");
+			const canJoinArticleGallery =
+				currentFancybox === null || currentFancybox === "article-gallery";
+
+			if (!canJoinArticleGallery) {
+				continue;
+			}
+
+			if (this.isElementVisible(image)) {
+				image.setAttribute("data-fancybox", "article-gallery");
+				continue;
+			}
+
+			if (currentFancybox === "article-gallery") {
+				image.removeAttribute("data-fancybox");
+			}
+		}
 	}
 
 	private bindWebsiteCardLogoPreview(): void {
@@ -166,6 +278,11 @@ export class FancyboxHandler {
 			this.Fancybox.unbind(selector);
 		});
 		this.boundSelectors = [];
+		this.articleGalleryResizeCleanup?.();
+		if (this.articleGalleryResizeTimer !== null) {
+			window.clearTimeout(this.articleGalleryResizeTimer);
+			this.articleGalleryResizeTimer = null;
+		}
 		this.websiteCardLogoCleanup?.();
 	}
 

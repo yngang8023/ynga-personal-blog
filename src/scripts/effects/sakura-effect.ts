@@ -6,6 +6,55 @@
 import type { SakuraConfig } from "../../types/config";
 import { initSakura, stopSakura } from "../../utils/sakura-manager";
 
+function normalizeRoutePath(pathname: string): string {
+	const rawPath = pathname.split(/[?#]/)[0].trim().toLowerCase();
+	if (!rawPath) {
+		return "/";
+	}
+
+	let normalized = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+	normalized = normalized.replace(/\/{2,}/g, "/");
+	if (normalized.length > 1) {
+		normalized = normalized.replace(/\/+$/, "");
+	}
+	return normalized || "/";
+}
+
+function matchesRoutePattern(pattern: string, pathname: string): boolean {
+	const normalizedPattern = normalizeRoutePath(pattern);
+	const normalizedPath = normalizeRoutePath(pathname);
+
+	if (normalizedPattern === "/") {
+		return normalizedPath === "/";
+	}
+
+	if (normalizedPattern.endsWith("/**")) {
+		const prefix = normalizedPattern.slice(0, -3);
+		return (
+			normalizedPath === prefix ||
+			normalizedPath.startsWith(`${prefix}/`)
+		);
+	}
+
+	if (normalizedPattern.endsWith("/*")) {
+		const prefix = normalizedPattern.slice(0, -2);
+		if (normalizedPath === prefix) {
+			return true;
+		}
+		if (!normalizedPath.startsWith(`${prefix}/`)) {
+			return false;
+		}
+
+		const rest = normalizedPath.slice(prefix.length + 1);
+		return !rest.includes("/");
+	}
+
+	return (
+		normalizedPath === normalizedPattern ||
+		normalizedPath.startsWith(`${normalizedPattern}/`)
+	);
+}
+
 /**
  * Sakura 特效处理器类
  * 负责樱花飘落特效的初始化和状态管理
@@ -21,13 +70,40 @@ export class SakuraEffectHandler {
 		return isMobileViewport ? mobileEnabled : desktopEnabled;
 	}
 
-	private isArticlePage(): boolean {
-		const path = window.location.pathname.toLowerCase();
-		if (path.startsWith("/posts/")) {
-			return true;
+	private shouldEnableOnCurrentRoute(config: SakuraConfig): boolean {
+		const pathname = window.location.pathname;
+		const routeRules = config.routeRules;
+		const explicitDisabledRoutes = routeRules?.disabled?.filter(Boolean) ?? [];
+		const explicitEnabledRoutes = routeRules?.enabled?.filter(Boolean) ?? [];
+		const hasExplicitRouteRules =
+			explicitDisabledRoutes.length > 0 || explicitEnabledRoutes.length > 0;
+		const fallbackDisabledRoutes =
+			!hasExplicitRouteRules && config.disableOnArticle
+				? ["/posts/**"]
+				: [];
+		const disabledRoutes = [
+			...fallbackDisabledRoutes,
+			...explicitDisabledRoutes,
+		];
+
+		if (
+			disabledRoutes.some((pattern) =>
+				matchesRoutePattern(pattern, pathname),
+			)
+		) {
+			return false;
 		}
 
-		return Boolean(document.getElementById("post-container"));
+		if (
+			explicitEnabledRoutes.length > 0 &&
+			!explicitEnabledRoutes.some((pattern) =>
+				matchesRoutePattern(pattern, pathname),
+			)
+		) {
+			return false;
+		}
+
+		return true;
 	}
 
 	/**
@@ -51,7 +127,7 @@ export class SakuraEffectHandler {
 			return;
 		}
 
-		if (sakuraConfig.disableOnArticle && this.isArticlePage()) {
+		if (!this.shouldEnableOnCurrentRoute(sakuraConfig)) {
 			stopSakura();
 			this.initialized = false;
 			this.config = null;

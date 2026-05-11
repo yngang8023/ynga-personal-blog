@@ -12,10 +12,7 @@
 	const MAX_ZOOM = 6;
 	const ZOOM_STEP = 1.2;
 	const OBSERVER_MARGIN = "280px 0px 280px 0px";
-	const MERMAID_SCRIPT_SOURCES = [
-		"https://unpkg.com/mermaid@11.12.0/dist/mermaid.min.js",
-		"https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.min.js",
-	];
+	const MERMAID_SCRIPT_SOURCES = ["/diagram/mermaid.js"];
 	const IDLE_PREFETCH_LIMIT = 2;
 	const THEME_PREWARM_LIMIT = 3;
 	const renderCache = new Map();

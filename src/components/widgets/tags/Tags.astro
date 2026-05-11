@@ -2,14 +2,28 @@
 import I18nKey from "../../../i18n/i18nKey";
 import { i18n } from "../../../i18n/translation";
 import { getTagList } from "../../../utils/content-utils";
+import {
+	getComponentConfig,
+	widgetManager,
+} from "../../../utils/widget-manager";
 import { getTagUrl } from "../../../utils/url-utils";
 import ButtonTag from "../../control/ButtonTag.astro";
 import WidgetEmptyState from "../common/WidgetEmptyState.astro";
 import WidgetLayout from "../common/WidgetLayout.astro";
 
 const tags = await getTagList();
-
-const COLLAPSED_HEIGHT = "7.5rem";
+const tagsWidgetConfig = getComponentConfig("tags");
+const isCollapsed = widgetManager.isCollapsed(tagsWidgetConfig, tags.length);
+const collapsedHeight = widgetManager.getCustomProp(
+	tagsWidgetConfig,
+	"collapsedHeight",
+	"7.5rem",
+);
+const collapsedRows = widgetManager.getCustomProp(
+	tagsWidgetConfig,
+	"collapsedRows",
+	3,
+);
 
 interface Props {
 	class?: string;
@@ -22,8 +36,9 @@ const style = Astro.props.style;
 <WidgetLayout
 	name={i18n(I18nKey.tags)}
 	id="tags"
-	isCollapsed={tags.length > 0}
-	collapsedHeight={COLLAPSED_HEIGHT}
+	isCollapsed={isCollapsed}
+	collapsedHeight={collapsedHeight}
+	collapsedRows={collapsedRows}
 	class={className}
 	style={style}
 >

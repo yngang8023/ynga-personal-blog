@@ -22,7 +22,7 @@
 
 /* Migrate from v3 config */
 @theme {
-  --font-sans: "Roboto", "sans-serif", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: "LXGWWenKai-Regular", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 
   --breakpoint-md: 768px;
   --breakpoint-lg: 1280px;
@@ -50,8 +50,14 @@
 @font-face {
   font-family: "LXGWWenKai-Regular";
   src: url("/assets/font/LXGWWenKai-Regular.ttf") format("truetype");
-  font-weight: 500;
+  font-weight: 400 700;
+  font-style: normal;
   font-display: swap;
+}
+
+html,
+body {
+  font-family: "LXGWWenKai-Regular", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 /* 确保平滑滚动，并稳定滚动条宽度以避免布局左右抖动 */

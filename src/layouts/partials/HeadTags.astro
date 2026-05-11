@@ -44,6 +44,27 @@ const keywords = siteConfig.keywords;
 // Favicons
 const favicons: Favicon[] =
 	siteConfig.favicon.length > 0 ? siteConfig.favicon : defaultFavicons;
+
+const fontPreloadFiles = Array.from(
+	new Set(
+		[
+			...(siteConfig.font.asciiFont?.enableCompress === false
+				? siteConfig.font.asciiFont.localFonts
+				: []),
+			...(siteConfig.font.cjkFont?.enableCompress === false
+				? siteConfig.font.cjkFont.localFonts
+				: []),
+		].filter(Boolean),
+	),
+);
+
+const getFontMimeType = (fileName: string): string => {
+	const lowerName = fileName.toLowerCase();
+	if (lowerName.endsWith(".woff2")) return "font/woff2";
+	if (lowerName.endsWith(".woff")) return "font/woff";
+	if (lowerName.endsWith(".otf")) return "font/otf";
+	return "font/ttf";
+};
 ---
 
 <!-- SEO Meta Tags -->
@@ -92,8 +113,17 @@ const favicons: Favicon[] =
 	))
 }
 
-<!-- 字体通过构建脚本压缩到 /assets/font/ 目录，此处不再预加载以避免 404 -->
-<!-- 字体在构建时通过 scripts/compress-fonts.js 处理并复制到 dist/ -->
+<!-- 未启用子集压缩的正文主字体可直接预加载，减少首屏回退 -->
+{
+	fontPreloadFiles.map((fontFile) => (
+		<link
+			rel="preload"
+			href={url(`/assets/font/${fontFile}`)}
+			as="font"
+			type={getFontMimeType(fontFile)}
+		/>
+	))
+}
 
 <!-- 预连接 Iconify API 以减少图标加载延迟 -->
 <link rel="preconnect" href="https://api.iconify.design" crossorigin />

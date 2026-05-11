@@ -85,7 +85,9 @@ const markdownPipelineDigest = createPluginSourceDigest([
 const plantumlConfig = {
 	enable: true,
 	servers: [
-		"https://www.plantuml.com/plantuml",
+		new URL("/diagram/plantuml", siteConfig.siteURL)
+			.toString()
+			.replace(/\/+$/, ""),
 	],
 	lightTheme: "",
 	darkTheme: "cyborg",

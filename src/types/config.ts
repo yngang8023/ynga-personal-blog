@@ -431,7 +431,11 @@ export interface WidgetComponentConfig {
 		hidden?: ("mobile" | "tablet" | "desktop")[]; // 在指定设备上隐藏
 		collapseThreshold?: number; // 折叠阈值
 	};
-	customProps?: Record<string, any>; // 自定义属性，用于扩展组件功能
+	customProps?: {
+		collapsedRows?: number; // 折叠状态下最多显示的行数
+		collapsedHeight?: string; // 折叠状态下的兜底高度
+		[key: string]: unknown;
+	}; // 自定义属性，用于扩展组件功能
 }
 
 export interface SidebarLayoutConfig {
@@ -461,6 +465,7 @@ export interface SakuraConfig {
 		desktop?: boolean; // 是否在桌面端启用
 		mobile?: boolean; // 是否在移动端启用
 	};
+	routeRules?: SakuraRouteRules; // 按路由控制樱花特效显示范围
 	disableOnArticle?: boolean; // 是否在文章阅读页禁用樱花特效
 	sakuraNum: number; // 樱花数量，默认21
 	limitTimes: number; // 樱花越界限制次数，-1为无限循环
@@ -485,6 +490,11 @@ export interface SakuraConfig {
 		fadeSpeed: number; // 消失速度
 	};
 	zIndex: number; // 层级，确保樱花在合适的层级显示
+}
+
+export interface SakuraRouteRules {
+	enabled?: string[]; // 白名单路由，配置后仅这些路由允许显示
+	disabled?: string[]; // 黑名单路由，匹配到这些路由时禁用显示
 }
 
 export interface FullscreenWallpaperConfig {

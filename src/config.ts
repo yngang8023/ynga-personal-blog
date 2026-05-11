@@ -234,7 +234,7 @@ export const siteConfig: SiteConfig = {
 			fontFamily: "LXGWWenKai-Regular",
 			fontWeight: "400",
 			localFonts: ["LXGWWenKai-Regular.ttf"],
-			enableCompress: true, // 启用字体子集优化，减少字体文件大小
+			enableCompress: false, // 关闭子集优化，避免正文偶发缺字/回退
 		},
 		cjkFont: {
 			// 中日韩字体 - 作为回退字体
@@ -242,7 +242,7 @@ export const siteConfig: SiteConfig = {
 			fontFamily: "LXGWWenKai-Regular",
 			fontWeight: "500",
 			localFonts: ["LXGWWenKai-Regular.ttf"],
-			enableCompress: true, // 启用字体子集优化，减少字体文件大小
+			enableCompress: false, // 关闭子集优化，保证正文字体稳定一致
 		},
 	},
 	showLastModified: true, // 控制"上次编辑"卡片显示的开关
@@ -594,8 +594,19 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 			animationDelay: 50,
 			// 响应式配置
 			responsive: {
-				// 折叠阈值：当分类数量超过5个时自动折叠
-				collapseThreshold: 5,
+				// 折叠阈值：当分类数量超过4个时自动折叠
+				collapseThreshold: 4,
+			},
+			// itemCount > collapseThreshold 且 actualRowCount > collapsedRows
+			// 先满足 itemCount > collapseThreshold，组件才进入可折叠状态；
+			// 再满足 actualRowCount > collapsedRows，才会真的折叠并显示“查看更多”
+			// 两者同时满足，才会折叠。
+			// 组件专属属性
+			customProps: {
+				// 折叠后默认最多显示四行
+				collapsedRows: 4,
+				// 折叠状态兜底高度
+				collapsedHeight: "7.5rem",
 			},
 		},
 		{
@@ -626,8 +637,19 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 			animationDelay: 250,
 			// 响应式配置
 			responsive: {
-				// 折叠阈值：当标签数量超过20个时自动折叠
-				collapseThreshold: 20,
+				// 折叠阈值：当标签数量超过10个时自动折叠
+				collapseThreshold: 10,
+			},
+			// itemCount > collapseThreshold 且 actualRowCount > collapsedRows
+			// 先满足 itemCount > collapseThreshold，组件才进入可折叠状态；
+			// 再满足 actualRowCount > collapsedRows，才会真的折叠并显示“查看更多”
+			// 两者同时满足，才会折叠。
+			// 组件专属属性
+			customProps: {
+				// 折叠后默认最多显示四行
+				collapsedRows: 4,
+				// 折叠状态兜底高度
+				collapsedHeight: "7.5rem",
 			},
 		},
 		{
@@ -705,7 +727,11 @@ export const sakuraConfig: SakuraConfig = {
 		desktop: true, // 桌面端启用樱花特效
 		mobile: false, // 移动端关闭樱花特效
 	},
-	disableOnArticle: true, // 在文章阅读页自动关闭樱花特效，减少阅读干扰
+	// 路由级控制：后续想屏蔽其它页面，直接继续往 disabled 里追加即可
+	routeRules: {
+		disabled: ["/posts/**"],
+		// disabled: [""],
+	},
 	sakuraNum: 21, // 樱花数量
 	limitTimes: -1, // 樱花越界限制次数，-1为无限循环
 	size: {

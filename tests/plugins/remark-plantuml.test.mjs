@@ -16,10 +16,7 @@ test("remarkPlantuml converts plantuml code fences into diagram container nodes"
 	};
 
 	remarkPlantuml({
-		servers: [
-			"https://example.com/plantuml",
-			"https://backup.example.com/plantuml",
-		],
+		servers: ["https://example.com/diagram/plantuml"],
 		darkTheme: "cyborg",
 	})(tree);
 
@@ -29,11 +26,11 @@ test("remarkPlantuml converts plantuml code fences into diagram container nodes"
 	assert.deepEqual(node.data.hProperties.className, ["plantuml-container"]);
 	assert.match(
 		node.data.hProperties["data-plantuml-light"],
-		/^https:\/\/example\.com\/plantuml\/svg\//,
+		/^https:\/\/example\.com\/diagram\/plantuml\/svg\//,
 	);
 	assert.match(
 		node.data.hProperties["data-plantuml-dark"],
-		/^https:\/\/example\.com\/plantuml\/svg\//,
+		/^https:\/\/example\.com\/diagram\/plantuml\/svg\//,
 	);
 	assert.notEqual(
 		node.data.hProperties["data-plantuml-light"],
@@ -41,23 +38,11 @@ test("remarkPlantuml converts plantuml code fences into diagram container nodes"
 	);
 	assert.deepEqual(
 		JSON.parse(node.data.hProperties["data-plantuml-light-sources"]),
-		[
-			node.data.hProperties["data-plantuml-light"],
-			node.data.hProperties["data-plantuml-light"].replace(
-				"https://example.com/plantuml/",
-				"https://backup.example.com/plantuml/",
-			),
-		],
+		[node.data.hProperties["data-plantuml-light"]],
 	);
 	assert.deepEqual(
 		JSON.parse(node.data.hProperties["data-plantuml-dark-sources"]),
-		[
-			node.data.hProperties["data-plantuml-dark"],
-			node.data.hProperties["data-plantuml-dark"].replace(
-				"https://example.com/plantuml/",
-				"https://backup.example.com/plantuml/",
-			),
-		],
+		[node.data.hProperties["data-plantuml-dark"]],
 	);
 	assert.equal(
 		node.data.hChildren[0].value,

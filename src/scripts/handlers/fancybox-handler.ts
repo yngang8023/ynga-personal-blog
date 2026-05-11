@@ -19,6 +19,7 @@ export class FancyboxHandler {
 	private Fancybox: FancyboxType | null = null;
 	private boundSelectors: string[] = [];
 	private initialized = false;
+	private websiteCardLogoCleanup: (() => void) | null = null;
 
 	/**
 	 * 初始化 Fancybox
@@ -42,6 +43,7 @@ export class FancyboxHandler {
 		}
 
 		this.bindImageSelectors();
+		this.bindWebsiteCardLogoPreview();
 		this.initialized = true;
 	}
 
@@ -52,7 +54,8 @@ export class FancyboxHandler {
 		return (
 			document.querySelector(FANCYBOX_SELECTORS.albumImages) !== null ||
 			document.querySelector(FANCYBOX_SELECTORS.albumLinks) !== null ||
-			document.querySelector(FANCYBOX_SELECTORS.singleFancybox) !== null
+			document.querySelector(FANCYBOX_SELECTORS.singleFancybox) !== null ||
+			document.querySelector(".card-website .wc-logo-shell") !== null
 		);
 	}
 
@@ -100,6 +103,56 @@ export class FancyboxHandler {
 		this.boundSelectors.push(FANCYBOX_SELECTORS.singleFancybox);
 	}
 
+	private bindWebsiteCardLogoPreview(): void {
+		if (!this.Fancybox) {
+			return;
+		}
+
+		this.websiteCardLogoCleanup?.();
+
+		const handler = (event: Event) => {
+			const target = event.target;
+			if (!(target instanceof Element)) {
+				return;
+			}
+
+			const logoShell = target.closest(".card-website .wc-logo-shell");
+			if (!logoShell) {
+				return;
+			}
+
+			const card = logoShell.closest<HTMLElement>(".card-website");
+			const logoImage = card?.querySelector<HTMLImageElement>(".wc-logo-image");
+			const logoSrc = card?.getAttribute("data-logo-src") || logoImage?.currentSrc || logoImage?.src || "";
+			const logoCaption =
+				card?.getAttribute("data-logo-caption") ||
+				logoImage?.getAttribute("alt") ||
+				"website logo";
+
+			if (!logoSrc || !this.Fancybox?.show) {
+				return;
+			}
+
+			event.preventDefault();
+			event.stopPropagation();
+
+			this.Fancybox.show([
+				{
+					src: logoSrc,
+					type: "image",
+					caption: logoCaption,
+				},
+			]);
+		};
+
+		document.addEventListener("click", handler, true);
+
+		this.websiteCardLogoCleanup = () => {
+			document.removeEventListener("click", handler, true);
+			this.websiteCardLogoCleanup = null;
+		};
+	}
+
 	/**
 	 * 清理 Fancybox 绑定
 	 * 在页面切换前调用
@@ -113,6 +166,7 @@ export class FancyboxHandler {
 			this.Fancybox.unbind(selector);
 		});
 		this.boundSelectors = [];
+		this.websiteCardLogoCleanup?.();
 	}
 
 	/**

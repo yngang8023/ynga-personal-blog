@@ -23,9 +23,11 @@
 		monthNames: string[];
 		weekDays: string[];
 		yearSuffix: string;
+		calendarDataVersion: string;
 	}
 
-	const { monthNames, weekDays, yearSuffix }: Props = $props();
+	const { monthNames, weekDays, yearSuffix, calendarDataVersion }: Props =
+		$props();
 
 	// State
 	let allPostsData: CalendarPost[] = $state([]);
@@ -106,7 +108,10 @@
 	// Functions
 	async function fetchCalendarData() {
 		try {
-			const res = await fetch("/api/calendar-data.json");
+			const query = encodeURIComponent(calendarDataVersion);
+			const res = await fetch(`/api/calendar-data.json?v=${query}`, {
+				cache: "no-store",
+			});
 			const data = await res.json();
 			if (Array.isArray(data)) {
 				allPostsData = data;

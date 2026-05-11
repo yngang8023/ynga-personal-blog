@@ -150,6 +150,13 @@ function createExternalLinkRedirect() {
 			return;
 		}
 
+		const isWebsiteCardLogoClick = Boolean(
+			target.closest(".card-website .wc-logo-shell"),
+		);
+		if (isWebsiteCardLogoClick) {
+			return;
+		}
+
 		const anchor = target.closest("a[href]");
 		if (!(anchor instanceof HTMLAnchorElement)) {
 			return;

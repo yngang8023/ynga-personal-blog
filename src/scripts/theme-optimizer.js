@@ -35,7 +35,13 @@ class ThemeOptimizer {
 			".dropdown-content",
 			".widget",
 			".post-card",
+		];
+		this.protectedContentSelectors = [
 			".custom-md",
+			".mermaid-wrapper",
+			".mermaid-diagram-container",
+			".plantuml-wrapper",
+			".plantuml-diagram-container",
 		];
 
 		this.init();
@@ -359,14 +365,11 @@ class ThemeOptimizer {
 					const isTransitioning = classList.contains(
 						"is-theme-transitioning",
 					);
-					const useViewTransition = classList.contains(
-						"use-view-transition",
-					);
 
 					if (isTransitioning && !this.isOptimizing) {
-						this.optimizeThemeSwitch(useViewTransition);
+						this.optimizeThemeSwitch();
 					} else if (!isTransitioning && this.isOptimizing) {
-						this.restoreAfterThemeSwitch(useViewTransition);
+						this.restoreAfterThemeSwitch();
 					}
 				}
 			}
@@ -378,14 +381,8 @@ class ThemeOptimizer {
 		});
 	}
 
-	optimizeThemeSwitch(useViewTransition = false) {
+	optimizeThemeSwitch() {
 		this.isOptimizing = true;
-		this.useViewTransition = useViewTransition;
-
-		// 如果使用 View Transitions，不需要额外的优化，让浏览器处理
-		if (useViewTransition) {
-			return;
-		}
 
 		// 1. 临时禁用重型元素动画
 		this.disableHeavyAnimations();
@@ -411,8 +408,7 @@ class ThemeOptimizer {
       .is-theme-transitioning .widget,
       .is-theme-transitioning .post-card,
       .is-theme-transitioning #navbar *,
-      .is-theme-transitioning .dropdown-content,
-      .is-theme-transitioning .custom-md * {
+      .is-theme-transitioning .dropdown-content {
         transition: none !important;
         animation: none !important;
       }
@@ -453,6 +449,13 @@ class ThemeOptimizer {
     `;
 	}
 
+	shouldKeepVisibleDuringThemeSwitch(element) {
+		return this.protectedContentSelectors.some(
+			(selector) =>
+				element.matches(selector) || element.closest(selector) !== null,
+		);
+	}
+
 	hideOffscreenHeavyElements() {
 		const viewportHeight = window.innerHeight;
 		const scrollTop = window.scrollY;
@@ -462,6 +465,10 @@ class ThemeOptimizer {
 		this.heavySelectors.forEach((selector) => {
 			const elements = document.querySelectorAll(selector);
 			elements.forEach((element) => {
+				if (this.shouldKeepVisibleDuringThemeSwitch(element)) {
+					return;
+				}
+
 				const rect = element.getBoundingClientRect();
 				const elementTop = rect.top + scrollTop;
 				const elementBottom = elementTop + rect.height;
@@ -498,14 +505,8 @@ class ThemeOptimizer {
 		});
 	}
 
-	restoreAfterThemeSwitch(useViewTransition = false) {
+	restoreAfterThemeSwitch() {
 		this.isOptimizing = false;
-
-		// 如果使用 View Transitions，直接清理即可
-		if (useViewTransition) {
-			this.useViewTransition = false;
-			return;
-		}
 
 		// 延迟恢复，确保主题切换完全完成
 		requestAnimationFrame(() => {

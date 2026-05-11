@@ -220,6 +220,7 @@ Mizuki supports enhanced features beyond standard GitHub Flavored Markdown:
 - **Math Formulas:** Write LaTeX math formulas using `$inline$` and `$$block$$` syntax
 - **Code Highlighting:** Advanced syntax highlighting with line numbers and copy buttons
 - **GitHub Cards:** Embed repository cards using `::github{repo="user/repo"}`
+- **Gitee Cards:** Embed repository cards using `::gitee{repo="user/repo"}`
 
 ### 🎨 Visual Elements
 - **Image Gallery:** Automatic PhotoSwipe integration for image viewing

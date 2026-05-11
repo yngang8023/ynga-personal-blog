@@ -2,8 +2,10 @@
 import { siteConfig } from "../../../config";
 import I18nKey from "../../../i18n/i18nKey";
 import { i18n } from "../../../i18n/translation";
+import { getSortedPosts } from "../../../utils/content-utils";
 import WidgetLayout from "../common/WidgetLayout.astro";
 import CalendarWidget from "./Calendar.svelte";
+import { createCalendarDataVersion } from "./utils/calendarDataVersion.js";
 
 interface Props {
 	class?: string;
@@ -39,6 +41,7 @@ const weekDays = [
 
 const isChinese = siteConfig.lang.startsWith("zh");
 const yearSuffix = isChinese ? "年" : " ";
+const calendarDataVersion = createCalendarDataVersion(await getSortedPosts());
 ---
 
 <WidgetLayout
@@ -46,5 +49,11 @@ const yearSuffix = isChinese ? "年" : " ";
 	class={`hidden md:block ${className}`}
 	style={style}
 >
-	<CalendarWidget client:visible {monthNames} {weekDays} {yearSuffix} />
+	<CalendarWidget
+		client:visible
+		{monthNames}
+		{weekDays}
+		{yearSuffix}
+		{calendarDataVersion}
+	/>
 </WidgetLayout>

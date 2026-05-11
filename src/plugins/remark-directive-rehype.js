@@ -23,7 +23,12 @@ export function parseDirectiveNode() {
 				const hast = h(node.name, node.attributes);
 
 				data.hName = hast.tagName;
-				data.hProperties = hast.properties;
+				// Preserve custom directive attributes like layout/columns/gap while
+				// still keeping hastscript's normalized HTML properties.
+				data.hProperties = {
+					...node.attributes,
+					...hast.properties,
+				};
 			}
 		});
 	};

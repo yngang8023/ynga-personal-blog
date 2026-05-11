@@ -163,7 +163,7 @@ a.card-github
   .gc-language
     display: none
 
-  .gc-stars, .gc-forks, .gc-license, .github-logo
+  .gc-stars, .gc-forks, .gc-license, .github-logo, .gitee-logo
     font-weight: 500
     font-size: 0.875rem
     opacity: 0.9;
@@ -206,6 +206,19 @@ a.card-github
       margin-right: 0
       mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='31' height='32' viewBox='0 0 496 512'%3E%3Cpath fill='%23a1f7cb' d='M165.9 397.4c0 2-2.3 3.6-5.2 3.6c-3.3.3-5.6-1.3-5.6-3.6c0-2 2.3-3.6 5.2-3.6c3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9c2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9c.3 2 2.9 3.3 5.9 2.6c2.9-.7 4.9-2.6 4.6-4.6c-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2c12.8 2.3 17.3-5.6 17.3-12.1c0-6.2-.3-40.4-.3-61.4c0 0-70 15-84.7-29.8c0 0-11.4-29.1-27.8-36.6c0 0-22.9-15.7 1.6-15.4c0 0 24.9 2 38.6 25.8c21.9 38.6 58.6 27.5 72.9 20.9c2.3-16 8.8-27.1 16-33.7c-55.9-6.2-112.3-14.3-112.3-110.5c0-27.5 7.6-41.3 23.6-58.9c-2.6-6.5-11.1-33.3 2.6-67.9c20.9-6.5 69 27 69 27c20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27c13.7 34.7 5.2 61.4 2.6 67.9c16 17.7 25.8 31.5 25.8 58.9c0 96.5-58.9 104.2-114.8 110.5c9.2 7.9 17 22.9 17 46.4c0 33.7-.3 75.4-.3 83.6c0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252C496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2c1.6 1.6 3.9 2.3 5.2 1c1.3-1 1-3.3-.7-5.2c-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9c1.6 1 3.6.7 4.3-.7c.7-1.3-.3-2.9-2.3-3.9c-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2c2.3 2.3 5.2 2.6 6.5 1c1.3-1.3.7-4.3-1.3-6.2c-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9c1.6 2.3 4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2c-1.4-2.3-4-3.3-5.6-2'/%3E%3C/svg%3E")
 
+  .gitee-logo
+    font-size: 1.25rem
+
+    &:before
+      width: 1.5em
+      background-color: transparent
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'%3E%3Cpath d='M512 1024C229.222 1024 0 794.778 0 512S229.222 0 512 0s512 229.222 512 512-229.222 512-512 512z m259.149-568.883h-290.74a25.293 25.293 0 0 0-25.292 25.293l-0.026 63.206c0 13.952 11.315 25.293 25.267 25.293h177.024c13.978 0 25.293 11.315 25.293 25.267v12.646a75.853 75.853 0 0 1-75.853 75.853h-240.23a25.293 25.293 0 0 1-25.267-25.293V417.203a75.853 75.853 0 0 1 75.827-75.853h353.946a25.293 25.293 0 0 0 25.267-25.292l0.077-63.207a25.293 25.293 0 0 0-25.268-25.293H417.152a189.62 189.62 0 0 0-189.62 189.645V771.15c0 13.977 11.316 25.293 25.294 25.293h372.94a170.65 170.65 0 0 0 170.65-170.65V480.384a25.293 25.293 0 0 0-25.293-25.267z' fill='%23C71D23'/%3E%3C/svg%3E")
+      background-size: contain
+      background-position: center
+      background-repeat: no-repeat
+      margin-right: 0
+      mask-image: none
+
 a.card-github.fetch-waiting
   pointer-events: none
   opacity: 0.7
@@ -239,49 +252,79 @@ a.card-github.fetch-error
   100%
     opacity: 0.15
 
-.card-github, .gc-description, .gc-titlebar, .gc-stars, .gc-forks, .gc-license, .gc-avatar, .github-logo
+.card-github, .card-gitee, .gc-description, .gc-titlebar, .gc-stars, .gc-forks, .gc-license, .gc-avatar, .github-logo, .gitee-logo
   transition-property: all
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)
   transition-duration: 0.15s
 
 // Mermaid 图表样式
 .mermaid-diagram-container
+  position: relative
   margin: 1rem 0
   border-radius: 0.75rem
   overflow: hidden
   background: var(--card-bg)
   transition: all 0.3s ease
+  --mermaid-preview-height: clamp(240px, 48vw, 460px)
 
   &:hover
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1)
 
 .mermaid-wrapper
-  padding: 1.5rem
-  text-align: center
+  padding: 1rem
+  position: relative
 
 .mermaid
-  display: flex
-  justify-content: center
-  align-items: center
-  min-height: 100px
   font-family: inherit
-  position: relative;
-  overflow: hidden;
+  position: relative
+  min-height: 0
+
+.mermaid-viewport
+  position: relative
+  width: 100%
+  height: var(--mermaid-preview-height, clamp(240px, 48vw, 460px))
+  overflow: hidden
+  border-radius: 0.75rem
+  border: 1px solid var(--btn-regular-bg)
+  background: unquote('color-mix(in srgb, var(--card-bg) 84%, white 16%)')
+  cursor: grab
+  touch-action: none
+
+  &:active
+    cursor: grabbing
+
+.mermaid-viewport-fullscreen
+  height: 100%
+  border: none
+  border-radius: 0
+  background: transparent
+
+.mermaid-stage
+  position: absolute
+  top: 0
+  left: 0
+  transform-origin: 0 0
+  will-change: transform
+  transition: transform 0.12s ease-out
 
   svg
-    max-width: 100%
-    height: auto
-    border-radius: 0.5rem
-    user-select: none;
-    pointer-events: all;
+    display: block
+    max-width: none
+    max-height: none
+    user-select: none
+    pointer-events: auto
 
 .mermaid-loading
   display: flex
   align-items: center
   justify-content: center
+  min-height: clamp(220px, 36vw, 320px)
   padding: 2rem
   color: var(--text-color-secondary)
   font-style: italic
+  border-radius: 0.75rem
+  border: 1px dashed var(--btn-regular-bg)
+  background: unquote('color-mix(in srgb, var(--card-bg) 88%, white 12%)')
   
   &::before
     content: ""
@@ -303,9 +346,9 @@ a.card-github.fetch-error
   color: var(--admonitions-color-warning)
   background: rgba(239, 68, 68, 0.1)
   border: 1px solid var(--admonitions-color-warning)
-  border-radius: 0.5rem
-  padding: 1rem
-  margin: 1rem 0
+  border-radius: 0.75rem
+  padding: 1.1rem
+  margin: 0
   text-align: center
   font-weight: 500
   
@@ -313,6 +356,12 @@ a.card-github.fetch-error
     margin: 0 0 0.5rem 0
     
   button
+    padding: 0.45rem 0.85rem
+    background: var(--primary)
+    color: white
+    border: none
+    border-radius: 0.5rem
+    cursor: pointer
     transition: all 0.2s ease
     
     &:hover
@@ -323,33 +372,405 @@ a.card-github.fetch-error
 .dark .mermaid-diagram-container
   background: var(--card-bg)
 
-  svg
-    filter: brightness(0.9) contrast(1.1)
+  .mermaid-viewport
+    background: unquote('color-mix(in srgb, var(--card-bg) 92%, black 8%)')
+
+body.mermaid-fullscreen-open
+  overflow: hidden
+
+.mermaid-controls
+  position: absolute
+  top: 1.25rem
+  right: 1.25rem
+  display: flex
+  gap: 4px
+  opacity: 0.5
+  transition: opacity 0.2s ease
+  z-index: 10
+
+  &:hover
+    opacity: 1
+
+.mermaid-ctrl-btn
+  width: 28px
+  height: 28px
+  border: none
+  border-radius: 6px
+  background: var(--btn-regular-bg)
+  color: var(--btn-content)
+  font-size: 14px
+  line-height: 28px
+  text-align: center
+  cursor: pointer
+  padding: 0
+  display: flex
+  align-items: center
+  justify-content: center
+  transition: all 0.15s ease
+  backdrop-filter: blur(8px)
+
+  &:hover
+    background: var(--btn-regular-bg-hover)
+    transform: translateY(-1px)
+
+  &:active
+    background: var(--btn-regular-bg-active)
+    transform: translateY(0)
+
+.mermaid-fullscreen-overlay
+  position: fixed
+  top: 0
+  left: 0
+  width: 100vw
+  height: 100vh
+  background: rgba(0, 0, 0, 0.85)
+  z-index: 9999
+  display: flex
+  align-items: center
+  justify-content: center
+
+.mermaid-fs-content
+  width: 90vw
+  height: 85vh
+  background: rgba(255, 255, 255, 0.95)
+  overflow: hidden
+  display: flex
+  align-items: center
+  justify-content: center
+
+  .mermaid-viewport
+    height: 100%
+
+.dark .mermaid-fs-content
+  background: rgba(8, 15, 30, 0.95)
+
+.mermaid-fs-controls
+  position: fixed
+  top: 16px
+  right: 16px
+  display: flex
+  gap: 6px
+  z-index: 10000
+  background: rgba(255, 255, 255, 0.1)
+  backdrop-filter: blur(12px)
+  padding: 6px
+  border-radius: 10px
+
+  .mermaid-ctrl-btn
+    width: 36px
+    height: 36px
+    font-size: 18px
+    border-radius: 8px
+    background: rgba(255, 255, 255, 0.15)
+    color: #fff
+
+    &:hover
+      background: rgba(255, 255, 255, 0.3)
+
+    &:active
+      background: rgba(255, 255, 255, 0.2)
 
 // 响应式设计
 @media (max-width: 768px)
   .mermaid-wrapper
+    padding: 0.75rem
+
+  .mermaid-diagram-container
+    --mermaid-preview-height: clamp(220px, 62vw, 380px)
+
+  .mermaid-controls
+    opacity: 0.82
+    top: 1rem
+    right: 1rem
+
+  .mermaid-ctrl-btn
+    width: 32px
+    height: 32px
+    font-size: 16px
+
+// PlantUML 图表样式
+.plantuml-diagram-container
+  position: relative
+  margin: 1rem 0
+  border-radius: 0.75rem
+  overflow: hidden
+  background: var(--card-bg)
+  transition: all 0.3s ease
+  touch-action: none
+
+  &:hover
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1)
+
+    .plantuml-controls
+      opacity: 1
+
+.plantuml-wrapper
+  padding: 1.5rem
+  display: flex
+  justify-content: center
+  align-items: center
+  min-height: 100px
+  max-height: 420px
+  overflow: hidden
+  position: relative
+
+.plantuml-image
+  max-width: 100%
+  max-height: 420px
+  height: auto
+  display: block
+  user-select: none
+  -webkit-user-drag: none
+  transition: transform 0.12s ease-out, opacity 0.18s ease
+  will-change: transform
+
+.plantuml-source-panel
+  margin: 0 1rem 1rem
+  border: 1px solid var(--btn-regular-bg)
+  border-radius: 0.75rem
+  background: unquote('color-mix(in srgb, var(--card-bg) 92%, black 8%)')
+  overflow: hidden
+
+.plantuml-source-actions
+  display: flex
+  justify-content: flex-end
+  padding: 0.5rem 0.75rem
+  border-bottom: 1px solid var(--btn-regular-bg)
+
+.plantuml-source-btn
+  border: none
+  border-radius: 0.5rem
+  background: var(--btn-regular-bg)
+  color: var(--btn-content)
+  padding: 0.35rem 0.7rem
+  cursor: pointer
+
+  &:hover
+    background: var(--btn-regular-bg-hover)
+
+.plantuml-source-btn[data-copy-state='success'],
+.plantuml-ctrl-btn[data-copy-state='success']
+  background: #16a34a
+  color: #fff
+
+  &:hover
+    background: #15803d
+
+.plantuml-source-btn[data-copy-state='warning'],
+.plantuml-ctrl-btn[data-copy-state='warning']
+  background: #d97706
+  color: #fff
+
+  &:hover
+    background: #b45309
+
+.plantuml-source-btn[data-copy-state='error'],
+.plantuml-ctrl-btn[data-copy-state='error']
+  background: #dc2626
+  color: #fff
+
+  &:hover
+    background: #b91c1c
+
+.plantuml-source-code
+  margin: 0
+  padding: 0.9rem 1rem 1rem
+  overflow: auto
+  white-space: pre-wrap
+  word-break: break-word
+  font-size: 0.875rem
+  line-height: 1.6
+  font-family: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace
+
+.plantuml-loading
+  display: flex
+  align-items: center
+  justify-content: center
+  position: absolute
+  inset: 0
+  padding: 2rem
+  color: var(--text-color-secondary)
+  font-style: italic
+  background: unquote('color-mix(in srgb, var(--card-bg) 88%, white 12%)')
+  opacity: 0
+  pointer-events: none
+  transition: opacity 0.18s ease
+  z-index: 2
+
+  &::before
+    content: ""
+    width: 20px
+    height: 20px
+    border: 2px solid var(--primary)
+    border-top: 2px solid transparent
+    border-radius: 50%
+    animation: spin 1s linear infinite
+    margin-right: 0.5rem
+
+.plantuml-wrapper[data-loading='true'] .plantuml-loading
+  opacity: 1
+
+.plantuml-wrapper[data-loading='false'] .plantuml-loading
+  opacity: 0
+
+.plantuml-wrapper[data-loading='true'] .plantuml-image
+  opacity: 0.22
+
+.plantuml-wrapper[data-loading='false'] .plantuml-image
+  opacity: 1
+
+.plantuml-error
+  color: var(--admonitions-color-warning)
+  background: rgba(239, 68, 68, 0.1)
+  border: 1px solid var(--admonitions-color-warning)
+  border-radius: 0.5rem
+  padding: 1rem
+  margin: 1rem
+  text-align: center
+  font-weight: 500
+
+  p
+    margin: 0 0 0.5rem 0
+
+  button
+    padding: 4px 12px
+    background: var(--primary)
+    color: white
+    border: none
+    border-radius: 4px
+    cursor: pointer
+    transition: all 0.2s ease
+
+    &:hover
+      background: var(--primary-hover)
+      transform: translateY(-1px)
+
+.dark .plantuml-diagram-container
+  background: var(--card-bg)
+
+.plantuml-controls
+  position: absolute
+  top: 8px
+  right: 8px
+  display: flex
+  gap: 4px
+  opacity: 0.5
+  transition: opacity 0.2s ease
+  z-index: 10
+
+  &:hover
+    opacity: 1
+
+.plantuml-ctrl-btn
+  width: 28px
+  height: 28px
+  border: none
+  border-radius: 6px
+  background: var(--btn-regular-bg)
+  color: var(--btn-content)
+  font-size: 14px
+  line-height: 28px
+  text-align: center
+  cursor: pointer
+  padding: 0
+  display: flex
+  align-items: center
+  justify-content: center
+  transition: all 0.15s ease
+  backdrop-filter: blur(8px)
+
+  &:hover
+    background: var(--btn-regular-bg-hover)
+    transform: translateY(-1px)
+
+  &:active
+    background: var(--btn-regular-bg-active)
+    transform: translateY(0)
+
+  &[data-copy-state]
+    width: auto
+    min-width: 5.5rem
+    padding: 0 0.7rem
+    font-size: 0.75rem
+    font-weight: 600
+
+.plantuml-fullscreen-overlay
+  position: fixed
+  top: 0
+  left: 0
+  width: 100vw
+  height: 100vh
+  background: rgba(0, 0, 0, 0.85)
+  z-index: 9999
+  display: flex
+  align-items: center
+  justify-content: center
+
+.plantuml-fs-content
+  width: 90vw
+  height: 85vh
+  cursor: grab
+  display: flex
+  align-items: center
+  justify-content: center
+  background: rgba(255, 255, 255, 0.95)
+  overflow: hidden
+
+  &:active
+    cursor: grabbing
+
+  img
+    max-width: 100%
+    max-height: 100%
+    user-select: none
+    -webkit-user-drag: none
+    will-change: transform
+
+.dark .plantuml-fs-content
+  background: rgba(5, 8, 22, 0.96)
+
+.plantuml-fs-controls
+  position: fixed
+  top: 16px
+  right: 16px
+  display: flex
+  gap: 6px
+  z-index: 10000
+  background: rgba(255, 255, 255, 0.1)
+  backdrop-filter: blur(12px)
+  padding: 6px
+  border-radius: 10px
+
+  .plantuml-ctrl-btn
+    width: 36px
+    height: 36px
+    font-size: 18px
+    border-radius: 8px
+    background: rgba(255, 255, 255, 0.15)
+    color: #fff
+
+    &:hover
+      background: rgba(255, 255, 255, 0.3)
+
+    &:active
+      background: rgba(255, 255, 255, 0.2)
+
+    &[data-copy-state]
+      min-width: 6rem
+      padding: 0 0.85rem
+      font-size: 0.8rem
+
+@media (max-width: 768px)
+  .plantuml-wrapper
     padding: 1rem
 
-  .mermaid svg
+  .plantuml-image
     max-height: 400px
 
+  .plantuml-controls
+    opacity: 0.8
 
-.mermaid-zoom-wrapper
-  transform-origin: 0 0;
-  transition: transform 120ms ease-out;
-  will-change: transform;
-  cursor: grab;
-  background: transparent;
-
-.mermaid-zoom-wrapper:active
-  cursor: grabbing;
-
-.mermaid-zoom-controls
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  gap: 6px;
-  z-index: 30;
-  user-select: none;
+  .plantuml-ctrl-btn
+    width: 32px
+    height: 32px
+    font-size: 16px

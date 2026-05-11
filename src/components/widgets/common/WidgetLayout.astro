@@ -48,7 +48,7 @@ const showLessLabel = i18n(I18nKey.showLess);
 	</div>
 	{
 		collapsible && (
-			<div class="expand-btn px-4 -mb-2">
+			<div class="expand-btn mt-3 px-4 pb-1">
 				<button
 					type="button"
 					class="btn-plain rounded-lg w-full h-9 widget-toggle-btn"
@@ -101,10 +101,14 @@ const showLessLabel = i18n(I18nKey.showLess);
 		wrapper: HTMLElement | null = null;
 		button: HTMLButtonElement | null = null;
 		label: HTMLElement | null = null;
-		collapsedHeight = "7.5rem";
-		isExpanded = false;
-		handleToggle: (() => void) | null = null;
-		handleTransitionEnd: ((event: TransitionEvent) => void) | null = null;
+	collapsedHeight = "7.5rem";
+	isExpanded = false;
+	shouldCollapse = false;
+	handleToggle: (() => void) | null = null;
+	handleTransitionEnd: ((event: TransitionEvent) => void) | null = null;
+	handleResize: (() => void) | null = null;
+	resizeObserver: ResizeObserver | null = null;
+	toggleContainer: HTMLElement | null = null;
 
 		connectedCallback() {
 			if (this.dataset.initialized === "true") {
@@ -119,6 +123,7 @@ const showLessLabel = i18n(I18nKey.showLess);
 			this.wrapper = this.querySelector(".collapse-wrapper");
 			this.button = this.querySelector(".widget-toggle-btn");
 			this.label = this.querySelector(".widget-toggle-label");
+			this.toggleContainer = this.querySelector(".expand-btn");
 			this.collapsedHeight =
 				this.dataset.collapsedHeight && this.dataset.collapsedHeight !== ""
 					? this.dataset.collapsedHeight
@@ -131,18 +136,21 @@ const showLessLabel = i18n(I18nKey.showLess);
 
 			this.handleToggle = () => this.toggle();
 			this.handleTransitionEnd = () => {
-				if (this.isExpanded && this.wrapper) {
+				if (this.isExpanded && this.wrapper && this.shouldCollapse) {
 					this.wrapper.style.maxHeight = "none";
 				}
 			};
+			this.handleResize = () => this.refreshCollapseState();
 
 			this.button.addEventListener("click", this.handleToggle);
 			this.wrapper.addEventListener(
 				"transitionend",
 				this.handleTransitionEnd,
 			);
-			this.syncState();
-			this.wrapper.style.maxHeight = this.collapsedHeight;
+			this.resizeObserver = new ResizeObserver(this.handleResize);
+			this.resizeObserver.observe(this.wrapper);
+			window.addEventListener("resize", this.handleResize);
+			this.refreshCollapseState();
 		}
 
 		disconnectedCallback() {
@@ -155,7 +163,68 @@ const showLessLabel = i18n(I18nKey.showLess);
 					this.handleTransitionEnd,
 				);
 			}
+			if (this.handleResize) {
+				window.removeEventListener("resize", this.handleResize);
+			}
+			this.resizeObserver?.disconnect();
 			this.dataset.initialized = "false";
+		}
+
+		getCollapsedHeightPx() {
+			if (!this.wrapper) {
+				return 0;
+			}
+
+			const computedStyle = getComputedStyle(this.wrapper);
+			const rootFontSize = parseFloat(
+				getComputedStyle(document.documentElement).fontSize,
+			);
+			const value = this.collapsedHeight.trim();
+
+			if (value.endsWith("rem")) {
+				return parseFloat(value) * rootFontSize;
+			}
+			if (value.endsWith("px")) {
+				return parseFloat(value);
+			}
+
+			const resolvedMaxHeight = parseFloat(computedStyle.maxHeight);
+			return Number.isFinite(resolvedMaxHeight) ? resolvedMaxHeight : 0;
+		}
+
+		refreshCollapseState() {
+			if (!this.wrapper || !this.button || !this.label) {
+				return;
+			}
+
+			const previousMaxHeight = this.wrapper.style.maxHeight;
+			this.wrapper.style.maxHeight = "none";
+
+			const contentHeight = this.wrapper.scrollHeight;
+			const collapsedHeightPx = this.getCollapsedHeightPx();
+			this.shouldCollapse = contentHeight > collapsedHeightPx + 1;
+			if (this.toggleContainer) {
+				this.toggleContainer.hidden = !this.shouldCollapse;
+			}
+
+			if (!this.shouldCollapse) {
+				this.isExpanded = false;
+				this.wrapper.classList.remove("collapsed", "collapsible");
+				this.wrapper.style.maxHeight = "none";
+				this.syncState();
+				return;
+			}
+
+			this.wrapper.classList.add("collapsible");
+			if (!this.isExpanded) {
+				this.wrapper.classList.add("collapsed");
+			}
+			this.wrapper.style.maxHeight = this.isExpanded
+				? previousMaxHeight === "none" || previousMaxHeight === ""
+					? `${contentHeight}px`
+					: previousMaxHeight
+				: this.collapsedHeight;
+			this.syncState();
 		}
 
 		syncState() {
@@ -165,17 +234,24 @@ const showLessLabel = i18n(I18nKey.showLess);
 
 			const expandLabel = this.button.dataset.labelExpand || "";
 			const collapseLabel = this.button.dataset.labelCollapse || "";
-			const currentLabel = this.isExpanded ? collapseLabel : expandLabel;
+			const currentLabel =
+				this.shouldCollapse && this.isExpanded ? collapseLabel : expandLabel;
 
-			this.button.dataset.expanded = String(this.isExpanded);
-			this.button.setAttribute("aria-expanded", String(this.isExpanded));
+			this.button.dataset.expanded = String(this.shouldCollapse && this.isExpanded);
+			this.button.setAttribute(
+				"aria-expanded",
+				String(this.shouldCollapse && this.isExpanded),
+			);
 			this.button.setAttribute("aria-label", currentLabel);
 			this.label.textContent = currentLabel;
-			this.wrapper.classList.toggle("collapsed", !this.isExpanded);
+			this.wrapper.classList.toggle(
+				"collapsed",
+				this.shouldCollapse && !this.isExpanded,
+			);
 		}
 
 		toggle() {
-			if (!this.wrapper || !this.button) {
+			if (!this.wrapper || !this.button || !this.shouldCollapse) {
 				return;
 			}
 

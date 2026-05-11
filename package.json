@@ -10,6 +10,7 @@
 		"prebuild": "node scripts/sync-content.js || true",
 		"dev": "astro dev",
 		"start": "astro dev",
+		"test": "node --test \"tests/**/*.test.mjs\"",
 		"check": "astro check",
 		"update-anime": "node scripts/update-anime.mjs",
 		"update-bangumi": "node scripts/update-bangumi.mjs",

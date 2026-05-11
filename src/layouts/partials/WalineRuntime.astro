@@ -19,14 +19,20 @@ import { commentConfig } from "@/config";
 				<script>
 					import { init } from "@waline/client";
 					import katex from "katex";
+					import "katex/contrib/mhchem";
 					import "katex/dist/katex.min.css";
+					import {
+						isTrustedKatexCommand,
+						katexMacros,
+						katexStrict,
+					} from "../../utils/katex-options.mjs";
+					import { teardownWalineInstance } from "./waline-runtime-utils.js";
 
 					const CONTAINER_ID = "waline";
 					const WRAPPER_ID = "waline-container";
 					const ROOT_MARGIN = "240px";
 					const PREVIEW_RETRY_DELAY = 120;
 					const PREVIEW_RETRY_LIMIT = 10;
-
 					const getRuntimeConfig = () =>
 						window.__mizukiWalineConfig || null;
 
@@ -187,6 +193,10 @@ import { commentConfig } from "@/config";
 								katex.renderToString(tex, {
 									displayMode: blockMode,
 									throwOnError: false,
+									strict: katexStrict,
+									trust: (context: { command: string }) =>
+										isTrustedKatexCommand(context),
+									macros: katexMacros,
 								}),
 							el: `#${CONTAINER_ID}`,
 							path: getCurrentPath(),
@@ -197,6 +207,7 @@ import { commentConfig } from "@/config";
 						Window["__mizukiWalineRuntime"]
 					> = window.__mizukiWalineRuntime || {
 						instance: null,
+						mountedContainer: null,
 						observer: null,
 						previewObserver: null,
 						initialized: false,
@@ -258,12 +269,28 @@ import { commentConfig } from "@/config";
 								}
 
 								if (runtime.instance) {
-									runtime.instance.destroy();
-									runtime.instance = null;
+									const teardownResult =
+										teardownWalineInstance(
+											runtime.instance,
+											runtime.mountedContainer,
+										);
+
+									if (
+										teardownResult.reason ===
+										"destroy-failed"
+									) {
+										console.warn(
+											"[Waline] 销毁旧实例失败，改为直接重置引用:",
+											teardownResult.error,
+										);
+									}
 								}
 
+								runtime.instance = null;
+								runtime.mountedContainer = null;
 								container.innerHTML = "";
 								runtime.instance = init(options);
+								runtime.mountedContainer = container;
 								runtime.initialized = true;
 								runtime.initAttemptedPath = getCurrentPath();
 								runtime.observePreviewDefaults();
@@ -282,8 +309,25 @@ import { commentConfig } from "@/config";
 								window.clearTimeout(runtime.previewTimer);
 								runtime.previewTimer = null;
 							}
-							runtime.instance?.destroy();
+							if (runtime.instance) {
+								const teardownResult =
+									teardownWalineInstance(
+										runtime.instance,
+										runtime.mountedContainer,
+									);
+
+								if (
+									teardownResult.reason ===
+									"destroy-failed"
+								) {
+									console.warn(
+										"[Waline] 销毁实例失败，已跳过:",
+										teardownResult.error,
+									);
+								}
+							}
 							runtime.instance = null;
+							runtime.mountedContainer = null;
 							runtime.initialized = false;
 						},
 						setupLazyLoad: () => {

@@ -8,6 +8,34 @@ import {
 import { siteConfig } from "@/config";
 import type { LIGHT_DARK_MODE, WALLPAPER_MODE } from "@/types/config";
 
+const THEME_TRANSITION_VEIL_ID = "theme-transition-veil";
+const THEME_SWITCH_TRANSITION_MS = 220;
+const THEME_VEIL_SETTLE_DELAY_MS = 44;
+const THEME_VEIL_SETTLE_MS = 72;
+const THEME_SWITCH_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
+const THEME_VEIL_MAX_OPACITY = 0.56;
+const THEME_VEIL_SETTLE_OPACITY = 0.34;
+const THEME_VEIL_BLUR = "blur(14px)";
+const THEME_SWITCH_FALLBACK_ORIGIN = {
+	x: "calc(100vw - 3rem)",
+	y: "3rem",
+};
+
+type ThemeTransitionMode = "theme-veil";
+
+type ThemeSwitchTrigger =
+	| HTMLElement
+	| {
+			x: number;
+			y: number;
+	  };
+
+export interface ThemeSwitchOptions {
+	trigger?: ThemeSwitchTrigger | null;
+}
+
+let themeTransitionCleanupTimer: number | null = null;
+
 export function getDefaultHue(): number {
 	const fallback = "250";
 	const configCarrier = document.getElementById("config-carrier");
@@ -32,7 +60,227 @@ export function setHue(hue: number): void {
 	r.style.setProperty("--hue", String(hue));
 }
 
-export function applyThemeToDocument(theme: LIGHT_DARK_MODE) {
+function clearThemeTransitionTimer(): void {
+	if (themeTransitionCleanupTimer !== null) {
+		window.clearTimeout(themeTransitionCleanupTimer);
+		themeTransitionCleanupTimer = null;
+	}
+}
+
+function cleanupThemeTransitionState(
+	root: HTMLElement = document.documentElement,
+): void {
+	clearThemeTransitionTimer();
+	root.classList.remove("is-theme-transitioning", "use-theme-veil");
+}
+
+function resolveThemeTransitionOrigin(
+	trigger?: ThemeSwitchTrigger | null,
+): { x: string; y: string } {
+	if (trigger instanceof HTMLElement) {
+		const rect = trigger.getBoundingClientRect();
+		return {
+			x: `${Math.round(rect.left + rect.width / 2)}px`,
+			y: `${Math.round(rect.top + rect.height / 2)}px`,
+		};
+	}
+
+	if (
+		trigger &&
+		typeof trigger === "object" &&
+		"x" in trigger &&
+		"y" in trigger &&
+		Number.isFinite(trigger.x) &&
+		Number.isFinite(trigger.y)
+	) {
+		return {
+			x: `${Math.round(trigger.x)}px`,
+			y: `${Math.round(trigger.y)}px`,
+		};
+	}
+
+	return THEME_SWITCH_FALLBACK_ORIGIN;
+}
+
+function updateThemeTransitionOrigin(
+	options: ThemeSwitchOptions = {},
+	root: HTMLElement = document.documentElement,
+): void {
+	const { x, y } = resolveThemeTransitionOrigin(options.trigger);
+	root.style.setProperty("--theme-switch-origin-x", x);
+	root.style.setProperty("--theme-switch-origin-y", y);
+}
+
+function resolveThemeBackdropColor(
+	root: HTMLElement = document.documentElement,
+): string {
+	const rootBackgroundColor = getComputedStyle(root).backgroundColor;
+	if (rootBackgroundColor && rootBackgroundColor !== "rgba(0, 0, 0, 0)") {
+		return rootBackgroundColor;
+	}
+
+	const bodyBackgroundColor = document.body
+		? getComputedStyle(document.body).backgroundColor
+		: "";
+	if (bodyBackgroundColor && bodyBackgroundColor !== "rgba(0, 0, 0, 0)") {
+		return bodyBackgroundColor;
+	}
+
+	return getComputedStyle(root).getPropertyValue("--page-bg").trim() || "#f6f3ed";
+}
+
+function getThemeVeilSpotlight(nextTheme: LIGHT_DARK_MODE): string {
+	return nextTheme === DARK_MODE
+		? "rgba(15, 23, 42, 0.22)"
+		: "rgba(255, 255, 255, 0.24)";
+}
+
+function ensureThemeTransitionVeil(): HTMLDivElement {
+	let veil = document.getElementById(
+		THEME_TRANSITION_VEIL_ID,
+	) as HTMLDivElement | null;
+
+	if (veil) {
+		return veil;
+	}
+
+	veil = document.createElement("div");
+	veil.id = THEME_TRANSITION_VEIL_ID;
+	veil.setAttribute("aria-hidden", "true");
+	document.body.appendChild(veil);
+	return veil;
+}
+
+function dispatchThemeSwitchEvent(
+	type: "start" | "end",
+	nextTheme: LIGHT_DARK_MODE,
+): void {
+	const mode: ThemeTransitionMode = "theme-veil";
+	window.dispatchEvent(
+		new CustomEvent(`theme-switch:${type}`, {
+			detail: {
+				mode,
+				nextTheme,
+				duration: THEME_SWITCH_TRANSITION_MS,
+			},
+		}),
+	);
+}
+
+function beginThemeTransition(
+	nextTheme: LIGHT_DARK_MODE,
+	options: ThemeSwitchOptions = {},
+): HTMLElement {
+	const root = document.documentElement;
+	cleanupThemeTransitionState(root);
+	updateThemeTransitionOrigin(options, root);
+	root.style.setProperty(
+		"--theme-switch-duration",
+		`${THEME_SWITCH_TRANSITION_MS}ms`,
+	);
+	root.style.setProperty("--theme-switch-easing", THEME_SWITCH_EASING);
+	root.style.setProperty("--theme-veil-spotlight", getThemeVeilSpotlight(nextTheme));
+	root.classList.add("is-theme-transitioning", "use-theme-veil");
+	dispatchThemeSwitchEvent("start", nextTheme);
+	return root;
+}
+
+function finalizeThemeTransition(
+	root: HTMLElement,
+	nextTheme: LIGHT_DARK_MODE,
+): void {
+	cleanupThemeTransitionState(root);
+	dispatchThemeSwitchEvent("end", nextTheme);
+}
+
+function scheduleMaskedThemeCleanup(
+	root: HTMLElement,
+	nextTheme: LIGHT_DARK_MODE,
+): Promise<void> {
+	return new Promise((resolve) => {
+		themeTransitionCleanupTimer = window.setTimeout(() => {
+			finalizeThemeTransition(root, nextTheme);
+			resolve();
+		}, THEME_SWITCH_TRANSITION_MS + THEME_VEIL_SETTLE_DELAY_MS + THEME_VEIL_SETTLE_MS);
+	});
+}
+
+function cleanupThemeTransitionVeil(veil: HTMLDivElement): void {
+	veil.style.setProperty("opacity", "0", "important");
+	veil.style.setProperty("visibility", "hidden", "important");
+	veil.style.setProperty("transition", "none", "important");
+	veil.style.setProperty("background-color", "transparent", "important");
+	veil.style.removeProperty("backdrop-filter");
+	veil.style.removeProperty("-webkit-backdrop-filter");
+}
+
+async function runMaskedThemeSwitch(
+	performThemeChange: () => void,
+	nextTheme: LIGHT_DARK_MODE,
+	options: ThemeSwitchOptions = {},
+): Promise<void> {
+	const root = beginThemeTransition(nextTheme, options);
+	const veil = ensureThemeTransitionVeil();
+	const oldSurfaceColor = resolveThemeBackdropColor(root);
+
+	clearThemeTransitionTimer();
+	veil.style.setProperty("transition", "none", "important");
+	veil.style.setProperty("visibility", "visible", "important");
+	veil.style.setProperty("background-color", oldSurfaceColor, "important");
+	veil.style.setProperty(
+		"backdrop-filter",
+		`${THEME_VEIL_BLUR} saturate(0.92)`,
+		"important",
+	);
+	veil.style.setProperty(
+		"-webkit-backdrop-filter",
+		`${THEME_VEIL_BLUR} saturate(0.92)`,
+		"important",
+	);
+	veil.style.setProperty(
+		"opacity",
+		String(THEME_VEIL_MAX_OPACITY),
+		"important",
+	);
+
+	// Force the translucent veil to cover the page before switching theme tokens.
+	void veil.offsetHeight;
+	performThemeChange();
+
+	requestAnimationFrame(() => {
+		const newSurfaceColor = resolveThemeBackdropColor(root);
+
+		veil.style.setProperty(
+			"transition",
+			[
+				`opacity ${THEME_SWITCH_TRANSITION_MS}ms ${THEME_SWITCH_EASING}`,
+				`background-color ${THEME_SWITCH_TRANSITION_MS}ms ${THEME_SWITCH_EASING}`,
+			].join(", "),
+			"important",
+		);
+		veil.style.setProperty("background-color", newSurfaceColor, "important");
+		veil.style.setProperty(
+			"opacity",
+			String(THEME_VEIL_SETTLE_OPACITY),
+			"important",
+		);
+
+		window.setTimeout(() => {
+			veil.style.setProperty("opacity", "0", "important");
+		}, THEME_VEIL_SETTLE_DELAY_MS);
+	});
+
+	try {
+		await scheduleMaskedThemeCleanup(root, nextTheme);
+	} finally {
+		cleanupThemeTransitionVeil(veil);
+	}
+}
+
+export async function applyThemeToDocument(
+	theme: LIGHT_DARK_MODE,
+	options: ThemeSwitchOptions = {},
+): Promise<void> {
 	// 获取当前主题状态的完整信息
 	const currentIsDark = document.documentElement.classList.contains("dark");
 	const currentTheme = document.documentElement.getAttribute("data-theme");
@@ -61,7 +309,7 @@ export function applyThemeToDocument(theme: LIGHT_DARK_MODE) {
 
 	// 如果既不需要主题切换也不需要代码主题更新，直接返回
 	if (!needsThemeChange && !needsCodeThemeUpdate) {
-		return;
+		return Promise.resolve();
 	}
 
 	// 定义实际执行主题切换的函数
@@ -88,64 +336,20 @@ export function applyThemeToDocument(theme: LIGHT_DARK_MODE) {
 		}
 	};
 
-	// 检查浏览器是否支持 View Transitions API
-	if (
-		needsThemeChange &&
-		document.startViewTransition &&
-		!window.matchMedia("(prefers-reduced-motion: reduce)").matches
-	) {
-		// 添加标记类，表示正在使用 View Transitions
-		document.documentElement.classList.add(
-			"is-theme-transitioning",
-			"use-view-transition",
-		);
-
-		// 使用 View Transitions API 实现平滑过渡
-		const transition = document.startViewTransition(() => {
-			performThemeChange();
-		});
-
-		// 在过渡完成后移除标记类（使用 finished promise 确保完全同步）
-		transition.finished
-			.then(() => {
-				// 使用 microtask 确保在下一个事件循环前完成清理
-				queueMicrotask(() => {
-					document.documentElement.classList.remove(
-						"is-theme-transitioning",
-						"use-view-transition",
-					);
-				});
-			})
-			.catch(() => {
-				// 如果过渡被中断，也要清理状态
-				document.documentElement.classList.remove(
-					"is-theme-transitioning",
-					"use-view-transition",
-				);
-			});
-	} else {
-		// 不支持 View Transitions API 或用户偏好减少动画，使用传统方式
-		// 只在需要主题切换时添加过渡保护
-		if (needsThemeChange) {
-			document.documentElement.classList.add("is-theme-transitioning");
-		}
-
-		performThemeChange();
-
-		// 使用 requestAnimationFrame 确保在下一帧移除过渡保护类
-		if (needsThemeChange) {
-			requestAnimationFrame(() => {
-				document.documentElement.classList.remove(
-					"is-theme-transitioning",
-				);
-			});
-		}
+	if (needsThemeChange) {
+		return runMaskedThemeSwitch(performThemeChange, theme, options);
 	}
+
+	performThemeChange();
+	return Promise.resolve();
 }
 
-export function setTheme(theme: LIGHT_DARK_MODE): void {
+export function setTheme(
+	theme: LIGHT_DARK_MODE,
+	options: ThemeSwitchOptions = {},
+): Promise<void> {
 	localStorage.setItem("theme", theme);
-	applyThemeToDocument(theme);
+	return applyThemeToDocument(theme, options);
 }
 
 export function getStoredTheme(): LIGHT_DARK_MODE {

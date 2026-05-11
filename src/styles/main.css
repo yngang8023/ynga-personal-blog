@@ -139,57 +139,15 @@ html.dark::-webkit-scrollbar-thumb:hover,
       before:absolute before:rounded-[inherit] before:inset-0 before:scale-[0.85] hover:before:scale-100 before:-z-10;
 }
 
+:root {
+  --theme-switch-duration: 220ms;
+  --theme-switch-easing: cubic-bezier(0.22, 1, 0.36, 1);
+  --theme-switch-origin-x: calc(100vw - 3rem);
+  --theme-switch-origin-y: 3rem;
+  --theme-veil-spotlight: rgba(255, 255, 255, 0.22);
+}
+
 @layer components {
-  /* View Transitions API 主题切换动画 */
-  /* 为整个文档根元素设置视图过渡 */
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation-duration: 0.5s;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    /* 使用混合模式使颜色过渡更平滑 */
-    mix-blend-mode: normal;
-  }
-
-  /* 视图过渡组 - 使用交叉淡化效果 */
-  ::view-transition-group(root) {
-    animation-duration: 0.5s;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  /* 淡出旧视图 - 使用更平滑的曲线 */
-  ::view-transition-old(root) {
-    animation-name: theme-fade-out;
-    /* 确保背景色同步切换 */
-    z-index: 2;
-  }
-
-  /* 淡入新视图 - 使用更平滑的曲线 */
-  ::view-transition-new(root) {
-    animation-name: theme-fade-in;
-    /* 确保新视图在上层 */
-    z-index: 1;
-  }
-
-  /* 定义淡出动画 - 使用更平滑的缓动函数 */
-  @keyframes theme-fade-out {
-    0% {
-      opacity: 1;
-    }
-    100% {
-      opacity: 0;
-    }
-  }
-
-  /* 定义淡入动画 - 从下层淡入 */
-  @keyframes theme-fade-in {
-    0% {
-      opacity: 0;
-    }
-    100% {
-      opacity: 1;
-    }
-  }
-
   /* 确保边框和分隔线元素在主题切换时有更明确的过渡时长 */
   .transition,
   [class*="border"],
@@ -199,17 +157,36 @@ html.dark::-webkit-scrollbar-thumb:hover,
     transition-duration: 0.15s;
   }
 
-  /* 主题过渡保护类 - 仅在非 View Transitions 模式下使用 */
-  /* 当使用 View Transitions API 时，浏览器会自动处理过渡，不需要禁用 transition */
-  .is-theme-transitioning:not(.use-view-transition) *,
-  .is-theme-transitioning:not(.use-view-transition) *::before,
-  .is-theme-transitioning:not(.use-view-transition) *::after {
-    transition: none !important;
+  #theme-transition-veil {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0;
+    visibility: hidden;
+    background-color: transparent;
+    background-image: radial-gradient(
+      circle at var(--theme-switch-origin-x) var(--theme-switch-origin-y),
+      var(--theme-veil-spotlight) 0%,
+      transparent 56%
+    );
+    backdrop-filter: blur(14px) saturate(0.92);
+    -webkit-backdrop-filter: blur(14px) saturate(0.92);
+    transition: none;
+    will-change: opacity, background-color;
+    contain: strict;
+    isolation: isolate;
+  }
+
+  .is-theme-transitioning.use-theme-veil #theme-transition-veil {
+    transition:
+      opacity var(--theme-switch-duration, 220ms) cubic-bezier(0.22, 1, 0.36, 1),
+      background-color var(--theme-switch-duration, 220ms) cubic-bezier(0.22, 1, 0.36, 1) !important;
     animation: none !important;
+    visibility: visible;
   }
 
   /* 在主题切换时禁用代码块的复杂效果以提升性能 */
-  /* 使用 View Transitions 时也需要禁用代码块动画，因为它们太多了 */
   .is-theme-transitioning .expressive-code,
   .is-theme-transitioning .expressive-code * {
     transition: none !important;
@@ -231,57 +208,29 @@ html.dark::-webkit-scrollbar-thumb:hover,
     content-visibility: visible !important;
     opacity: 1 !important;
   }
-  /* 禁用复杂选择器元素的过渡 - 仅在非 View Transitions 模式下 */
-  .is-theme-transitioning:not(.use-view-transition) .float-panel,
-  .is-theme-transitioning:not(.use-view-transition) .float-panel *,
-  .is-theme-transitioning:not(.use-view-transition) .music-player,
-  .is-theme-transitioning:not(.use-view-transition) .music-player *,
-  .is-theme-transitioning:not(.use-view-transition) .widget,
-  .is-theme-transitioning:not(.use-view-transition) .widget *,
-  .is-theme-transitioning:not(.use-view-transition) .dropdown-content,
-  .is-theme-transitioning:not(.use-view-transition) .dropdown-content * {
-    transition: none !important;
-    animation: none !important;
-  }
 
-  /* 强制使用 contain 隔离渲染上下文 - 仅在非 View Transitions 模式下 */
-  .is-theme-transitioning:not(.use-view-transition) .post-card,
-  .is-theme-transitioning:not(.use-view-transition) .widget,
-  .is-theme-transitioning:not(.use-view-transition) .float-panel {
+  /* 强制使用 contain 隔离渲染上下文 - 仅在 veil 主题切换时使用 */
+  .is-theme-transitioning.use-theme-veil .post-card,
+  .is-theme-transitioning.use-theme-veil .widget,
+  .is-theme-transitioning.use-theme-veil .float-panel {
     contain: layout style paint !important;
   }
 
-  /* 波浪效果精确同步处理 - 仅在非 View Transitions 模式下 */
-  .is-theme-transitioning:not(.use-view-transition) svg use {
-    /* 禁用过渡但保持动画 */
-    transition: none;
+  /* 波浪效果精确同步处理 - 仅在 veil 主题切换时使用 */
+  .is-theme-transitioning.use-theme-veil svg use {
     /* 强制立即继承页面背景色 */
     fill: currentColor;
   }
 
-  /* 导航栏主题切换保护 - 仅在非 View Transitions 模式下禁用过渡 */
-  .is-theme-transitioning:not(.use-view-transition) #navbar > div,
-  .is-theme-transitioning:not(.use-view-transition) #navbar[data-transparent-mode] > div,
-  .is-theme-transitioning:not(.use-view-transition) #navbar[data-transparent-mode].scrolled > div,
-  .is-theme-transitioning:not(.use-view-transition) body.wallpaper-transparent #navbar > div,
-  .is-theme-transitioning:not(.use-view-transition) body.wallpaper-transparent #navbar[data-transparent-mode] > div,
-  .is-theme-transitioning:not(.use-view-transition) body.wallpaper-transparent #navbar[data-transparent-mode].scrolled > div,
-  .is-theme-transitioning:not(.use-view-transition) #banner-wrapper ~ * #navbar > div,
-  .is-theme-transitioning:not(.use-view-transition) #banner-wrapper ~ * #navbar[data-transparent-mode] > div,
-  .is-theme-transitioning:not(.use-view-transition) body:has(#banner-wrapper) #navbar > div,
-  .is-theme-transitioning:not(.use-view-transition) body:has(#banner-wrapper) #navbar[data-transparent-mode] > div {
-    transition: none !important;
-    backdrop-filter: none !important;
-  }
-
-  /* 导航栏相关浮动面板的过渡禁用 */
-  .is-theme-transitioning .dropdown-content,
-  .is-theme-transitioning .float-panel,
-  .is-theme-transitioning #display-setting,
-  .is-theme-transitioning #nav-menu-panel,
-  .is-theme-transitioning #translate-panel,
-  .is-theme-transitioning #mobile-toc-panel,
-  .is-theme-transitioning #search-panel {
+  .is-theme-transitioning.use-theme-veil :is(
+      .dropdown-content,
+      .float-panel,
+      #display-setting,
+      #nav-menu-panel,
+      #translate-panel,
+      #mobile-toc-panel,
+      #search-panel
+    ) {
     transition: none !important;
     backdrop-filter: none !important;
   }
@@ -427,7 +376,7 @@ html.dark::-webkit-scrollbar-thumb:hover,
 
   .comment-panel-card .waline-container .wl-panel {
     position: relative;
-    z-index: 8;
+    z-index: 12;
     isolation: isolate;
     border-radius: 1.25rem;
     border: 1px solid color-mix(in oklch, var(--primary) 10%, var(--waline-border-color) 90%);
@@ -444,7 +393,7 @@ html.dark::-webkit-scrollbar-thumb:hover,
   .waline-container .wl-footer {
     position: relative;
     align-items: center;
-    z-index: 4;
+    z-index: 24;
   }
 
   .waline-container .wl-actions > a,
@@ -517,9 +466,22 @@ html.dark::-webkit-scrollbar-thumb:hover,
     display: none !important;
   }
 
-  .comment-panel-card .waline-container .wl-emoji-popup,
-  .comment-panel-card .waline-container .wl-gif-popup {
-    z-index: 120;
+  .waline-container .wl-cards:has(.wl-emoji-popup.display),
+  .waline-container .wl-cards:has(.wl-gif-popup.display) {
+    position: relative;
+    z-index: 500 !important;
+  }
+
+  .waline-container .wl-emoji-popup,
+  .waline-container .wl-gif-popup {
+    position: absolute !important;
+    top: auto !important;
+    bottom: calc(100% + 0.75rem) !important;
+    left: 1.25em !important;
+    right: auto !important;
+    width: min(100%, 526px) !important;
+    max-width: min(calc(100vw - 2rem), 526px) !important;
+    z-index: 2147483647 !important;
     box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
   }
 
@@ -938,6 +900,241 @@ html.dark::-webkit-scrollbar-thumb:hover,
 .custom-md img,
 #post-cover img {
   @apply cursor-zoom-in;
+}
+
+.custom-md a.card-website {
+  --wc-accent: var(--primary);
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.95rem;
+  margin: 1rem 0;
+  padding: 1rem 1.05rem;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: var(--radius-large);
+  border: 1px solid color-mix(in oklch, var(--line-divider) 70%, var(--wc-accent) 30%);
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--card-bg) 96%, white 4%), color-mix(in oklch, var(--license-block-bg) 94%, var(--card-bg) 6%));
+  color: inherit;
+  box-shadow:
+    0 14px 32px rgba(15, 23, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+  text-decoration-line: none;
+  text-decoration-thickness: 0;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.custom-md a.card-website > .wc-logo-shell,
+.custom-md a.card-website > .wc-body {
+  position: relative;
+  z-index: 1;
+}
+
+.custom-md a.card-website:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklch, var(--wc-accent) 46%, var(--line-divider) 54%);
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--btn-regular-bg-hover) 70%, white 30%), color-mix(in oklch, var(--license-block-bg) 88%, var(--btn-regular-bg-hover) 12%));
+  box-shadow:
+    0 18px 40px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.custom-md a.card-website:active {
+  transform: scale(0.99);
+}
+
+.custom-md a.card-website:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--primary) 76%, white 24%);
+  outline-offset: 3px;
+}
+
+.custom-md a.card-website .wc-logo-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4rem;
+  height: 4rem;
+  overflow: hidden;
+  border-radius: 1.15rem;
+  cursor: zoom-in;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 242, 236, 0.98));
+  border: 1px solid color-mix(in oklch, var(--line-divider) 60%, var(--wc-accent) 40%);
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.custom-md a.card-website .wc-logo-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  margin: 0;
+  object-fit: cover;
+  border-radius: inherit;
+  cursor: zoom-in;
+}
+
+.custom-md a.card-website .wc-body {
+  min-width: 0;
+  display: grid;
+  gap: 0.58rem;
+}
+
+.custom-md a.card-website .wc-content {
+  min-width: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.custom-md a.card-website .wc-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+}
+
+.custom-md a.card-website .wc-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.custom-md a.card-website .wc-site-name {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: color-mix(in oklch, var(--wc-accent) 82%, var(--tw-prose-headings) 18%);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+
+.custom-md a.card-website .wc-domain-tag {
+  display: inline-flex;
+  width: fit-content;
+  max-width: min(52%, 14rem);
+  flex: 0 1 auto;
+  margin-inline-start: auto;
+  align-self: flex-start;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklch, var(--wc-accent) 28%, var(--line-divider) 72%);
+  background: color-mix(in oklch, var(--wc-accent) 11%, var(--card-bg) 89%);
+  color: color-mix(in oklch, var(--wc-accent) 74%, var(--tw-prose-headings) 26%);
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.custom-md a.card-website .wc-url {
+  display: block;
+  min-width: 0;
+  color: color-mix(in oklch, var(--tw-prose-body) 78%, transparent 22%);
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.custom-md a.card-website .wc-description {
+  display: -webkit-box;
+  overflow: hidden;
+  color: color-mix(in oklch, var(--tw-prose-body) 90%, transparent 10%);
+  font-size: 0.92rem;
+  line-height: 1.65;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+:root.dark .custom-md a.card-website,
+.dark .custom-md a.card-website {
+  border-color: color-mix(in oklch, rgba(255, 255, 255, 0.14) 72%, var(--wc-accent) 28%);
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--card-bg) 92%, black 8%), color-mix(in oklch, var(--license-block-bg) 90%, black 10%));
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+:root.dark .custom-md a.card-website:hover,
+.dark .custom-md a.card-website:hover {
+  border-color: color-mix(in oklch, var(--wc-accent) 44%, rgba(255, 255, 255, 0.18) 56%);
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--btn-regular-bg-hover) 48%, var(--card-bg) 52%), color-mix(in oklch, var(--license-block-bg) 84%, black 16%));
+}
+
+:root.dark .custom-md a.card-website .wc-logo-shell,
+.dark .custom-md a.card-website .wc-logo-shell {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root.dark .custom-md a.card-website .wc-domain-tag,
+.dark .custom-md a.card-website .wc-domain-tag {
+  border-color: color-mix(in oklch, var(--wc-accent) 22%, rgba(255, 255, 255, 0.12) 78%);
+  background: color-mix(in oklch, var(--wc-accent) 18%, rgba(255, 255, 255, 0.04) 82%);
+}
+
+@media (max-width: 640px) {
+  .custom-md a.card-website {
+    grid-template-columns: 2.9rem minmax(0, 1fr);
+    gap: 0.8rem;
+    padding: 0.9rem 0.9rem;
+  }
+
+  .custom-md a.card-website .wc-logo-shell {
+    width: 2.9rem;
+    height: 2.9rem;
+    border-radius: 0.9rem;
+  }
+
+  .custom-md a.card-website .wc-url {
+    font-size: 0.74rem;
+  }
+
+  .custom-md a.card-website .wc-description {
+    font-size: 0.88rem;
+  }
+
+  .custom-md a.card-website .wc-site-name {
+    font-size: 0.75rem;
+  }
+
+  .custom-md a.card-website .wc-head {
+    gap: 0.5rem;
+  }
+
+  .custom-md a.card-website .wc-domain-tag {
+    font-size: 0.72rem;
+    max-width: 48%;
+    padding-inline: 0.45rem;
+  }
+
 }
 
 ::selection {

@@ -222,6 +222,7 @@ Mizuki 支持超越标准 GitHub Flavored Markdown 的增强功能：
 - **数学公式：** 使用 `$行内$` 和 `$$块级$$` 语法编写 LaTeX 数学公式
 - **代码高亮：** 高级语法高亮，支持行号和复制按钮
 - **GitHub 卡片：** 使用 `::github{repo="用户/仓库"}` 嵌入仓库卡片
+- **Gitee 卡片：** 使用 `::gitee{repo="用户/仓库"}` 嵌入仓库卡片
 
 ### 🎨 视觉元素
 - **图片画廊：** 自动 PhotoSwipe 集成，支持图片查看
@@ -294,6 +295,11 @@ Mizuki 支持将代码和内容分成两个独立的仓库管理,适合团队协
 | 🔧 **分离模式** | 设置 `ENABLE_CONTENT_SYNC=true` | 团队协作、私有内容 |
 
 **一键启用/禁用**:
+
+Remove-Item .astro -Recurse -Force
+pnpm astro sync
+pnpm dev
+
 
 ```bash
 # 方式 1: 本地模式 (推荐新手)

@@ -1,6 +1,8 @@
 @reference "tailwindcss";
 
 .custom-md {
+  counter-reset: theorem-counter lemma-counter;
+
   h1 {
     @apply text-3xl;
   }
@@ -154,20 +156,26 @@
   /* --- 数学公式样式 --- */
   .katex-display {
     @apply w-full overflow-x-auto overflow-y-hidden box-border my-4;
-    padding-bottom: 6px;
+    padding-bottom: 2px;
     padding-top: 0.5rem;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
 
     &::-webkit-scrollbar {
-      height: 6px;
-      width: 6px;
+      height: 3px;
+      width: 3px;
+    }
+    &::-webkit-scrollbar-button {
+      display: none;
+      width: 0;
+      height: 0;
     }
     &::-webkit-scrollbar-track {
       background: transparent;
     }
     &::-webkit-scrollbar-thumb {
       background: var(--scrollbar-bg);
-      border-radius: 4px;
+      border-radius: 999px;
     }
     &::-webkit-scrollbar-thumb:hover {
       background: var(--scrollbar-bg-hover);
@@ -187,6 +195,288 @@
     display: block;
     padding-right: 3rem;
     box-sizing: border-box;
+  }
+
+  .katex .math-accent {
+    color: var(--primary);
+    font-weight: 700;
+  }
+
+  .katex .math-note {
+    color: var(--text-main);
+    background: var(--btn-plain-bg-hover);
+    padding: 0.08em 0.45em;
+    border-radius: 0.45rem;
+  }
+
+  .katex .math-link {
+    color: var(--primary);
+    font-weight: 600;
+  }
+
+  .katex-html a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.14em;
+  }
+
+  .paper-math-block,
+  .paper-statement,
+  .paper-math-cols {
+    margin: 1.25rem 0;
+    border: 1px solid var(--line-divider);
+    border-radius: 1rem;
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--card-bg) 94%, var(--primary) 6%),
+        color-mix(in oklch, var(--card-bg) 98%, transparent 2%)
+      );
+    overflow: hidden;
+  }
+
+  .paper-math-head,
+  .math-statement-head {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.9rem 1rem 0.75rem;
+    border-bottom: 1px solid var(--line-divider);
+    background: color-mix(in oklch, var(--btn-regular-bg) 88%, transparent 12%);
+    color: var(--text-main);
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .paper-math-head > div,
+  .math-statement-title > div,
+  .paper-math-head > p,
+  .math-statement-title > p {
+    margin: 0;
+  }
+
+  .paper-math-body,
+  .math-statement-body {
+    padding: 0.95rem 1rem 1.05rem;
+  }
+
+  .paper-math-body > :first-child,
+  .math-statement-body > :first-child {
+    margin-top: 0;
+  }
+
+  .paper-math-body > :last-child,
+  .math-statement-body > :last-child {
+    margin-bottom: 0;
+  }
+
+  .paper-math-compact {
+    margin: 0.9rem 0 1.15rem;
+  }
+
+  .paper-math-compact .paper-math-head {
+    padding-bottom: 0.65rem;
+  }
+
+  .paper-math-compact .paper-math-body {
+    padding-top: 0.7rem;
+    padding-bottom: 0.8rem;
+  }
+
+  .paper-math-compact .katex-display {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .paper-math-cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  .paper-math-cols > .paper-math-head {
+    grid-column: 1 / -1;
+  }
+
+  .paper-math-col {
+    min-width: 0;
+    padding: 0;
+  }
+
+  .paper-math-col + .paper-math-col {
+    border-left: 1px solid var(--line-divider);
+  }
+
+  .paper-math-col .paper-math-head {
+    border-bottom-width: 0;
+    background: transparent;
+    padding-bottom: 0.35rem;
+  }
+
+  .paper-math-col .paper-math-body {
+    padding-top: 0.2rem;
+  }
+
+  .paper-math-col .katex-display {
+    margin-top: 0.55rem;
+    margin-bottom: 0.55rem;
+  }
+
+  .paper-statement {
+    position: relative;
+  }
+
+  .paper-theorem {
+    counter-increment: theorem-counter;
+  }
+
+  .paper-lemma {
+    counter-increment: lemma-counter;
+  }
+
+  .math-statement-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--primary);
+    font-weight: 800;
+    letter-spacing: 0.01em;
+  }
+
+  .paper-theorem .math-statement-kind::before {
+    content: "定理 " counter(theorem-counter);
+  }
+
+  .paper-lemma .math-statement-kind::before {
+    content: "引理 " counter(lemma-counter);
+  }
+
+  .math-statement-title {
+    color: var(--text-main);
+    font-weight: 650;
+  }
+
+  .paper-statement .math-statement-body {
+    font-size: 0.98rem;
+  }
+
+  .paper-math-long .paper-math-body {
+    padding-bottom: 0.9rem;
+  }
+
+  .paper-math-long .katex-display {
+    margin-top: 0.55rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .paper-math-long .katex-display > .katex {
+    min-width: max-content;
+    width: max-content;
+  }
+
+  .paper-math-long .katex-display > .katex:has(.tag) > .katex-html {
+    min-width: max-content;
+  }
+
+  .image-grid {
+    display: flex;
+    flex-direction: column;
+    --image-grid-gap: 0.9rem;
+    gap: var(--image-grid-gap);
+    margin: 1.2rem 0;
+  }
+
+  .image-grid[data-gap='sm'] {
+    --image-grid-gap: 0.6rem;
+  }
+
+  .image-grid[data-gap='md'] {
+    --image-grid-gap: 0.9rem;
+  }
+
+  .image-grid[data-gap='lg'] {
+    --image-grid-gap: 1.25rem;
+  }
+
+  .image-grid-row {
+    display: grid;
+    grid-template-columns: repeat(var(--image-grid-columns, 2), minmax(0, 1fr));
+    align-items: stretch;
+    gap: var(--image-grid-gap);
+  }
+
+  .image-grid-figure {
+    display: flex;
+    flex-direction: column;
+    justify-content: stretch;
+    height: 100%;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  .image-grid-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 220px;
+    flex-grow: 1;
+    object-fit: cover;
+    object-position: center;
+    margin: 0;
+    border-radius: 1rem;
+    background: var(--codeblock-bg);
+    cursor: zoom-in;
+  }
+
+  .image-grid-caption {
+    margin-top: 0.55rem;
+    margin-bottom: 0;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+    line-height: 1.5;
+    text-align: center;
+  }
+}
+
+@media (min-width: 901px) {
+  .custom-md .image-grid[data-desktop-visible='false'] {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) and (min-width: 641px) {
+  .custom-md .image-grid[data-tablet-visible='false'] {
+    display: none;
+  }
+
+  .custom-md .image-grid[data-tablet-visible='true'] .image-grid-row {
+    grid-template-columns: repeat(var(--image-grid-tablet-columns, 3), minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .custom-md {
+    .paper-math-cols {
+      grid-template-columns: 1fr;
+    }
+
+    .paper-math-col + .paper-math-col {
+      border-left: none;
+      border-top: 1px solid var(--line-divider);
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .custom-md .image-grid[data-mobile-visible='false'] {
+    display: none;
+  }
+
+  .custom-md .image-grid[data-mobile-visible='true'] .image-grid-row {
+    grid-template-columns: repeat(var(--image-grid-mobile-columns, 2), minmax(0, 1fr));
   }
 }
 

@@ -135,6 +135,7 @@ const defaultPostListLayout = siteConfig.postListLayout?.defaultMode || "list";
 
 	<!-- Main content -->
 	<div
+		id="main-content-shell"
 		class={`absolute w-full z-30 pointer-events-none ${mobileNonHomeBannerClass ? "mobile-main-no-banner" : ""} ${siteConfig.wallpaperMode.defaultMode === "none" ? "no-banner-layout" : ""} ${transparentClass}`}
 		style={`top: ${finalMainPanelTop}`}
 	>

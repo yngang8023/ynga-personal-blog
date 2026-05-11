@@ -476,6 +476,7 @@ export const commentConfig: CommentConfig = {
 		loading: "lazy",
 	},
 	waline: {
+		// Waline 配置项说明：https://waline.js.org/reference/client/props.html
 		serverURL: "https://ynga.kingcola-icg.cn/waline/",
 		lang: "zh-CN",
 		meta: ["nick", "mail", "link"],
@@ -488,13 +489,14 @@ export const commentConfig: CommentConfig = {
 		noCopyright: false,
 		noRss: false,
 		reaction: [
+			// 国内访问建议使用国内表情链接，以下是 Waline 官方提供的国内表情链接示例
 			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f44d.png",
 			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f970.png",
 			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f389.png",
 			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f525.png",
 			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f31f.png",
 			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f44f.png",
-			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f917.png",
+			// "https://unpkg.com/@waline/emojis@1.1.0/tw/1f917.png",
 			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f92f.png",
 		],
 		emoji: [
@@ -539,13 +541,15 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	showFloatingPlayer: true, // 显示悬浮播放器 UI
 	floatingEntryMode: "fab", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
 	// floatingEntryMode: "default", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
-	mode: "meting", // 音乐播放器模式，可选 "local" 或 "meting"
+	mode: "local", // 音乐播放器模式，可选 "local" 或 "meting"，开发环境还是local，避免频繁请求第三方API
 	meting_api: [
 		// "https://meting-api-alpha-snowy.vercel.app/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
 		"https://meting.mysqil.com/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
 		"https://api.injahow.cn/meting/?server=:server&type=:type&id=:id&auth=:auth&r=:r",
 		// "https://meting-api-omega.vercel.app/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
 	], // Meting API 地址，按顺序自动兜底切换
+	// https://github.com/xizeyoupan/Meting-API
+	// 也可以自己根据上面这个仓库直接自己快速部署到 Vercel 或者 Cloudflare Workers 上，免费又稳定
 	// id: "3778678", // 歌单ID
 	// id: "14164869977", // 歌单ID
 	id: "2996592506", // 歌单ID
@@ -580,31 +584,14 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 			animationDelay: 0,
 		},
 		{
-			// 组件类型：公告组件
-			type: "announcement",
-			// 保持在左侧顶部区域，不参与吸顶
-			position: "top",
+			// 组件类型：分类组件
+			type: "categories",
+			// 右侧从分类组件开始进入吸顶区
+			position: "sticky",
 			// CSS 类名
 			class: "onload-animation",
 			// 动画延迟时间
 			animationDelay: 50,
-		},
-		{
-			// 组件类型：侧栏音乐组件
-			type: "music-sidebar",
-			position: "sticky",
-			class: "onload-animation",
-			animationDelay: 100,
-		},
-		{
-			// 组件类型：分类组件
-			type: "categories",
-			// 组件位置："sticky" 表示粘性定位，可滚动
-			position: "sticky",
-			// CSS 类名
-			class: "onload-animation",
-			// 动画延迟时间
-			animationDelay: 150,
 			// 响应式配置
 			responsive: {
 				// 折叠阈值：当分类数量超过5个时自动折叠
@@ -612,9 +599,26 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 			},
 		},
 		{
+			// 组件类型：公告组件
+			type: "announcement",
+			// 公告保持在左侧顶部区域
+			position: "top",
+			// CSS 类名
+			class: "onload-animation",
+			// 动画延迟时间
+			animationDelay: 100,
+		},
+		{
+			// 组件类型：侧栏音乐组件
+			type: "music-sidebar",
+			position: "sticky",
+			class: "onload-animation",
+			animationDelay: 150,
+		},
+		{
 			// 组件类型：标签组件
 			type: "tags",
-			// 从标签开始进入左侧吸顶区
+			// 分类之后继续留在左侧吸顶区
 			position: "sticky",
 			// CSS 类名
 			class: "onload-animation",
@@ -665,9 +669,9 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 		drawer: [
 			"profile",
 			"announcement",
-			"music-sidebar",
-			"categories",
 			"tags",
+			"categories",
+			"music-sidebar",
 		],
 	},
 

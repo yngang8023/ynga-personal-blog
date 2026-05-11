@@ -328,8 +328,8 @@ if (siteConfig.font) {
 				height: var(--banner-height-home);
 				transform: translateY(var(--bannerOffset));
 			}
-			.enable-banner.lg\:is-home #main-grid {
-				transform: translateY(var(--banner-height-extend));
+			.enable-banner.lg\:is-home #main-content-shell {
+				top: calc(var(--banner-height) + var(--banner-height-extend)) !important;
 			}
 		}
 
@@ -350,15 +350,6 @@ if (siteConfig.font) {
 		}
 	}
 	@layer utilities {
-		@media (min-width: 1280px) {
-			.enable-banner.lg\:is-home #main-grid {
-				--sidebar-sticky-top: calc(
-					var(--navbar-height, 4.5rem) +
-					var(--sidebar-sticky-gap, 1rem) -
-					var(--banner-height-extend)
-				);
-			}
-		}
 		.navbar-hidden {
 			@apply opacity-100 translate-y-0;
 		}

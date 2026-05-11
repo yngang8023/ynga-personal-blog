@@ -30,7 +30,11 @@ const commentEnabled = data.comment ?? true;
 		<div class="card-base comment-panel-card p-6 mb-4">
 			{commentService === "twikoo" && <Twikoo path={Astro.url.pathname} />}
 			{commentService === "giscus" && <Giscus path={Astro.url.pathname} />}
-			{commentService === "waline" && <Waline path={Astro.url.pathname} />}
+			{
+				commentService === "waline" && (
+					<Waline path={Astro.url.pathname} commentLabel="评论数" />
+				)
+			}
 			{commentService === "" && null}
 		</div>
 	)

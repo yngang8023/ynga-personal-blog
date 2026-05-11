@@ -14,7 +14,10 @@
 		mode = getStoredTheme();
 	});
 
-	function switchScheme(newMode: LIGHT_DARK_MODE) {
+	async function switchScheme(
+		newMode: LIGHT_DARK_MODE,
+		trigger?: HTMLElement | null,
+	) {
 		// 防止连续快速点击
 		if (isChanging) {
 			return;
@@ -22,15 +25,14 @@
 
 		isChanging = true;
 		mode = newMode;
-		setTheme(newMode);
-
-		// 50ms 后重置状态，防止过快切换
-		setTimeout(() => {
+		try {
+			await setTheme(newMode, { trigger: trigger || undefined });
+		} finally {
 			isChanging = false;
-		}, 50);
+		}
 	}
 
-	function toggleScheme() {
+	function toggleScheme(trigger?: HTMLElement | null) {
 		if (isChanging) {
 			return;
 		}
@@ -41,7 +43,11 @@
 				break;
 			}
 		}
-		switchScheme(seq[(i + 1) % seq.length]);
+		void switchScheme(seq[(i + 1) % seq.length], trigger);
+	}
+
+	function handleToggleClick(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
+		toggleScheme(event.currentTarget);
 	}
 
 	// 添加 Swup 钩子监听，确保在页面切换后同步主题状态
@@ -90,7 +96,7 @@
 	aria-label="Light/Dark Mode"
 	class="relative btn-plain scale-animation rounded-lg h-11 w-11 active:scale-90 theme-switch-btn z-50"
 	id="scheme-switch"
-	onclick={toggleScheme}
+	onclick={handleToggleClick}
 	data-mode={mode}
 >
 	<div

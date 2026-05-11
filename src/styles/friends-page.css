@@ -182,6 +182,11 @@
 	color: rgb(30 41 59 / 0.95);
 }
 
+.friends-site-meta {
+	flex: 1;
+	min-width: 0;
+}
+
 .dark .friends-site-meta h3 {
 	color: rgb(255 255 255 / 0.94);
 }
@@ -505,13 +510,27 @@
 	}
 
 	.friends-site-profile {
-		flex-direction: column;
-		align-items: flex-start;
+		flex-direction: row;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.85rem 0.9rem;
 	}
 
 	.friends-site-avatar {
-		width: 4rem;
-		height: 4rem;
+		width: 3.6rem;
+		height: 3.6rem;
+		border-radius: 0.9rem;
+	}
+
+	.friends-site-meta h3 {
+		font-size: 0.98rem;
+		line-height: 1.35;
+	}
+
+	.friends-site-meta p {
+		margin-top: 0.12rem;
+		font-size: 0.8rem;
+		line-height: 1.5;
 	}
 
 	.friends-step-item {

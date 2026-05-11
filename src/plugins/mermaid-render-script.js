@@ -1,7 +1,5 @@
 (() => {
-	// 单例模式：检查是否已经初始化过
 	if (window.mermaidInitialized) {
-		// 如果已经初始化过，只确保 renderMermaidDiagrams 函数可用
 		if (typeof window.renderMermaidDiagrams !== "function") {
 			window.renderMermaidDiagrams = renderMermaidDiagrams;
 		}
@@ -10,751 +8,1388 @@
 
 	window.mermaidInitialized = true;
 
-	// 记录当前主题状态，避免不必要的重新渲染
-	let currentTheme = null;
-	let isRendering = false; // 防止并发渲染
-	let retryCount = 0;
-	const MAX_RETRIES = 3;
-	const RETRY_DELAY = 1000; // 1秒
+	const MIN_ZOOM = 0.65;
+	const MAX_ZOOM = 6;
+	const ZOOM_STEP = 1.2;
+	const OBSERVER_MARGIN = "280px 0px 280px 0px";
+	const MERMAID_SCRIPT_SOURCES = [
+		"https://unpkg.com/mermaid@11.12.0/dist/mermaid.min.js",
+		"https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.min.js",
+	];
+	const IDLE_PREFETCH_LIMIT = 2;
+	const THEME_PREWARM_LIMIT = 3;
+	const renderCache = new Map();
+	const preparedRenderCache = new Map();
+	const renderQueue = [];
+	const MERMAID_THEME_PALETTES = {
+		default: {
+			background: "#f8fafc",
+			primaryColor: "#ffffff",
+			secondaryColor: "#f8fafc",
+			tertiaryColor: "#e2e8f0",
+			primaryTextColor: "#0f172a",
+			secondaryTextColor: "#0f172a",
+			tertiaryTextColor: "#0f172a",
+			primaryBorderColor: "#94a3b8",
+			secondaryBorderColor: "#cbd5e1",
+			tertiaryBorderColor: "#cbd5e1",
+			lineColor: "#334155",
+			textColor: "#0f172a",
+			mainBkg: "#ffffff",
+			secondBkg: "#f8fafc",
+			tertiaryBkg: "#eef2ff",
+			clusterBkg: "#f8fafc",
+			clusterBorder: "#cbd5e1",
+			defaultLinkColor: "#334155",
+			titleColor: "#0f172a",
+			edgeLabelBackground: "#ffffff",
+			nodeTextColor: "#0f172a",
+			labelBackground: "#ffffff",
+			labelBoxBkgColor: "#ffffff",
+			labelBoxBorderColor: "#cbd5e1",
+			labelTextColor: "#0f172a",
+			noteBkgColor: "#fff7ed",
+			noteTextColor: "#7c2d12",
+			noteBorderColor: "#fdba74",
+			actorBkg: "#ffffff",
+			actorBorder: "#94a3b8",
+			actorTextColor: "#0f172a",
+			actorLineColor: "#334155",
+			signalColor: "#334155",
+			signalTextColor: "#0f172a",
+			sectionBkgColor: "#f8fafc",
+			altSectionBkgColor: "#ffffff",
+			gridColor: "#cbd5e1",
+			taskBkgColor: "#ffffff",
+			taskTextColor: "#0f172a",
+			taskTextDarkColor: "#0f172a",
+			taskTextOutsideColor: "#334155",
+			activeTaskBkgColor: "#dbeafe",
+			activeTaskBorderColor: "#60a5fa",
+			doneTaskBkgColor: "#dcfce7",
+			doneTaskBorderColor: "#22c55e",
+			critBkgColor: "#fecaca",
+			critBorderColor: "#ef4444",
+			todayLineColor: "#f59e0b",
+			personBkg: "#ffffff",
+			personBorder: "#94a3b8",
+			classText: "#0f172a",
+			errorBkgColor: "#fee2e2",
+			errorTextColor: "#991b1b",
+			fillType0: "#dbeafe",
+			fillType1: "#e0f2fe",
+			fillType2: "#dcfce7",
+			fillType3: "#fef3c7",
+			fillType4: "#ede9fe",
+			fillType5: "#fde68a",
+			fillType6: "#fed7aa",
+			fillType7: "#fecaca",
+			pie1: "#2563eb",
+			pie2: "#0ea5e9",
+			pie3: "#22c55e",
+			pie4: "#f59e0b",
+			pie5: "#8b5cf6",
+			pie6: "#ef4444",
+			pie7: "#14b8a6",
+			pie8: "#f97316",
+			pie9: "#ec4899",
+			pie10: "#64748b",
+			git0: "#2563eb",
+			git1: "#10b981",
+			git2: "#f59e0b",
+			git3: "#8b5cf6",
+			git4: "#ef4444",
+			git5: "#14b8a6",
+			git6: "#f97316",
+			git7: "#ec4899",
+			tagLabelColor: "#0f172a",
+			tagLabelBackground: "#e2e8f0",
+		},
+		dark: {
+			background: "#020617",
+			primaryColor: "#0f172a",
+			secondaryColor: "#111827",
+			tertiaryColor: "#1e293b",
+			primaryTextColor: "#e5e7eb",
+			secondaryTextColor: "#e5e7eb",
+			tertiaryTextColor: "#e5e7eb",
+			primaryBorderColor: "#64748b",
+			secondaryBorderColor: "#475569",
+			tertiaryBorderColor: "#475569",
+			lineColor: "#cbd5e1",
+			textColor: "#e5e7eb",
+			mainBkg: "#0f172a",
+			secondBkg: "#111827",
+			tertiaryBkg: "#1e293b",
+			clusterBkg: "#111827",
+			clusterBorder: "#475569",
+			defaultLinkColor: "#cbd5e1",
+			titleColor: "#f8fafc",
+			edgeLabelBackground: "#0f172a",
+			nodeTextColor: "#e5e7eb",
+			labelBackground: "#0f172a",
+			labelBoxBkgColor: "#111827",
+			labelBoxBorderColor: "#475569",
+			labelTextColor: "#e5e7eb",
+			noteBkgColor: "#3f2f14",
+			noteTextColor: "#fde68a",
+			noteBorderColor: "#f59e0b",
+			actorBkg: "#111827",
+			actorBorder: "#64748b",
+			actorTextColor: "#e5e7eb",
+			actorLineColor: "#cbd5e1",
+			signalColor: "#cbd5e1",
+			signalTextColor: "#e5e7eb",
+			sectionBkgColor: "#111827",
+			altSectionBkgColor: "#0b1220",
+			gridColor: "#475569",
+			taskBkgColor: "#111827",
+			taskTextColor: "#e5e7eb",
+			taskTextDarkColor: "#e5e7eb",
+			taskTextOutsideColor: "#cbd5e1",
+			activeTaskBkgColor: "#1d4ed8",
+			activeTaskBorderColor: "#60a5fa",
+			doneTaskBkgColor: "#14532d",
+			doneTaskBorderColor: "#22c55e",
+			critBkgColor: "#7f1d1d",
+			critBorderColor: "#f87171",
+			todayLineColor: "#fbbf24",
+			personBkg: "#111827",
+			personBorder: "#64748b",
+			classText: "#e5e7eb",
+			errorBkgColor: "#7f1d1d",
+			errorTextColor: "#fee2e2",
+			fillType0: "#1d4ed8",
+			fillType1: "#0369a1",
+			fillType2: "#166534",
+			fillType3: "#92400e",
+			fillType4: "#7e22ce",
+			fillType5: "#9a3412",
+			fillType6: "#be123c",
+			fillType7: "#0f766e",
+			pie1: "#60a5fa",
+			pie2: "#22d3ee",
+			pie3: "#4ade80",
+			pie4: "#fbbf24",
+			pie5: "#c084fc",
+			pie6: "#fb7185",
+			pie7: "#2dd4bf",
+			pie8: "#fb923c",
+			pie9: "#f472b6",
+			pie10: "#94a3b8",
+			git0: "#60a5fa",
+			git1: "#34d399",
+			git2: "#fbbf24",
+			git3: "#c084fc",
+			git4: "#fb7185",
+			git5: "#22d3ee",
+			git6: "#fb923c",
+			git7: "#a3e635",
+			tagLabelColor: "#e5e7eb",
+			tagLabelBackground: "#334155",
+		},
+	};
+	let currentTheme = getCurrentTheme();
+	let mermaidLoadPromise = null;
+	let mermaidInitPromise = null;
+	let mermaidWorkPromise = Promise.resolve();
+	let initializedTheme = "";
+	let diagramObserver = null;
+	let themeObserver = null;
 	let fullscreenOverlay = null;
+	let renderSequence = 0;
+	let drainingQueuePromise = null;
+	let idleBatchToken = 0;
+	let prewarmBatchToken = 0;
+	let resizeFrame = 0;
+	let themeSwitchFrame = 0;
 
-	function injectFullscreenStyles() {
-		if (document.getElementById("mermaid-fullscreen-style")) {
+	function getCurrentTheme() {
+		return document.documentElement.classList.contains("dark")
+			? "dark"
+			: "default";
+	}
+
+	function getOppositeTheme(theme) {
+		return theme === "dark" ? "default" : "dark";
+	}
+
+	function getCacheKey(theme, code) {
+		return `${theme}::${code}`;
+	}
+
+	function runMermaidTask(task) {
+		const nextTask = mermaidWorkPromise.catch(() => undefined).then(task);
+		mermaidWorkPromise = nextTask.then(
+			() => undefined,
+			() => undefined,
+		);
+		return nextTask;
+	}
+
+	function getMermaidConfig(theme) {
+		const isDark = theme === "dark";
+		const palette = isDark
+			? MERMAID_THEME_PALETTES.dark
+			: MERMAID_THEME_PALETTES.default;
+
+		return {
+			startOnLoad: false,
+			theme: "base",
+			darkMode: isDark,
+			securityLevel: "loose",
+			errorLevel: "warn",
+			logLevel: "error",
+			suppressErrorRendering: true,
+			themeVariables: {
+				darkMode: isDark,
+				fontFamily: "inherit",
+				fontSize: "16px",
+				...palette,
+			},
+		};
+	}
+
+	function loadScript(src) {
+		return new Promise((resolve, reject) => {
+			const script = document.createElement("script");
+			script.src = src;
+			script.async = true;
+			script.onload = resolve;
+			script.onerror = reject;
+			document.head.appendChild(script);
+		});
+	}
+
+	function yieldToMainThread() {
+		return new Promise((resolve) => {
+			window.requestAnimationFrame(() => resolve());
+		});
+	}
+
+	async function loadMermaidLibrary() {
+		if (window.mermaid?.render) {
+			return window.mermaid;
+		}
+
+		if (mermaidLoadPromise) {
+			return mermaidLoadPromise;
+		}
+
+		mermaidLoadPromise = (async () => {
+			let lastError = null;
+
+			for (const src of MERMAID_SCRIPT_SOURCES) {
+				try {
+					await loadScript(src);
+					break;
+				} catch (error) {
+					lastError = error;
+				}
+			}
+
+			if (!window.mermaid?.render) {
+				throw lastError || new Error("Mermaid library did not load correctly");
+			}
+
+			return window.mermaid;
+		})();
+
+		return mermaidLoadPromise;
+	}
+
+	async function ensureMermaid(theme) {
+		const mermaid = await loadMermaidLibrary();
+
+		if (initializedTheme === theme) {
+			return mermaid;
+		}
+
+		if (mermaidInitPromise) {
+			await mermaidInitPromise;
+			if (initializedTheme === theme) {
+				return mermaid;
+			}
+		}
+
+		mermaidInitPromise = Promise.resolve().then(() => {
+			mermaid.initialize(getMermaidConfig(theme));
+			initializedTheme = theme;
+			return mermaid;
+		});
+
+		try {
+			return await mermaidInitPromise;
+		} finally {
+			mermaidInitPromise = null;
+		}
+	}
+
+	async function getRenderedSvgMarkup(code, theme) {
+		const normalizedCode = (code || "").trim();
+		if (!normalizedCode) {
+			throw new Error("Mermaid code is empty");
+		}
+
+		const cacheKey = getCacheKey(theme, normalizedCode);
+		const cached = renderCache.get(cacheKey);
+		if (cached) {
+			return cached;
+		}
+
+		return runMermaidTask(async () => {
+			const existing = renderCache.get(cacheKey);
+			if (existing) {
+				return existing;
+			}
+
+			await ensureMermaid(theme);
+			const { svg } = await window.mermaid.render(
+				`mermaid-${theme}-${++renderSequence}`,
+				normalizedCode,
+			);
+			renderCache.set(cacheKey, svg);
+			return svg;
+		});
+	}
+
+	async function getPreparedDiagram(code, theme) {
+		const normalizedCode = (code || "").trim();
+		if (!normalizedCode) {
+			throw new Error("Mermaid code is empty");
+		}
+
+		const cacheKey = getCacheKey(theme, normalizedCode);
+		const prepared = preparedRenderCache.get(cacheKey);
+		if (prepared) {
+			return clonePreparedDiagram(prepared);
+		}
+
+		const svgMarkup = await getRenderedSvgMarkup(normalizedCode, theme);
+		return buildPreparedDiagram(cacheKey, svgMarkup);
+	}
+
+	function getAllDiagramHosts() {
+		return Array.from(document.querySelectorAll(".mermaid[data-mermaid-code]"));
+	}
+
+	function getDiagramContainer(host) {
+		return host.closest(".mermaid-diagram-container");
+	}
+
+	function setContainerReady(host, ready) {
+		const container = getDiagramContainer(host);
+		if (!container) {
 			return;
 		}
 
-		const style = document.createElement("style");
-		style.id = "mermaid-fullscreen-style";
-		style.textContent = `
-		:where(.mermaid[data-mermaid-code]) { position: relative; }
-		.mermaid-fullscreen-btn {
-			position: absolute;
-			top: 10px;
-			right: 10px;
-			height: 36px;
-			width: 36px;
-			display: inline-flex;
-			align-items: center;
-			justify-content: center;
-			opacity: 0;
-			transition: opacity 0.2s ease;
-			z-index: 3;
-		}
-		.mermaid:hover .mermaid-fullscreen-btn,
-		.mermaid:focus-within .mermaid-fullscreen-btn {
-			opacity: 1;
-		}
-		.mermaid-fullscreen-overlay {
-			position: fixed;
-			inset: 0;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			padding: clamp(12px, 3vw, 28px);
-			backdrop-filter: blur(6px);
-			z-index: 9999;
-			background: var(--mermaid-fs-backdrop, rgba(15, 23, 42, 0.9));
-		}
-		.mermaid-fullscreen-stage {
-			position: relative;
-			width: min(1200px, 96vw);
-			max-height: 90vh;
-			padding: clamp(12px, 2vw, 18px);
-			background: var(--mermaid-fs-surface, #0f172a);
-			border: 1px solid var(--mermaid-fs-border, rgba(255,255,255,0.08));
-			border-radius: 16px;
-			box-shadow: 0 20px 80px rgba(0, 0, 0, 0.35);
-			overflow: hidden;
-		}
-		.mermaid-fullscreen-stage svg {
-			width: 100%;
-			height: auto;
-			min-height: 320px;
-		}
-		.mermaid-fullscreen-close {
-			position: absolute;
-			top: 10px;
-			right: 10px;
-			z-index: 4;
-		}
-		.mermaid-fullscreen-overlay .mermaid-zoom-controls {
-			position: absolute;
-			left: 12px;
-			bottom: 12px;
-			display: flex;
-			gap: 8px;
-		}
-		body.mermaid-fullscreen-open { overflow: hidden; }
-		`;
-		document.head.appendChild(style);
+		container.setAttribute("data-mermaid-ready", ready ? "true" : "false");
 	}
 
-	function getThemePalette() {
-		const htmlElement = document.documentElement;
-		const isDark = htmlElement.classList.contains("dark");
-		const styles = getComputedStyle(htmlElement);
-		const primary =
-			styles.getPropertyValue("--primary")?.trim() ||
-			(isDark ? "#7dd3fc" : "#2563eb");
-		const surface =
-			styles.getPropertyValue("--card-bg")?.trim() ||
-			styles.getPropertyValue("--surface")?.trim() ||
-			(isDark ? "#0b1220" : "#ffffff");
-		const text =
-			styles.getPropertyValue("--text-color")?.trim() ||
-			styles.getPropertyValue("--foreground")?.trim() ||
-			(isDark ? "#e5e7eb" : "#0f172a");
-		const muted =
-			styles.getPropertyValue("--muted")?.trim() ||
-			styles.getPropertyValue("--muted-foreground")?.trim() ||
-			(isDark ? "#1f2937" : "#e5e7eb");
-		const backdrop = isDark
-			? "rgba(8, 15, 30, 0.9)"
-			: "rgba(255, 255, 255, 0.94)";
-
-		return { isDark, primary, surface, text, muted, backdrop };
+	function dispatchRenderStart(count, total = count) {
+		window.dispatchEvent(
+			new CustomEvent("mermaid:render:start", {
+				detail: { count, total },
+			}),
+		);
 	}
 
-	function closeFullscreen() {
-		if (fullscreenOverlay) {
-			fullscreenOverlay.remove();
-			fullscreenOverlay = null;
-			document.body.classList.remove("mermaid-fullscreen-open");
+	function dispatchRenderDone(count, total = count) {
+		window.dispatchEvent(
+			new CustomEvent("mermaid:render:done", {
+				detail: { count, total },
+			}),
+		);
+	}
+
+	function setLoadingState(host, label = "Mermaid 图表加载中...") {
+		if (!host || !host.isConnected) {
+			return;
+		}
+
+		if (host.querySelector(".mermaid-viewport")) {
+			return;
+		}
+
+		if (host.querySelector(".mermaid-loading")) {
+			host.dataset.mermaidState = "loading";
+			setContainerReady(host, false);
+			return;
+		}
+
+		host.innerHTML = "";
+		const loading = document.createElement("div");
+		loading.className = "mermaid-loading";
+		loading.textContent = label;
+		host.appendChild(loading);
+		host.dataset.mermaidState = "loading";
+		setContainerReady(host, false);
+	}
+
+	function showRenderError(host, error) {
+		host.innerHTML = "";
+		host.dataset.mermaidState = "error";
+		setContainerReady(host, false);
+
+		const box = document.createElement("div");
+		box.className = "mermaid-error";
+
+		const message = document.createElement("p");
+		message.textContent = "Mermaid 图表渲染失败，请稍后重试";
+		box.appendChild(message);
+
+		if (error?.message) {
+			box.setAttribute("data-error-message", error.message);
+		}
+
+		const retry = document.createElement("button");
+		retry.type = "button";
+		retry.textContent = "重试";
+		retry.addEventListener("click", (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			host.dataset.renderedTheme = "";
+			host.dataset.mermaidState = "idle";
+			host.dataset.renderAttempts = "0";
+			setLoadingState(host);
+			queueDiagramRender(host, { force: true, priority: "high" });
+		});
+
+		box.appendChild(retry);
+		host.appendChild(box);
+	}
+
+	function parseSvgMarkup(svgMarkup) {
+		const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+		const svg = parsed.documentElement;
+		if (!svg || svg.tagName.toLowerCase() !== "svg") {
+			throw new Error("Mermaid render did not return a valid SVG");
+		}
+		return svg;
+	}
+
+	function assertNotMermaidErrorSvg(svgElement, svgMarkup) {
+		const textContent = (svgElement.textContent || "").trim();
+		const hasErrorIcon = Boolean(
+			svgElement.querySelector('[class*="error-icon"], [id*="error-icon"]'),
+		);
+		const hasErrorText =
+			/syntax error in text/i.test(textContent) ||
+			/lexical error/i.test(textContent) ||
+			/parse error/i.test(textContent) ||
+			/class=['"][^'"]*error-icon/.test(svgMarkup);
+
+		if (hasErrorIcon || hasErrorText) {
+			throw new Error(textContent || "Mermaid returned an error SVG");
 		}
 	}
 
-	function openFullscreen(svgElement) {
-		const palette = getThemePalette();
-		injectFullscreenStyles();
+	function clonePreparedDiagram(prepared) {
+		return {
+			svg: prepared.svgTemplate.cloneNode(true),
+			dimensions: {
+				width: prepared.dimensions.width,
+				height: prepared.dimensions.height,
+			},
+		};
+	}
 
-		closeFullscreen();
+	function buildPreparedDiagram(cacheKey, svgMarkup) {
+		const cachedPrepared = preparedRenderCache.get(cacheKey);
+		if (cachedPrepared) {
+			return clonePreparedDiagram(cachedPrepared);
+		}
 
-		const overlay = document.createElement("div");
-		overlay.className = "mermaid-fullscreen-overlay";
-		overlay.style.setProperty("--mermaid-fs-backdrop", palette.backdrop);
-		overlay.style.setProperty("--mermaid-fs-surface", palette.surface);
-		overlay.style.setProperty(
-			"--mermaid-fs-border",
-			palette.isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.08)",
+		const svg = parseSvgMarkup(svgMarkup);
+		assertNotMermaidErrorSvg(svg, svgMarkup);
+		const dimensions = getSvgDimensions(svg);
+		normalizeSvgElement(svg, dimensions);
+
+		const prepared = {
+			dimensions,
+			svgTemplate: svg.cloneNode(true),
+		};
+		preparedRenderCache.set(cacheKey, prepared);
+		return clonePreparedDiagram(prepared);
+	}
+
+	function getSvgDimensions(svgElement) {
+		const viewBox = svgElement.getAttribute("viewBox");
+		if (viewBox) {
+			const values = viewBox
+				.trim()
+				.split(/[\s,]+/)
+				.map((value) => Number(value));
+			if (
+				values.length === 4 &&
+				Number.isFinite(values[2]) &&
+				Number.isFinite(values[3]) &&
+				values[2] > 0 &&
+				values[3] > 0
+			) {
+				return { width: values[2], height: values[3] };
+			}
+		}
+
+		const width = Number.parseFloat(svgElement.getAttribute("width") || "0");
+		const height = Number.parseFloat(svgElement.getAttribute("height") || "0");
+
+		return {
+			width: width > 0 ? width : 960,
+			height: height > 0 ? height : 540,
+		};
+	}
+
+	function normalizeSvgElement(svgElement, dimensions) {
+		svgElement.removeAttribute("height");
+		svgElement.removeAttribute("width");
+		svgElement.setAttribute("preserveAspectRatio", "xMidYMid meet");
+		svgElement.style.width = `${dimensions.width}px`;
+		svgElement.style.height = `${dimensions.height}px`;
+		svgElement.style.maxWidth = "none";
+		svgElement.style.maxHeight = "none";
+		svgElement.style.display = "block";
+		svgElement.style.userSelect = "none";
+		svgElement.style.pointerEvents = "auto";
+	}
+
+	function getPreviewHeight(dimensions) {
+		const ratio = dimensions.height / dimensions.width;
+		const nextHeight = Math.round(ratio * 760);
+		return Math.max(240, Math.min(460, nextHeight || 320));
+	}
+
+	function createDiagramState(viewport, stage, dimensions) {
+		return {
+			viewport,
+			stage,
+			intrinsicWidth: dimensions.width,
+			intrinsicHeight: dimensions.height,
+			baseScale: 1,
+			zoom: 1,
+			tx: 0,
+			ty: 0,
+		};
+	}
+
+	function getViewportSize(state) {
+		const width =
+			state.viewport.clientWidth ||
+			state.viewport.getBoundingClientRect().width ||
+			state.intrinsicWidth;
+		const height =
+			state.viewport.clientHeight ||
+			state.viewport.getBoundingClientRect().height ||
+			state.intrinsicHeight;
+		return { width, height };
+	}
+
+	function calculateFitScale(state) {
+		const viewportSize = getViewportSize(state);
+		const widthScale = viewportSize.width / state.intrinsicWidth;
+		const heightScale = viewportSize.height / state.intrinsicHeight;
+		return Math.min(widthScale, heightScale, 1);
+	}
+
+	function getTotalScale(state) {
+		return state.baseScale * state.zoom;
+	}
+
+	function applyTransform(state) {
+		const scale = getTotalScale(state);
+		state.stage.style.transform = `matrix(${scale}, 0, 0, ${scale}, ${state.tx}, ${state.ty})`;
+	}
+
+	function centerState(state) {
+		const viewportSize = getViewportSize(state);
+		const scale = getTotalScale(state);
+		state.tx = (viewportSize.width - state.intrinsicWidth * scale) / 2;
+		state.ty = (viewportSize.height - state.intrinsicHeight * scale) / 2;
+	}
+
+	function resetView(state) {
+		state.zoom = 1;
+		state.baseScale = calculateFitScale(state);
+		centerState(state);
+		applyTransform(state);
+	}
+
+	function syncStateToResize(state) {
+		if (!state) {
+			return;
+		}
+
+		const previousScale = getTotalScale(state) || 1;
+		const viewportSize = getViewportSize(state);
+		const centerX = viewportSize.width / 2;
+		const centerY = viewportSize.height / 2;
+		const worldX = (centerX - state.tx) / previousScale;
+		const worldY = (centerY - state.ty) / previousScale;
+
+		state.baseScale = calculateFitScale(state);
+
+		const nextScale = getTotalScale(state) || 1;
+		state.tx = centerX - worldX * nextScale;
+		state.ty = centerY - worldY * nextScale;
+		applyTransform(state);
+	}
+
+	function zoomBy(state, factor, originX, originY) {
+		const previousScale = getTotalScale(state);
+		const nextZoom = Math.max(
+			MIN_ZOOM,
+			Math.min(MAX_ZOOM, +(state.zoom * factor).toFixed(3)),
 		);
 
-		const closeButton = document.createElement("button");
-		closeButton.className =
-			"mermaid-fullscreen-close btn-regular rounded-lg h-10 w-10";
-		closeButton.title = "关闭全屏";
-		closeButton.textContent = "✕";
-		closeButton.addEventListener("click", closeFullscreen);
-
-		const stage = document.createElement("div");
-		stage.className = "mermaid-fullscreen-stage";
-
-		const clonedSvg = svgElement.cloneNode(true);
-		stage.appendChild(clonedSvg);
-		overlay.appendChild(stage);
-		overlay.appendChild(closeButton);
-
-		overlay.addEventListener("click", (ev) => {
-			if (ev.target === overlay) {
-				closeFullscreen();
-			}
-		});
-
-		const escHandler = (ev) => {
-			if (ev.key === "Escape") {
-				closeFullscreen();
-			}
-		};
-		window.addEventListener("keydown", escHandler, { once: true });
-
-		document.body.appendChild(overlay);
-		document.body.classList.add("mermaid-fullscreen-open");
-		fullscreenOverlay = overlay;
-
-		// 为全屏内的图表添加缩放控制
-		attachZoomControls(stage, clonedSvg);
-	}
-
-	function ensureFullscreenButton(element) {
-		if (element.querySelector(".mermaid-fullscreen-btn")) {
+		if (nextZoom === state.zoom) {
 			return;
 		}
-		const btn = document.createElement("button");
-		btn.type = "button";
-		btn.className = "mermaid-fullscreen-btn btn-regular rounded-lg h-9 w-9";
-		btn.title = "全屏查看";
-		btn.setAttribute("aria-label", "全屏查看 Mermaid 图表");
-		btn.innerHTML = "⛶";
-		btn.addEventListener("click", (ev) => {
-			ev.stopPropagation();
-			const svg = element.querySelector("svg");
-			if (!svg) {return;}
-			openFullscreen(svg);
-		});
-		element.appendChild(btn);
-	}
 
-	// 检查主题是否真的发生了变化
-	function hasThemeChanged() {
-		const isDark = document.documentElement.classList.contains("dark");
-		const newTheme = isDark ? "dark" : "default";
+		state.zoom = nextZoom;
+		const nextScale = getTotalScale(state);
 
-		if (currentTheme !== newTheme) {
-			currentTheme = newTheme;
-			return true;
+		if (typeof originX === "number" && typeof originY === "number") {
+			const worldX = (originX - state.tx) / previousScale;
+			const worldY = (originY - state.ty) / previousScale;
+			state.tx = originX - worldX * nextScale;
+			state.ty = originY - worldY * nextScale;
+		} else {
+			centerState(state);
 		}
-		return false;
+
+		applyTransform(state);
 	}
 
-	// 等待 Mermaid 库加载完成
-	function waitForMermaid(timeout = 10000) {
-		return new Promise((resolve, reject) => {
-			const startTime = Date.now();
-
-			function check() {
-				if (
-					window.mermaid &&
-					typeof window.mermaid.initialize === "function"
-				) {
-					resolve(window.mermaid);
-				} else if (Date.now() - startTime > timeout) {
-					reject(
-						new Error(
-							"Mermaid library failed to load within timeout",
-						),
-					);
-				} else {
-					setTimeout(check, 100);
-				}
-			}
-
-			check();
-		});
-	}
-
-	// 存储 MutationObserver 实例
-	let themeObserver = null;
-
-	// 清理 MutationObserver
-	function cleanupMutationObserver() {
-		if (themeObserver) {
-			themeObserver.disconnect();
-			themeObserver = null;
-		}
-	}
-
-	// 设置 MutationObserver 监听 html 元素的 class 属性变化
-	function setupMutationObserver() {
-		cleanupMutationObserver();
-
-		themeObserver = new MutationObserver((mutations) => {
-			mutations.forEach((mutation) => {
-				if (
-					mutation.type === "attributes" &&
-					mutation.attributeName === "class"
-				) {
-					// 检查是否是 dark 类的变化
-					const target = mutation.target;
-					const wasDark = mutation.oldValue
-						? mutation.oldValue.includes("dark")
-						: false;
-					const isDark = target.classList.contains("dark");
-
-					if (wasDark !== isDark) {
-						if (hasThemeChanged()) {
-							// 延迟渲染，避免主题切换时的闪烁
-							setTimeout(() => renderMermaidDiagrams(), 150);
-						}
-					}
-				}
-			});
-		});
-
-		// 开始观察 html 元素的 class 属性变化
-		themeObserver.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ["class"],
-			attributeOldValue: true,
-		});
-	}
-
-	// 缩放平移
-	function attachZoomControls(element, svgElement) {
-		if (element.__zoomAttached) {
+	function bindDiagramInteractions(viewport, state) {
+		if (viewport.dataset.interactionBound === "true") {
 			return;
 		}
-		element.__zoomAttached = true;
 
-		const wrapper = document.createElement("div");
-		wrapper.className = "mermaid-zoom-wrapper";
+		viewport.dataset.interactionBound = "true";
+		viewport.style.touchAction = "none";
 
-		const svgParent = svgElement.parentNode;
-		wrapper.appendChild(svgElement);
-		svgParent.appendChild(wrapper);
-
-		let scale = 1;
-		let tx = 0;
-		let ty = 0;
-		const MIN_SCALE = 0.2;
-		const MAX_SCALE = 6;
-
-		function applyTransform() {
-			wrapper.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
-		}
-		const controls = document.createElement("div");
-		controls.className = "mermaid-zoom-controls";
-		controls.innerHTML = `
-			<button class="btn-regular rounded-lg h-10 w-10 active:scale-90" data-action="zoom-in" title="Zoom in">+</button>
-			<button class="btn-regular rounded-lg h-10 w-10 active:scale-90" data-action="zoom-out" title="Zoom out">−</button>
-			<button class="btn-regular rounded-lg h-10 w-10 active:scale-90" data-action="reset" title="Reset">⤾</button>
-		`;
-		element.appendChild(controls);
-
-		controls.addEventListener("click", (ev) => {
-			const action =
-				ev.target.getAttribute && ev.target.getAttribute("data-action");
-			if (!action) {
-				return;
-			}
-
-			switch (action) {
-				case "zoom-in":
-					scale = Math.min(MAX_SCALE, +(scale * 1.2).toFixed(3));
-					applyTransform();
-					break;
-				case "zoom-out":
-					scale = Math.max(MIN_SCALE, +(scale / 1.2).toFixed(3));
-					applyTransform();
-					break;
-				case "reset":
-					scale = 1;
-					tx = 0;
-					ty = 0;
-					applyTransform();
-					break;
-			}
-		});
-
-		let isPanning = false;
+		let dragging = false;
 		let startX = 0;
 		let startY = 0;
 		let startTx = 0;
 		let startTy = 0;
 
-		wrapper.style.touchAction = "none";
+		const getLocalPoint = (event) => {
+			const rect = viewport.getBoundingClientRect();
+			return {
+				x: event.clientX - rect.left,
+				y: event.clientY - rect.top,
+			};
+		};
 
-		wrapper.addEventListener("pointerdown", (ev) => {
-			if (ev.button !== 0) {
-				return;
-			} // 仅左键
-			isPanning = true;
-			wrapper.setPointerCapture(ev.pointerId);
-			startX = ev.clientX;
-			startY = ev.clientY;
-			startTx = tx;
-			startTy = ty;
-		});
-
-		wrapper.addEventListener("pointermove", (ev) => {
-			if (!isPanning) {
+		viewport.addEventListener("pointerdown", (event) => {
+			if (event.button !== 0 && event.pointerType !== "touch") {
 				return;
 			}
-			const dx = ev.clientX - startX;
-			const dy = ev.clientY - startY;
-			tx = startTx + dx / scale; // 根据当前缩放调整灵敏度
-			ty = startTy + dy / scale;
-			applyTransform();
+
+			dragging = true;
+			startX = event.clientX;
+			startY = event.clientY;
+			startTx = state.tx;
+			startTy = state.ty;
+			viewport.setPointerCapture?.(event.pointerId);
 		});
 
-		wrapper.addEventListener("pointerup", (ev) => {
-			isPanning = false;
-			try {
-				wrapper.releasePointerCapture(ev.pointerId);
-			} catch (e) {}
+		viewport.addEventListener("pointermove", (event) => {
+			if (!dragging) {
+				return;
+			}
+
+			state.tx = startTx + (event.clientX - startX);
+			state.ty = startTy + (event.clientY - startY);
+			applyTransform(state);
 		});
 
-		wrapper.addEventListener("pointercancel", () => {
-			isPanning = false;
-		});
+		const stopDragging = (event) => {
+			if (!dragging) {
+				return;
+			}
 
-		// 鼠标滚轮缩放
-		element.addEventListener(
+			dragging = false;
+			viewport.releasePointerCapture?.(event.pointerId);
+		};
+
+		viewport.addEventListener("pointerup", stopDragging);
+		viewport.addEventListener("pointercancel", stopDragging);
+
+		viewport.addEventListener(
 			"wheel",
-			(ev) => {
-				ev.preventDefault();
-				const delta = -ev.deltaY;
-				const zoomFactor = delta > 0 ? 1.12 : 1 / 1.12;
-				const prevScale = scale;
-				scale = Math.min(
-					MAX_SCALE,
-					Math.max(MIN_SCALE, +(scale * zoomFactor).toFixed(3)),
-				);
-
-				const rect = wrapper.getBoundingClientRect();
-				const cx = ev.clientX - rect.left;
-				const cy = ev.clientY - rect.top;
-
-				const worldX = cx / prevScale - tx;
-				const worldY = cy / prevScale - ty;
-
-				tx = cx / scale - worldX;
-				ty = cy / scale - worldY;
-
-				applyTransform();
+			(event) => {
+				event.preventDefault();
+				const point = getLocalPoint(event);
+				const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+				zoomBy(state, factor, point.x, point.y);
 			},
 			{ passive: false },
 		);
 
-		// 双击重置
-		wrapper.addEventListener("dblclick", () => {
-			scale = 1;
-			tx = 0;
-			ty = 0;
-			applyTransform();
-		});
-		applyTransform();
-		let resizeTimer = null;
-		window.addEventListener("resize", () => {
-			clearTimeout(resizeTimer);
-			resizeTimer = setTimeout(() => {
-				applyTransform();
-			}, 200);
-		});
-	}
-
-	// 设置其他事件监听器
-	function setupEventListeners() {
-		// 监听页面切换
-		document.addEventListener("astro:page-load", () => {
-			// 重新初始化主题状态
-			currentTheme = null;
-			retryCount = 0; // 重置重试计数
-			if (hasThemeChanged()) {
-				setTimeout(() => renderMermaidDiagrams(), 100);
-			}
-		});
-
-		// 监听页面可见性变化，页面重新可见时重新渲染
-		document.addEventListener("visibilitychange", () => {
-			if (!document.hidden) {
-				setTimeout(() => renderMermaidDiagrams(), 200);
-			}
-		});
-
-		// 页面切换前清理
-		document.addEventListener("astro:before-swap", cleanupMutationObserver);
-
-		// 页面切换前清理全屏状态
-		document.addEventListener("astro:before-swap", closeFullscreen);
-
-		// Swup 页面切换时重新设置 Observer
-		document.addEventListener("astro:after-swap", () => {
-			if (themeObserver === null) {
-				setupMutationObserver();
-			}
-		});
-	}
-
-	async function initializeMermaid() {
-		try {
-			await waitForMermaid();
-
-			// 初始化 Mermaid 配置
-			window.mermaid.initialize({
-				startOnLoad: false,
-				theme: "default",
-				themeVariables: {
-					fontFamily: "inherit",
-					fontSize: "16px",
-				},
-				securityLevel: "loose",
-				// 添加错误处理配置
-				errorLevel: "warn",
-				logLevel: "error",
-			});
-
-			// 渲染所有 Mermaid 图表
-			await renderMermaidDiagrams();
-		} catch (error) {
-			console.error("Failed to initialize Mermaid:", error);
-			// 如果初始化失败，尝试重新加载
-			if (retryCount < MAX_RETRIES) {
-				retryCount++;
-				setTimeout(() => initializeMermaid(), RETRY_DELAY * retryCount);
-			}
-		}
-	}
-
-	async function renderMermaidDiagrams() {
-		// 防止并发渲染
-		if (isRendering) {
-			return;
-		}
-
-		// 检查 Mermaid 是否可用
-		if (!window.mermaid || typeof window.mermaid.render !== "function") {
-			console.warn("Mermaid not available, skipping render");
-			return;
-		}
-
-		isRendering = true;
-		window.dispatchEvent(new CustomEvent("mermaid:render:start"));
-
-		try {
-			const mermaidElements = Array.from(
-				document.querySelectorAll(".mermaid[data-mermaid-code]"),
-			);
-
-			if (mermaidElements.length === 0) {
-				isRendering = false;
-				window.dispatchEvent(
-					new CustomEvent("mermaid:render:done", {
-						detail: { count: 0 },
-					}),
-				);
+		viewport.addEventListener("dblclick", (event) => {
+			const point = getLocalPoint(event);
+			if (state.zoom > 1.01) {
+				resetView(state);
 				return;
 			}
 
-			// 延迟检测主题，确保 DOM 已经更新
-			await new Promise((resolve) => setTimeout(resolve, 100));
-
-			const htmlElement = document.documentElement;
-			const isDark = htmlElement.classList.contains("dark");
-			const theme = isDark ? "dark" : "default";
-
-			// 更新 Mermaid 主题（只需要更新一次）
-			window.mermaid.initialize({
-				startOnLoad: false,
-				theme: theme,
-				themeVariables: {
-					fontFamily: "inherit",
-					fontSize: "16px",
-					// 强制应用主题变量
-					primaryColor: isDark ? "#ffffff" : "#000000",
-					primaryTextColor: isDark ? "#ffffff" : "#000000",
-					primaryBorderColor: isDark ? "#ffffff" : "#000000",
-					lineColor: isDark ? "#ffffff" : "#000000",
-					secondaryColor: isDark ? "#333333" : "#f0f0f0",
-					tertiaryColor: isDark ? "#555555" : "#e0e0e0",
-				},
-				securityLevel: "loose",
-				errorLevel: "warn",
-				logLevel: "error",
-			});
-
-			// 分批渲染，避免一次性阻塞主线程
-			const BATCH_SIZE = 3;
-			let index = 0;
-
-			async function renderBatch() {
-				const batch = mermaidElements.slice(index, index + BATCH_SIZE);
-				if (batch.length === 0) {
-					return;
-				}
-
-				await Promise.all(
-					batch.map(async (element, localIndex) => {
-						const globalIndex = index + localIndex;
-						let attempts = 0;
-						const maxAttempts = 3;
-
-						while (attempts < maxAttempts) {
-							try {
-								const code =
-									element.getAttribute("data-mermaid-code");
-
-								if (!code) {
-									break;
-								}
-
-								// 显示加载状态
-								element.innerHTML =
-									'<div class="mermaid-loading">Rendering diagram...</div>';
-
-								// 渲染图表
-								const { svg } = await window.mermaid.render(
-									`mermaid-${Date.now()}-${globalIndex}-${attempts}`,
-									code,
-								);
-
-								const parser = new DOMParser();
-								const doc = parser.parseFromString(
-									svg,
-									"image/svg+xml",
-								);
-								const svgElement = doc.documentElement;
-
-								element.innerHTML = "";
-								element.__zoomAttached = false;
-								element.appendChild(svgElement);
-
-								// 添加响应式支持
-								const insertedSvg =
-									element.querySelector("svg");
-								if (insertedSvg) {
-									insertedSvg.setAttribute("width", "100%");
-									insertedSvg.removeAttribute("height");
-									insertedSvg.style.maxWidth = "100%";
-									insertedSvg.style.height = "auto";
-									//Todo 需要根据实际情况
-									insertedSvg.style.minHeight = "300px";
-
-									// 强制应用样式
-									if (isDark) {
-										svgElement.style.filter =
-											"brightness(0.9) contrast(1.1)";
-									} else {
-										svgElement.style.filter = "none";
-									}
-									attachZoomControls(element, insertedSvg);
-									ensureFullscreenButton(element);
-								}
-
-								// 渲染成功，跳出重试循环
-								break;
-							} catch (error) {
-								attempts++;
-								console.warn(
-									`Mermaid rendering attempt ${attempts} failed for element ${globalIndex}:`,
-									error,
-								);
-
-								if (attempts >= maxAttempts) {
-									console.error(
-										`Failed to render Mermaid diagram after ${maxAttempts} attempts:`,
-										error,
-									);
-									element.innerHTML = `
-										<div class="mermaid-error">
-											<p>Failed to render diagram after ${maxAttempts} attempts.</p>
-											<button onclick="location.reload()" style="margin-top: 8px; padding: 4px 8px; background: var(--primary); color: white; border: none; border-radius: 4px; cursor: pointer;">
-												Retry Page
-											</button>
-										</div>
-									`;
-								} else {
-									// 等待一段时间后重试
-									await new Promise((resolve) =>
-										setTimeout(resolve, 500 * attempts),
-									);
-								}
-							}
-						}
-					}),
-				);
-
-				index += BATCH_SIZE;
-
-				if (index < mermaidElements.length) {
-					// 在空闲时间继续渲染下一批，避免长时间阻塞主线程
-					await new Promise((resolve) => {
-						if ("requestIdleCallback" in window) {
-							window.requestIdleCallback(() => resolve());
-						} else {
-							setTimeout(resolve, 50);
-						}
-					});
-					return renderBatch();
-				}
-			}
-
-			await renderBatch();
-			retryCount = 0; // 重置重试计数
-			window.dispatchEvent(
-				new CustomEvent("mermaid:render:done", {
-					detail: { count: mermaidElements.length },
-				}),
-			);
-		} catch (error) {
-			console.error("Error in renderMermaidDiagrams:", error);
-			window.dispatchEvent(new CustomEvent("mermaid:render:done"));
-
-			// 如果渲染失败，尝试重新渲染
-			if (retryCount < MAX_RETRIES) {
-				retryCount++;
-				setTimeout(
-					() => renderMermaidDiagrams(),
-					RETRY_DELAY * retryCount,
-				);
-			}
-		} finally {
-			isRendering = false;
-		}
-	}
-
-	// 初始化主题状态
-	function initializeThemeState() {
-		const isDark = document.documentElement.classList.contains("dark");
-		currentTheme = isDark ? "dark" : "default";
-	}
-
-	// 加载 Mermaid 库
-	async function loadMermaid() {
-		if (typeof window.mermaid !== "undefined") {
-			return Promise.resolve();
-		}
-
-		return new Promise((resolve, reject) => {
-			const script = document.createElement("script");
-			script.src =
-				"https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js";
-
-			script.onload = () => {
-				console.log("Mermaid library loaded successfully");
-				resolve();
-			};
-
-			script.onerror = (error) => {
-				console.error("Failed to load Mermaid library:", error);
-				// 尝试备用 CDN
-				const fallbackScript = document.createElement("script");
-				fallbackScript.src =
-					"https://unpkg.com/mermaid@11/dist/mermaid.min.js";
-
-				fallbackScript.onload = () => {
-					console.log("Mermaid library loaded from fallback CDN");
-					resolve();
-				};
-
-				fallbackScript.onerror = () => {
-					reject(
-						new Error(
-							"Failed to load Mermaid from both primary and fallback CDNs",
-						),
-					);
-				};
-
-				document.head.appendChild(fallbackScript);
-			};
-
-			document.head.appendChild(script);
+			zoomBy(state, ZOOM_STEP * ZOOM_STEP, point.x, point.y);
 		});
 	}
 
-	// 主初始化函数
+	function createControlButtons(className, actions) {
+		const controls = document.createElement("div");
+		controls.className = className;
+
+		actions.forEach((action) => {
+			const button = document.createElement("button");
+			button.type = "button";
+			button.className = "mermaid-ctrl-btn";
+			button.textContent = action.label;
+			button.title = action.title;
+			button.setAttribute("data-action", action.key);
+			button.addEventListener("click", (event) => {
+				event.preventDefault();
+				event.stopPropagation();
+				action.handler();
+			});
+			controls.appendChild(button);
+		});
+
+		return controls;
+	}
+
+	function closeFullscreen() {
+		if (!fullscreenOverlay) {
+			return;
+		}
+
+		document.body.classList.remove("mermaid-fullscreen-open");
+		document.removeEventListener("keydown", fullscreenOverlay.__escHandler);
+		fullscreenOverlay.remove();
+		fullscreenOverlay = null;
+	}
+
+	function openFullscreen(host) {
+		const sourceSvg = host.querySelector(".mermaid-stage svg");
+		if (!sourceSvg) {
+			return;
+		}
+
+		closeFullscreen();
+
+		const overlay = document.createElement("div");
+		overlay.className = "mermaid-fullscreen-overlay";
+
+		const content = document.createElement("div");
+		content.className = "mermaid-fs-content";
+
+		const viewport = document.createElement("div");
+		viewport.className = "mermaid-viewport mermaid-viewport-fullscreen";
+
+		const stage = document.createElement("div");
+		stage.className = "mermaid-stage";
+
+		const clonedSvg = sourceSvg.cloneNode(true);
+		const dimensions = getSvgDimensions(clonedSvg);
+		normalizeSvgElement(clonedSvg, dimensions);
+		stage.style.width = `${dimensions.width}px`;
+		stage.style.height = `${dimensions.height}px`;
+		stage.appendChild(clonedSvg);
+		viewport.appendChild(stage);
+		content.appendChild(viewport);
+		overlay.appendChild(content);
+
+		const fullscreenState = createDiagramState(viewport, stage, dimensions);
+		bindDiagramInteractions(viewport, fullscreenState);
+
+		const controls = createControlButtons("mermaid-fs-controls", [
+			{
+				key: "zoom-in",
+				label: "+",
+				title: "放大",
+				handler: () => zoomBy(fullscreenState, ZOOM_STEP),
+			},
+			{
+				key: "zoom-out",
+				label: "−",
+				title: "缩小",
+				handler: () => zoomBy(fullscreenState, 1 / ZOOM_STEP),
+			},
+			{
+				key: "reset",
+				label: "↺",
+				title: "重置",
+				handler: () => resetView(fullscreenState),
+			},
+			{
+				key: "close",
+				label: "✕",
+				title: "关闭",
+				handler: closeFullscreen,
+			},
+		]);
+
+		overlay.appendChild(controls);
+
+		const escHandler = (event) => {
+			if (event.key === "Escape") {
+				closeFullscreen();
+			}
+		};
+
+		overlay.__escHandler = escHandler;
+		overlay.__mermaidView = fullscreenState;
+		overlay.addEventListener("click", (event) => {
+			if (event.target === overlay) {
+				closeFullscreen();
+			}
+		});
+
+		document.body.appendChild(overlay);
+		document.body.classList.add("mermaid-fullscreen-open");
+		document.addEventListener("keydown", escHandler);
+		fullscreenOverlay = overlay;
+
+		requestAnimationFrame(() => {
+			resetView(fullscreenState);
+			syncStateToResize(fullscreenState);
+		});
+	}
+
+	function ensureDiagramShell(host, dimensions) {
+		const existingState = host.__mermaidView;
+		const existingViewport = host.querySelector(":scope > .mermaid-viewport");
+		const existingStage = existingViewport?.querySelector(".mermaid-stage");
+
+		if (existingState && existingViewport && existingStage) {
+			return {
+				isNew: false,
+				stage: existingStage,
+				state: existingState,
+			};
+		}
+
+		host.innerHTML = "";
+		const viewport = document.createElement("div");
+		viewport.className = "mermaid-viewport";
+
+		const stage = document.createElement("div");
+		stage.className = "mermaid-stage";
+		stage.style.width = `${dimensions.width}px`;
+		stage.style.height = `${dimensions.height}px`;
+		viewport.appendChild(stage);
+		host.appendChild(viewport);
+
+		const state = createDiagramState(viewport, stage, dimensions);
+		host.__mermaidView = state;
+		bindDiagramInteractions(viewport, state);
+
+		const controls = createControlButtons("mermaid-controls", [
+			{
+				key: "zoom-in",
+				label: "+",
+				title: "放大",
+				handler: () => zoomBy(state, ZOOM_STEP),
+			},
+			{
+				key: "zoom-out",
+				label: "−",
+				title: "缩小",
+				handler: () => zoomBy(state, 1 / ZOOM_STEP),
+			},
+			{
+				key: "reset",
+				label: "↺",
+				title: "重置",
+				handler: () => resetView(state),
+			},
+			{
+				key: "fullscreen",
+				label: "⛶",
+				title: "全屏查看",
+				handler: () => openFullscreen(host),
+			},
+		]);
+
+		host.appendChild(controls);
+		return {
+			isNew: true,
+			stage,
+			state,
+		};
+	}
+
+	function mountDiagram(host, prepared, theme) {
+		const { dimensions } = prepared;
+		const { isNew, stage, state } = ensureDiagramShell(host, dimensions);
+
+		host.style.setProperty(
+			"--mermaid-preview-height",
+			`${getPreviewHeight(dimensions)}px`,
+		);
+
+		state.intrinsicWidth = dimensions.width;
+		state.intrinsicHeight = dimensions.height;
+		stage.style.width = `${dimensions.width}px`;
+		stage.style.height = `${dimensions.height}px`;
+		stage.replaceChildren(prepared.svg);
+
+		if (isNew) {
+			resetView(state);
+		} else if (state.zoom > 1.01) {
+			syncStateToResize(state);
+		} else {
+			state.baseScale = calculateFitScale(state);
+			centerState(state);
+			applyTransform(state);
+		}
+
+		host.dataset.renderedTheme = theme;
+		host.dataset.mermaidState = "ready";
+		host.dataset.renderAttempts = "0";
+		setContainerReady(host, true);
+	}
+
+	function needsRender(host, theme, force = false) {
+		if (!host || !host.isConnected) {
+			return false;
+		}
+
+		if (force) {
+			return true;
+		}
+
+		if (host.dataset.renderedTheme !== theme) {
+			return true;
+		}
+
+		if (host.dataset.mermaidState !== "ready") {
+			return true;
+		}
+
+		return !host.querySelector(".mermaid-stage svg");
+	}
+
+	function isLikelyVisible(host) {
+		const rect = host.getBoundingClientRect();
+		const viewportHeight =
+			window.innerHeight || document.documentElement.clientHeight || 0;
+		return rect.bottom >= -120 && rect.top <= viewportHeight + 240;
+	}
+
+	function scheduleIdleWork(callback) {
+		if ("requestIdleCallback" in window) {
+			window.requestIdleCallback(callback, { timeout: 900 });
+			return;
+		}
+
+		window.setTimeout(
+			() =>
+				callback({
+					didTimeout: true,
+					timeRemaining: () => 0,
+				}),
+			40,
+		);
+	}
+
+	function queueDiagramRender(host, options = {}) {
+		const force = options.force === true;
+		const priority = options.priority || "normal";
+		const theme = getCurrentTheme();
+
+		if (!needsRender(host, theme, force)) {
+			return;
+		}
+
+		if (force) {
+			host.dataset.renderedTheme = "";
+		}
+
+		if (host.dataset.renderQueued === "true") {
+			return;
+		}
+
+		host.dataset.renderQueued = "true";
+		if (!host.querySelector(".mermaid-viewport")) {
+			setLoadingState(host);
+		}
+
+		const job = { host };
+		if (priority === "high") {
+			renderQueue.unshift(job);
+		} else {
+			renderQueue.push(job);
+		}
+
+		void drainRenderQueue();
+	}
+
+	async function renderHost(host) {
+		const code = host.getAttribute("data-mermaid-code") || "";
+		const theme = getCurrentTheme();
+		if (!code.trim()) {
+			return false;
+		}
+
+		if (!needsRender(host, theme, false)) {
+			return true;
+		}
+
+		host.dataset.rendering = "true";
+
+		try {
+			const prepared = await getPreparedDiagram(code, theme);
+			mountDiagram(host, prepared, theme);
+			return true;
+		} catch (error) {
+			const attempts = Number(host.dataset.renderAttempts || "0") + 1;
+			host.dataset.renderAttempts = String(attempts);
+
+			if (attempts < 2) {
+				host.dataset.renderQueued = "false";
+				host.dataset.rendering = "false";
+				window.setTimeout(() => {
+					queueDiagramRender(host, { force: true, priority: "high" });
+				}, 220 * attempts);
+				return false;
+			}
+
+			console.error("Failed to render Mermaid diagram:", error);
+			showRenderError(host, error);
+			return false;
+		} finally {
+			host.dataset.rendering = "false";
+		}
+	}
+
+	async function drainRenderQueue() {
+		if (drainingQueuePromise) {
+			return drainingQueuePromise;
+		}
+
+		drainingQueuePromise = (async () => {
+			while (renderQueue.length > 0) {
+				const job = renderQueue.shift();
+				const host = job?.host;
+				if (!host || !host.isConnected) {
+					continue;
+				}
+
+				host.dataset.renderQueued = "false";
+				await renderHost(host);
+				if (renderQueue.length > 0) {
+					await yieldToMainThread();
+				}
+			}
+		})().finally(() => {
+			drainingQueuePromise = null;
+		});
+
+		return drainingQueuePromise;
+	}
+
+	function applyThemeFromCache(hosts, theme) {
+		const misses = [];
+
+		hosts.forEach((host) => {
+			if (!host?.isConnected) {
+				return;
+			}
+
+			const code = host.getAttribute("data-mermaid-code") || "";
+			if (!code.trim()) {
+				return;
+			}
+
+			const cachedPrepared = preparedRenderCache.get(
+				getCacheKey(theme, code.trim()),
+			);
+			if (!cachedPrepared) {
+				misses.push(host);
+				return;
+			}
+
+			mountDiagram(host, clonePreparedDiagram(cachedPrepared), theme);
+		});
+
+		return misses;
+	}
+
+	function prewarmThemeCache(hosts, theme) {
+		const queue = hosts
+			.filter((host) => host?.isConnected)
+			.slice(0, THEME_PREWARM_LIMIT);
+		if (queue.length === 0) {
+			return;
+		}
+
+		const token = ++prewarmBatchToken;
+		const pump = (deadline) => {
+			if (token !== prewarmBatchToken) {
+				return;
+			}
+
+			while (queue.length > 0) {
+				if (
+					deadline &&
+					!deadline.didTimeout &&
+					typeof deadline.timeRemaining === "function" &&
+					deadline.timeRemaining() < 10
+				) {
+					break;
+				}
+
+				const nextHost = queue.shift();
+				const code = nextHost?.getAttribute("data-mermaid-code") || "";
+				if (!code.trim()) {
+					continue;
+				}
+
+				const cacheKey = getCacheKey(theme, code.trim());
+				if (preparedRenderCache.has(cacheKey)) {
+					continue;
+				}
+
+				void getPreparedDiagram(code, theme).catch(() => undefined);
+			}
+
+			if (queue.length > 0) {
+				scheduleIdleWork(pump);
+			}
+		};
+
+		pump({
+			didTimeout: false,
+			timeRemaining: () => 18,
+		});
+	}
+
+	function scheduleThemePrewarm(theme, hosts = getAllDiagramHosts()) {
+		const queue = hosts
+			.filter((host) => host?.isConnected)
+			.slice(0, THEME_PREWARM_LIMIT);
+		if (queue.length === 0) {
+			return;
+		}
+
+		scheduleIdleWork(() => prewarmThemeCache(queue, theme));
+	}
+
+	function scheduleIdlePrefetch(hosts, force = false) {
+		const queue = hosts.filter((host) =>
+			needsRender(host, getCurrentTheme(), force),
+		).slice(0, IDLE_PREFETCH_LIMIT);
+		if (queue.length === 0) {
+			return;
+		}
+
+		const token = ++idleBatchToken;
+		scheduleIdleWork(() => {
+			if (token !== idleBatchToken) {
+				return;
+			}
+
+			prewarmThemeCache(queue, getCurrentTheme());
+		});
+	}
+
+	function ensureDiagramObserver() {
+		if (diagramObserver || typeof IntersectionObserver === "undefined") {
+			return;
+		}
+
+		diagramObserver = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (!entry.isIntersecting) {
+						return;
+					}
+
+					diagramObserver.unobserve(entry.target);
+					queueDiagramRender(entry.target, { priority: "high" });
+				});
+			},
+			{
+				rootMargin: OBSERVER_MARGIN,
+				threshold: 0.01,
+			},
+		);
+	}
+
+	function observeHost(host) {
+		ensureDiagramObserver();
+		if (!diagramObserver || !host?.isConnected) {
+			return;
+		}
+
+		diagramObserver.observe(host);
+	}
+
+	function refreshVisibleDiagrams(force = false) {
+		const hosts = getAllDiagramHosts();
+		if (hosts.length === 0) {
+			dispatchRenderDone(0, 0);
+			return Promise.resolve();
+		}
+
+		currentTheme = getCurrentTheme();
+		dispatchRenderStart(hosts.length, hosts.length);
+
+		const visibleHosts = [];
+		const deferredHosts = [];
+
+		hosts.forEach((host) => {
+			if (force) {
+				host.dataset.renderedTheme = "";
+			}
+
+			observeHost(host);
+
+			if (!needsRender(host, currentTheme, force)) {
+				return;
+			}
+
+			if (!host.querySelector(".mermaid-viewport")) {
+				setLoadingState(host);
+			}
+
+			if (isLikelyVisible(host)) {
+				visibleHosts.push(host);
+			} else {
+				deferredHosts.push(host);
+			}
+		});
+
+		visibleHosts.forEach((host) =>
+			queueDiagramRender(host, { force, priority: "high" }),
+		);
+		scheduleIdlePrefetch(deferredHosts, force);
+
+		return drainRenderQueue().finally(() => {
+			dispatchRenderDone(visibleHosts.length, hosts.length);
+			scheduleThemePrewarm(getOppositeTheme(currentTheme), visibleHosts);
+		});
+	}
+
+	async function renderMermaidDiagrams(options = {}) {
+		await refreshVisibleDiagrams(options.force === true);
+	}
+
+	function scheduleThemeSwitch() {
+		window.cancelAnimationFrame(themeSwitchFrame);
+		themeSwitchFrame = window.requestAnimationFrame(() => {
+			themeSwitchFrame = 0;
+
+			const nextTheme = getCurrentTheme();
+			if (nextTheme === currentTheme) {
+				return;
+			}
+
+			currentTheme = nextTheme;
+			closeFullscreen();
+
+			const hosts = getAllDiagramHosts();
+			const visibleHosts = [];
+			const deferredHosts = [];
+
+			hosts.forEach((host) => {
+				observeHost(host);
+				if (isLikelyVisible(host)) {
+					visibleHosts.push(host);
+				} else {
+					deferredHosts.push(host);
+				}
+			});
+
+			const missingVisible = applyThemeFromCache(visibleHosts, nextTheme);
+			if (missingVisible.length > 0) {
+				dispatchRenderStart(missingVisible.length, hosts.length);
+				missingVisible.forEach((host) =>
+					queueDiagramRender(host, { force: true, priority: "high" }),
+				);
+				void drainRenderQueue().finally(() => {
+					dispatchRenderDone(missingVisible.length, hosts.length);
+				});
+			}
+
+			scheduleThemePrewarm(nextTheme, deferredHosts);
+			scheduleThemePrewarm(getOppositeTheme(nextTheme), visibleHosts);
+		});
+	}
+
+	function handleThemeMutation() {
+		scheduleThemeSwitch();
+	}
+
+	function setupThemeObserver() {
+		if (themeObserver) {
+			return;
+		}
+
+		themeObserver = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				if (
+					mutation.type === "attributes" &&
+					mutation.attributeName === "class"
+				) {
+					handleThemeMutation();
+					break;
+				}
+			}
+		});
+
+		themeObserver.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ["class"],
+		});
+	}
+
+	function syncAllViewports() {
+		window.cancelAnimationFrame(resizeFrame);
+		resizeFrame = window.requestAnimationFrame(() => {
+			getAllDiagramHosts().forEach((host) => {
+				syncStateToResize(host.__mermaidView);
+			});
+
+			if (fullscreenOverlay?.__mermaidView) {
+				syncStateToResize(fullscreenOverlay.__mermaidView);
+			}
+		});
+	}
+
+	function setupEventListeners() {
+		document.addEventListener("astro:before-preparation", closeFullscreen);
+		document.addEventListener("astro:before-swap", closeFullscreen);
+		document.addEventListener("astro:page-load", () => {
+			closeFullscreen();
+			void renderMermaidDiagrams();
+		});
+		document.addEventListener("visibilitychange", () => {
+			if (!document.hidden) {
+				void renderMermaidDiagrams();
+			}
+		});
+		window.addEventListener("resize", syncAllViewports, { passive: true });
+	}
+
 	async function initialize() {
 		try {
-			// 设置监听器
-			setupMutationObserver();
+			setupThemeObserver();
 			setupEventListeners();
-
-			// 初始化主题状态
-			initializeThemeState();
-
-			// 加载并初始化 Mermaid
-			await loadMermaid();
-			await initializeMermaid();
-
-			// 将 renderMermaidDiagrams 暴露到全局作用域，以便在解密后调用
 			window.renderMermaidDiagrams = renderMermaidDiagrams;
+			await renderMermaidDiagrams();
 		} catch (error) {
 			console.error("Failed to initialize Mermaid system:", error);
 		}
 	}
 
-	// 启动初始化
 	if (document.readyState === "loading") {
-		document.addEventListener("DOMContentLoaded", initialize);
+		document.addEventListener("DOMContentLoaded", initialize, { once: true });
 	} else {
-		initialize();
+		void initialize();
 	}
 })();

@@ -160,6 +160,7 @@ declare global {
 			instance: {
 				destroy: () => void;
 			} | null;
+			mountedContainer: HTMLElement | null;
 			observer: IntersectionObserver | null;
 			previewObserver: MutationObserver | null;
 			initialized: boolean;
@@ -179,6 +180,7 @@ declare global {
 	interface Fancybox {
 		unbind: (selector: string) => void;
 		bind: (selector: string, options: object) => void;
+		show: (items: Array<Record<string, unknown>>, options?: object) => void;
 	}
 
 	var Fancybox: Fancybox | undefined;

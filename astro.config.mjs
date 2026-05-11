@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
 import svelte, { vitePreprocess } from "@astrojs/svelte";
@@ -8,6 +10,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "astro/config";
 import expressiveCode from "astro-expressive-code";
 import icon from "astro-icon";
+import "katex/contrib/mhchem";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import rehypeComponents from "rehype-components";
 import rehypeExternalLinks from "rehype-external-links";
@@ -18,17 +21,75 @@ import remarkMath from "remark-math";
 import remarkSectionize from "remark-sectionize";
 
 import { siteConfig } from "./src/config.ts";
+import { createMarkdownContentHmrPlugin } from "./src/dev/markdown-content-hmr.mjs";
 import { pluginCustomCopyButton } from "./src/plugins/expressive-code/custom-copy-button.js";
 import { pluginLanguageBadge } from "./src/plugins/expressive-code/language-badge.ts";
 import { AdmonitionComponent } from "./src/plugins/rehype-component-admonition.mjs";
+import { GiteeCardComponent } from "./src/plugins/rehype-component-gitee-card.mjs";
 import { GithubCardComponent } from "./src/plugins/rehype-component-github-card.mjs";
+import { ImageGridComponent } from "./src/plugins/rehype-component-image-grid.mjs";
+import {
+	MathColComponent,
+	MathColsComponent,
+	MathCompactComponent,
+	MathLongComponent,
+	MathStatementComponent,
+} from "./src/plugins/rehype-component-math-layout.mjs";
 import { rehypeImageWidth } from "./src/plugins/rehype-image-width.mjs";
 import { rehypeMermaid } from "./src/plugins/rehype-mermaid.mjs";
+import { rehypePlantuml } from "./src/plugins/rehype-plantuml.mjs";
+import { rehypeSiteCard } from "./src/plugins/rehype-site-card.mjs";
 import { rehypeWrapTable } from "./src/plugins/rehype-wrap-table.mjs";
 import { remarkContent } from "./src/plugins/remark-content.mjs";
 import { parseDirectiveNode } from "./src/plugins/remark-directive-rehype.js";
 import { remarkFixGithubAdmonitions } from "./src/plugins/remark-fix-github-admonitions.js";
+import { remarkImageGrid } from "./src/plugins/remark-image-grid.js";
 import { remarkMermaid } from "./src/plugins/remark-mermaid.js";
+import { remarkPlantuml } from "./src/plugins/remark-plantuml.js";
+import { katexOptions } from "./src/utils/katex-options.mjs";
+
+const createPluginSourceDigest = (filePaths) => {
+	const hash = createHash("sha256");
+
+	for (const relativePath of filePaths) {
+		hash.update(readFileSync(new URL(relativePath, import.meta.url), "utf8"));
+	}
+
+	return hash.digest("hex").slice(0, 12);
+};
+
+const markdownPipelineDigest = createPluginSourceDigest([
+	"./src/content.config.ts",
+	"./src/plugins/remark-content.mjs",
+	"./src/plugins/remark-directive-rehype.js",
+	"./src/plugins/remark-fix-github-admonitions.js",
+	"./src/plugins/remark-image-grid.js",
+	"./src/plugins/remark-mermaid.js",
+	"./src/plugins/remark-plantuml.js",
+	"./src/plugins/rehype-component-admonition.mjs",
+	"./src/plugins/rehype-component-gitee-card.mjs",
+	"./src/plugins/rehype-component-github-card.mjs",
+	"./src/plugins/rehype-component-image-grid.mjs",
+	"./src/plugins/rehype-component-math-layout.mjs",
+	"./src/plugins/rehype-image-width.mjs",
+	"./src/plugins/rehype-mermaid.mjs",
+	"./src/plugins/rehype-plantuml.mjs",
+	"./src/plugins/mermaid-render-script.js",
+	"./src/plugins/plantuml-render-script.js",
+	"./src/plugins/plantuml-encoder.js",
+	"./src/plugins/rehype-site-card.mjs",
+	"./src/plugins/website-card-utils.mjs",
+	"./src/plugins/rehype-wrap-table.mjs",
+]);
+
+const plantumlConfig = {
+	enable: true,
+	servers: [
+		"https://www.plantuml.com/plantuml",
+	],
+	lightTheme: "",
+	darkTheme: "cyborg",
+};
 
 // https://astro.build/config
 export default defineConfig({
@@ -122,12 +183,14 @@ export default defineConfig({
 			remarkContent,
 			remarkFixGithubAdmonitions,
 			remarkDirective,
+			remarkImageGrid,
 			remarkSectionize,
 			parseDirectiveNode,
 			remarkMermaid,
+			[remarkPlantuml, plantumlConfig],
 		],
 		rehypePlugins: [
-			rehypeKatex,
+			[rehypeKatex, katexOptions],
 			[
 				rehypeExternalLinks,
 				{
@@ -138,11 +201,23 @@ export default defineConfig({
 			rehypeSlug,
 			rehypeWrapTable,
 			rehypeMermaid,
+			rehypePlantuml,
+			[rehypeSiteCard, { cacheKey: markdownPipelineDigest }],
 			[
 				rehypeComponents,
 				{
 					components: {
+						gitee: GiteeCardComponent,
 						github: GithubCardComponent,
+						"image-grid": ImageGridComponent,
+						"math-compact": MathCompactComponent,
+						"math-cols": MathColsComponent,
+						"math-col": MathColComponent,
+						theorem: (x, y) =>
+							MathStatementComponent(x, y, "theorem"),
+						lemma: (x, y) =>
+							MathStatementComponent(x, y, "lemma"),
+						"math-long": MathLongComponent,
 						note: (x, y) => AdmonitionComponent(x, y, "note"),
 						tip: (x, y) => AdmonitionComponent(x, y, "tip"),
 						important: (x, y) =>
@@ -179,7 +254,10 @@ export default defineConfig({
 			__VUE_PROD_DEVTOOLS__: false,
 			__VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
 		},
-		plugins: [tailwindcss()],
+		plugins: [
+			tailwindcss(),
+			createMarkdownContentHmrPlugin({ rootDir: process.cwd() }),
+		],
 		build: {
 			// 静态资源处理优化，防止小图片转 base64 导致 HTML 体积过大
 			assetsInlineLimit: 4096,

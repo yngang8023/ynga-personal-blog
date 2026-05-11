@@ -49,6 +49,27 @@ async function readConfigContent() {
 	return fs.readFile(configPath, "utf-8");
 }
 
+async function clearAstroContentCache() {
+	const cacheTargets = [
+		path.join(rootDir, ".astro", "data-store.json"),
+		path.join(rootDir, ".astro", "content-assets.mjs"),
+		path.join(rootDir, ".astro", "content-modules.mjs"),
+	];
+
+	await Promise.all(
+		cacheTargets.map(async (targetPath) => {
+			try {
+				await fs.rm(targetPath, { force: true });
+				console.log(`[predev] Cleared Astro cache: ${path.relative(rootDir, targetPath)}`);
+			} catch (error) {
+				console.warn(
+					`[predev] Failed to clear Astro cache ${path.relative(rootDir, targetPath)}: ${error.message}`,
+				);
+			}
+		}),
+	);
+}
+
 function parseConfigValue(content, sectionName, keyName) {
 	const pattern = new RegExp(
 		`${sectionName}:\\s*\\{[\\s\\S]*?${keyName}:\\s*["']?([^,"'\\n}]+)["']?`,
@@ -92,6 +113,8 @@ async function resolveAnimeDevTask() {
 }
 
 async function main() {
+	await clearAstroContentCache();
+
 	await runNodeScript("sync-content.js", {
 		ignoreFailure: true,
 		label: "sync-content.js",

@@ -3,7 +3,6 @@ import I18nKey from "../../../i18n/i18nKey";
 import { i18n } from "../../../i18n/translation";
 import { getTagList } from "../../../utils/content-utils";
 import { getTagUrl } from "../../../utils/url-utils";
-import { widgetManager } from "../../../utils/widget-manager";
 import ButtonTag from "../../control/ButtonTag.astro";
 import WidgetEmptyState from "../common/WidgetEmptyState.astro";
 import WidgetLayout from "../common/WidgetLayout.astro";
@@ -11,14 +10,6 @@ import WidgetLayout from "../common/WidgetLayout.astro";
 const tags = await getTagList();
 
 const COLLAPSED_HEIGHT = "7.5rem";
-
-// 使用统一的组件管理器检查是否应该折叠
-const tagsComponent = widgetManager
-	.getConfig()
-	.properties.find((p) => p.type === "tags");
-const isCollapsed = tagsComponent
-	? widgetManager.isCollapsed(tagsComponent, tags.length)
-	: false;
 
 interface Props {
 	class?: string;
@@ -31,7 +22,7 @@ const style = Astro.props.style;
 <WidgetLayout
 	name={i18n(I18nKey.tags)}
 	id="tags"
-	isCollapsed={isCollapsed}
+	isCollapsed={tags.length > 0}
 	collapsedHeight={COLLAPSED_HEIGHT}
 	class={className}
 	style={style}

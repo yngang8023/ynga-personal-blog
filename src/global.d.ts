@@ -45,17 +45,29 @@ declare global {
 		swup: Swup | undefined;
 		closeAnnouncement: () => void;
 		oddmisc?: {
-			getStats: (path?: string) => Promise<{
+			getStats: (
+				path?: string,
+				options?: {
+					fresh?: boolean;
+				},
+			) => Promise<{
 				pageviews: number;
 				visitors: number;
 				visits: number;
 			}>;
-			getSiteStats: () => Promise<{
+			getSiteStats: (options?: {
+				fresh?: boolean;
+			}) => Promise<{
 				pageviews: number;
 				visitors: number;
 				visits: number;
 			}>;
-			getPageStats: (path?: string) => Promise<{
+			getPageStats: (
+				path?: string,
+				options?: {
+					fresh?: boolean;
+				},
+			) => Promise<{
 				pageviews: number;
 				visitors: number;
 				visits: number;
@@ -185,10 +197,13 @@ declare global {
 			initAttemptedPath: string;
 			previewTimer: number | null;
 			statsRefreshTimer: number | null;
+			commentCountSyncTimer: number | null;
 			statsAborters: {
 				abortCommentCount: (() => void) | null;
 				abortPageviewCount: (() => void) | null;
 			} | null;
+			lastCommentCount: number | null;
+			pendingCommentMutationDelta: number;
 			originalConfirm: typeof window.confirm;
 			confirmProxy: typeof window.confirm;
 			deleteConfirmBridge: {
@@ -201,6 +216,8 @@ declare global {
 			schedulePreviewEnable: () => void;
 			observePreviewDefaults: () => void;
 			refreshStats: () => void;
+			syncCommentCountFromWaline: () => void;
+			scheduleCommentCountSync: () => void;
 			scheduleStatsRefresh: () => void;
 			observeCommentStats: () => void;
 			installDeleteConfirmBridge: () => void;

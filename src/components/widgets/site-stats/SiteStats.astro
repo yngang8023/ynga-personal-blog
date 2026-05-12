@@ -10,7 +10,6 @@ import {
 	getTagList,
 } from "../../../utils/content-utils";
 import { resolveLatestPostActivityDate } from "../../../utils/post-last-modified";
-import { getPostUrl } from "../../../utils/url-utils";
 import WidgetLayout from "../common/WidgetLayout.astro";
 
 interface Props {
@@ -28,7 +27,6 @@ const relativeTimeLocale = (siteConfig.lang || "en").replaceAll("_", "-");
 const posts = await getSortedPosts();
 const categories = await getCategoryList();
 const tags = await getTagList();
-const postPaths = posts.map((post) => getPostUrl(post));
 
 // 计算总字数
 let totalWords = 0;
@@ -161,7 +159,6 @@ const stats = [
 		siteStartDate,
 		lastActivityTimestamp,
 		relativeTimeLocale,
-		postPaths,
 	}}
 >
 	function updateDynamicStats() {
@@ -266,16 +263,10 @@ const stats = [
 		}
 
 		try {
-			const pageviewsList = await Promise.all(
-				postPaths.map(async (path) => {
-					const stats = await window.oddmisc.getStats(path);
-					return stats.pageviews ?? 0;
-				}),
-			);
-			const totalViews = pageviewsList.reduce(
-				(sum, views) => sum + views,
-				0,
-			);
+			const stats = await window.oddmisc.getSiteStats({
+				fresh: attempt > 0,
+			});
+			const totalViews = stats.pageviews ?? 0;
 
 			totalViewsElements.forEach((element) => {
 				element.textContent = totalViews.toLocaleString();

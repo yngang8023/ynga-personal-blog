@@ -1,158 +1,92 @@
 ---
 import { umamiConfig } from "@/config";
+import {
+	DEFAULT_UMAMI_PROXY_BASE_PATH,
+	DEFAULT_UMAMI_STATS_CACHE_TTL_MS,
+} from "@/config";
+
+const runtimeConfig = JSON.stringify({
+	shareUrl: umamiConfig.shareUrl,
+	proxyBasePath:
+		umamiConfig.proxyBasePath || DEFAULT_UMAMI_PROXY_BASE_PATH,
+	statsCacheTtlMs:
+		umamiConfig.statsCacheTtlMs ?? DEFAULT_UMAMI_STATS_CACHE_TTL_MS,
+});
 ---
 
 {
 	umamiConfig.enable && (
-		<script is:inline define:vars={{ shareUrl: umamiConfig.shareUrl }}>
-			(() => {
-				const RUNTIME_KEY = "__mizukiUmamiRuntimeReady";
-				if (window[RUNTIME_KEY]) {
-					return;
-				}
-				window[RUNTIME_KEY] = true;
+		<>
+			<script
+				type="application/json"
+				is:inline
+				id="mizuki-umami-runtime-config"
+				set:html={runtimeConfig}
+			/>
+			<script>
+				import { createUmamiStatsClient } from "./umami-runtime-utils.js";
 
-				const runtimeShareUrl = shareUrl;
-				if (!runtimeShareUrl) {
-					return;
-				}
-
-				const REQUEST_TIMEOUT = 10000;
-				const shareState = {
-					data: null,
-					promise: null,
-				};
-
-				const parseShareUrl = (rawUrl) => {
-					const parsed = new URL(rawUrl);
-					const segments = parsed.pathname
-						.split("/")
-						.filter(Boolean);
-					const shareIndex = segments.indexOf("share");
-
-					if (
-						shareIndex === -1 ||
-						shareIndex >= segments.length - 1
-					) {
-						throw new Error("无效的 Umami 分享链接");
-					}
-
-					const shareId = segments[shareIndex + 1];
-					const prefix = segments.slice(0, shareIndex).join("/");
-					return {
-						apiBase: `${parsed.origin}/${prefix}/api`,
-						shareId,
+				(() => {
+					type UmamiRuntimeConfig = {
+						shareUrl?: string;
+						proxyBasePath?: string;
+						statsCacheTtlMs?: number;
 					};
-				};
 
-				const { apiBase, shareId } = parseShareUrl(runtimeShareUrl);
-				const clearCache = () => {
-					shareState.data = null;
-					shareState.promise = null;
-				};
+					const RUNTIME_KEY = "__mizukiUmamiRuntimeReady";
+					if (window[RUNTIME_KEY]) {
+						return;
+					}
+					window[RUNTIME_KEY] = true;
 
-				const fetchWithTimeout = async (url, options = {}) => {
-					const controller = new AbortController();
-					const timer = setTimeout(
-						() => controller.abort(),
-						REQUEST_TIMEOUT,
+					const configElement = document.getElementById(
+						"mizuki-umami-runtime-config",
 					);
+					if (!configElement?.textContent) {
+						return;
+					}
 
+					let runtimeConfig: UmamiRuntimeConfig;
 					try {
-						return await fetch(url, {
-							cache: "no-store",
-							...options,
-							signal: controller.signal,
-						});
-					} finally {
-						clearTimeout(timer);
-					}
-				};
-
-				const getShareData = async () => {
-					if (shareState.data) {
-						return shareState.data;
-					}
-					if (shareState.promise) {
-						return shareState.promise;
+						runtimeConfig = JSON.parse(
+							configElement.textContent,
+						) as UmamiRuntimeConfig;
+					} catch (error) {
+						console.error("[Umami] 运行时配置解析失败:", error);
+						return;
 					}
 
-					shareState.promise = (async () => {
-						const response = await fetchWithTimeout(
-							`${apiBase}/share/${shareId}`,
-							{
-								headers: {
-									accept: "application/json",
-								},
-							},
-						);
+					const runtimeShareUrl = runtimeConfig.shareUrl;
+					if (!runtimeShareUrl) {
+						return;
+					}
 
-						if (!response.ok) {
-							shareState.promise = null;
-							throw new Error(
-								`获取 Umami 分享信息失败: ${response.status}`,
-							);
-						}
-
-						const data = await response.json();
-						shareState.data = data;
-						return data;
-					})();
-
-					return shareState.promise;
-				};
-
-				const normalizeStats = (stats) => ({
-					pageviews:
-						stats?.pageviews?.value ?? stats?.pageviews ?? 0,
-					visitors: stats?.visitors?.value ?? stats?.visitors ?? 0,
-					visits: stats?.visits?.value ?? stats?.visits ?? 0,
-				});
-
-				const getStats = async (path) => {
-					const shareData = await getShareData();
-					const params = new URLSearchParams({
-						startAt: "0",
-						endAt: Date.now().toString(),
+					const client = createUmamiStatsClient({
+						shareUrl: runtimeShareUrl,
+						proxyBasePath: runtimeConfig.proxyBasePath,
+						statsCacheTtlMs:
+							Number(runtimeConfig.statsCacheTtlMs) || 3000,
 					});
 
-					if (path) {
-						params.set("path", `eq.${path}`);
-					}
-
-					const response = await fetchWithTimeout(
-						`${apiBase}/websites/${shareData.websiteId}/stats?${params.toString()}`,
-						{
-							headers: {
-								accept: "application/json",
-								"x-umami-share-token": shareData.token,
-								"x-umami-share-context": "1",
-							},
+					window.oddmisc = {
+						...(window.oddmisc || {}),
+						getStats: (path, options) =>
+							client.getStats(path, options),
+						getSiteStats: (options) =>
+							client.getSiteStats(options),
+						getPageStats: (path, options) =>
+							client.getPageStats(path, options),
+						clearCache: () => client.clearCache(),
+						umami: {
+							clearCache: () => client.clearCache(),
 						},
+					};
+
+					window.dispatchEvent(
+						new CustomEvent("mizuki:umami-ready"),
 					);
-
-					if (!response.ok) {
-						throw new Error(`获取统计失败: ${response.status}`);
-					}
-
-					return normalizeStats(await response.json());
-				};
-
-				window.oddmisc = {
-					...(window.oddmisc || {}),
-					getStats,
-					getSiteStats: () => getStats(),
-					getPageStats: (path) => getStats(path),
-					clearCache,
-					umami: {
-						clearCache,
-					},
-				};
-
-				window.dispatchEvent(
-					new CustomEvent("mizuki:umami-ready"),
-				);
-			})();
-		</script>
+				})();
+			</script>
+		</>
 	)
 }

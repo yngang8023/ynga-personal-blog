@@ -82,6 +82,7 @@ const { id, path } = Astro.props;
 									const latestStats =
 										await window.oddmisc.getStats(
 											statsPath,
+											{ fresh: true },
 										);
 									const latestViews =
 										latestStats.pageviews ?? pageViews;

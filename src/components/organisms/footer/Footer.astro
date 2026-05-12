@@ -482,7 +482,9 @@ if (footerConfig.enable) {
 						}
 
 						try {
-							const stats = await window.oddmisc.getSiteStats();
+							const stats = await window.oddmisc.getSiteStats({
+								fresh: attempt > 0,
+							});
 							const values = {
 								pageviews: stats.pageviews ?? 0,
 								visitors: stats.visitors ?? 0,

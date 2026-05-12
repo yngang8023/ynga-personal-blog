@@ -28,8 +28,11 @@ import { commentConfig } from "@/config";
 					} from "../../utils/katex-options.mjs";
 					import {
 						createWalineDeleteConfirmBridge,
+						getWalineCommentMutationDelta,
 						matchWalineDeleteButton,
 						refreshWalineStats,
+						resolveWalineCommentCount,
+						syncWalineCommentCountDisplay,
 						teardownWalineInstance,
 					} from "./waline-runtime-utils.js";
 
@@ -45,6 +48,21 @@ import { commentConfig } from "@/config";
 
 					const getCommentShell = () =>
 						document.querySelector(".waline-comment-shell");
+
+					const getCommentCountBadge = () =>
+						document.querySelector<HTMLElement>(
+							".waline-comment-count",
+						);
+
+					const getWalineCountValue = () =>
+						document.querySelector<HTMLElement>(
+							`#${CONTAINER_ID} .wl-count .wl-num`,
+						);
+
+					const getWalineCountContainer = () =>
+						document.querySelector<HTMLElement>(
+							`#${CONTAINER_ID} .wl-count`,
+						);
 
 					const getCommentEditors = () =>
 						Array.from(
@@ -222,6 +240,9 @@ import { commentConfig } from "@/config";
 						previewTimer: null,
 						statsRefreshTimer: null,
 						statsAborters: null,
+						commentCountSyncTimer: null,
+						lastCommentCount: null,
+						pendingCommentMutationDelta: 0,
 						originalConfirm: window.confirm.bind(window),
 						confirmProxy: (message = "") =>
 							runtime.deleteConfirmBridge?.confirm(message) ??
@@ -252,7 +273,64 @@ import { commentConfig } from "@/config";
 								serverURL: config.serverURL,
 								path: getCurrentPath(),
 								lang: config.lang,
+								refreshCommentCount:
+									runtime.pendingCommentMutationDelta === 0,
 							});
+						},
+						syncCommentCountFromWaline: () => {
+							const badge = getCommentCountBadge();
+							const walineCountContainer =
+								getWalineCountContainer();
+							if (!badge && !walineCountContainer) {
+								return;
+							}
+
+							const walineCountText =
+								getWalineCountValue()?.textContent?.trim() ??
+								"";
+							const displayedCount = Number.parseInt(
+								walineCountText,
+								10,
+							);
+							const resolvedCount =
+								resolveWalineCommentCount({
+									displayedCount,
+									lastKnownCount:
+										runtime.lastCommentCount,
+									pendingRootDelta:
+										runtime.pendingCommentMutationDelta,
+								});
+
+							if (resolvedCount === null) {
+								return;
+							}
+
+							runtime.lastCommentCount =
+								syncWalineCommentCountDisplay({
+									count: resolvedCount,
+									badgeElement: badge,
+									walineCountContainer,
+									createCountElement: () => {
+										const element =
+											document.createElement("span");
+										element.className = "wl-num";
+										return element;
+									},
+								});
+							runtime.pendingCommentMutationDelta = 0;
+						},
+						scheduleCommentCountSync: () => {
+							if (runtime.commentCountSyncTimer !== null) {
+								window.clearTimeout(
+									runtime.commentCountSyncTimer,
+								);
+							}
+
+							runtime.commentCountSyncTimer =
+								window.setTimeout(() => {
+									runtime.commentCountSyncTimer = null;
+									runtime.syncCommentCountFromWaline();
+								}, 120);
 						},
 						scheduleStatsRefresh: () => {
 							if (runtime.statsRefreshTimer !== null) {
@@ -265,6 +343,7 @@ import { commentConfig } from "@/config";
 								() => {
 									runtime.statsRefreshTimer = null;
 									runtime.refreshStats();
+									runtime.scheduleCommentCountSync();
 								},
 								180,
 							);
@@ -286,6 +365,10 @@ import { commentConfig } from "@/config";
 
 							runtime.statsObserver = new MutationObserver(
 								(mutations) => {
+									const mutationDelta =
+										getWalineCommentMutationDelta(
+											mutations,
+										);
 									const hasCommentTreeChange =
 										mutations.some(
 											(mutation) =>
@@ -298,6 +381,11 @@ import { commentConfig } from "@/config";
 										);
 
 									if (hasCommentTreeChange) {
+										if (mutationDelta !== 0) {
+											runtime.pendingCommentMutationDelta +=
+												mutationDelta;
+											runtime.scheduleCommentCountSync();
+										}
 										runtime.scheduleStatsRefresh();
 									}
 								},
@@ -426,9 +514,20 @@ import { commentConfig } from "@/config";
 									runtime.statsRefreshTimer = null;
 								}
 
+								if (
+									runtime.commentCountSyncTimer !== null
+								) {
+									window.clearTimeout(
+										runtime.commentCountSyncTimer,
+									);
+									runtime.commentCountSyncTimer = null;
+								}
+
 								runtime.statsAborters?.abortCommentCount?.();
 								runtime.statsAborters?.abortPageviewCount?.();
 								runtime.statsAborters = null;
+								runtime.lastCommentCount = null;
+								runtime.pendingCommentMutationDelta = 0;
 
 								if (runtime.instance) {
 									const teardownResult =
@@ -458,6 +557,7 @@ import { commentConfig } from "@/config";
 								runtime.observePreviewDefaults();
 								runtime.installDeleteConfirmBridge();
 								runtime.scheduleStatsRefresh();
+								runtime.scheduleCommentCountSync();
 							} catch (error) {
 								console.error("[Waline] 初始化失败:", error);
 							} finally {
@@ -481,9 +581,19 @@ import { commentConfig } from "@/config";
 								);
 								runtime.statsRefreshTimer = null;
 							}
+							if (
+								runtime.commentCountSyncTimer !== null
+							) {
+								window.clearTimeout(
+									runtime.commentCountSyncTimer,
+								);
+								runtime.commentCountSyncTimer = null;
+							}
 							runtime.statsAborters?.abortCommentCount?.();
 							runtime.statsAborters?.abortPageviewCount?.();
 							runtime.statsAborters = null;
+							runtime.lastCommentCount = null;
+							runtime.pendingCommentMutationDelta = 0;
 							runtime.teardownDeleteConfirmBridge();
 							if (runtime.instance) {
 								const teardownResult =

@@ -30,7 +30,12 @@ export const umamiConfig = {
 	shareUrl: "https://cloud.umami.is/analytics/us/share/VXfzKN9KrGekRNdd",
 	scriptUrl: "https://cloud.umami.is/script.js",
 	websiteId: "c32f806f-e719-4b51-89e7-64b7cd3085cb",
+	proxyBasePath: "/umami",
+	statsCacheTtlMs: 3000,
 };
+
+export const DEFAULT_UMAMI_PROXY_BASE_PATH = "/umami";
+export const DEFAULT_UMAMI_STATS_CACHE_TTL_MS = 3000;
 
 export const siteConfig: SiteConfig = {
 	title: "HiYngaの随✏️记",

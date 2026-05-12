@@ -152,6 +152,20 @@ const {
                         if (display) {
                             display.textContent = `${pageViewsText} ${pageViews}`;
                         }
+
+                        window.setTimeout(async () => {
+                            try {
+                                const latestStats = await window.oddmisc.getStats(statsPath, {
+                                    fresh: true,
+                                });
+                                const latestViews = latestStats.pageviews ?? pageViews;
+                                if (display) {
+                                    display.textContent = `${pageViewsText} ${latestViews}`;
+                                }
+                            } catch {
+                                // keep current value if follow-up refresh fails
+                            }
+                        }, 1600);
                     }));
                 } catch (error) {
                     if (attempt < maxRetries) {

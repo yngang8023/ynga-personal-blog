@@ -470,6 +470,9 @@ const WALINE_BASE_REACTION_ASSETS = [
 	"tw/1f44f.png",
 	"tw/1f92f.png",
 ] as const;
+// 本地Waline的表情静态资源目录下载方法：
+// 下载：npm pack @waline/emojis@1.4.0 -> waline-emojis-1.4.0.tgz
+// 本地解压：tar -xf .\waline-emojis-1.4.0.tgz -> package\
 const WALINE_BASE_EMOJI_PRESETS = [
 	"bmoji",
 	"qq",

@@ -117,11 +117,15 @@ declare global {
 				visitors: number;
 				visits: number;
 			} | null;
-			render: ((values: {
-				pageviews: number;
-				visitors: number;
-				visits: number;
-			} | null) => void) | null;
+			render:
+				| ((
+						values: {
+							pageviews: number;
+							visitors: number;
+							visits: number;
+						} | null,
+				  ) => void)
+				| null;
 			refresh?: () => Promise<void>;
 		};
 		__mizukiPageViewsManager?: {
@@ -131,6 +135,17 @@ declare global {
 		__mizukiArticlePageViewsCardManager?: {
 			fetching: boolean;
 			refresh: (attempt?: number) => Promise<void>;
+		};
+		__mizukiConfirm?: {
+			confirm: (options: {
+				badge?: string;
+				title?: string;
+				message: string;
+				note?: string;
+				confirmText?: string;
+				cancelText?: string;
+				tone?: "default" | "danger";
+			}) => Promise<boolean>;
 		};
 		__mizukiWalineConfig?: {
 			serverURL: string;
@@ -158,18 +173,38 @@ declare global {
 		};
 		__mizukiWalineRuntime?: {
 			instance: {
+				update: (newOptions?: Record<string, unknown>) => void;
 				destroy: () => void;
 			} | null;
 			mountedContainer: HTMLElement | null;
 			observer: IntersectionObserver | null;
 			previewObserver: MutationObserver | null;
+			statsObserver: MutationObserver | null;
 			initialized: boolean;
 			loading: boolean;
 			initAttemptedPath: string;
 			previewTimer: number | null;
+			statsRefreshTimer: number | null;
+			statsAborters: {
+				abortCommentCount: (() => void) | null;
+				abortPageviewCount: (() => void) | null;
+			} | null;
+			originalConfirm: typeof window.confirm;
+			confirmProxy: typeof window.confirm;
+			deleteConfirmBridge: {
+				confirm: (message?: string) => boolean;
+				handleDeleteClick: (event: Event) => void;
+				reset: () => void;
+			} | null;
+			deleteClickCaptureHandler: ((event: Event) => void) | null;
 			bound: boolean;
 			schedulePreviewEnable: () => void;
 			observePreviewDefaults: () => void;
+			refreshStats: () => void;
+			scheduleStatsRefresh: () => void;
+			observeCommentStats: () => void;
+			installDeleteConfirmBridge: () => void;
+			teardownDeleteConfirmBridge: () => void;
 			mount: () => Promise<void>;
 			destroy: () => void;
 			setupLazyLoad: () => void;

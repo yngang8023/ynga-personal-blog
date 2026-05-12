@@ -1,7 +1,7 @@
-# 🌸 Mizuki
+<h1><img src="./public/assets/home/home.webp" width="64" height="64" align="absmiddle" alt="HiYnga icon"> Mizuki-Ynga-Blog 🌸 </h1>
 <img align='right' src='logo.png' width='200px' alt="Mizuki logo">
 
-一個現代化、功能豐富的靜態部落格模板，基於 [Astro](https://astro.build) 構建，具有先進的功能和精美的設計。
+這是一個基於 [Mizuki](https://github.com/matsuzaka-yuki/Mizuki) 持續延伸開發並公開整理的個人部落格專案，使用 [Astro](https://astro.build) 構建，保留原模板的成熟能力，也加入了我自己的客製與調整。
 
 [![Node.js >= 20](https://img.shields.io/badge/node.js-%3E%3D20-brightgreen)](https://nodejs.org/)
 [![pnpm >= 9](https://img.shields.io/badge/pnpm-%3E%3D9-blue)](https://pnpm.io/)
@@ -9,29 +9,24 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.2-blue)](https://www.typescriptlang.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?logo=apache)](https://opensource.org/licenses/Apache-2.0)
 
-[**🖥️ 線上演示**](https://mizuki.mysqil.com/) | [**📝 使用者文檔**](https://docs.mizuki.mysqil.com/)
+[**🖥️ 線上預覽**](https://ynga.kingcola-icg.cn/) | [**📦 開源倉庫**](https://github.com/yngang8023/ynga-personal-blog) | [**📝 使用者文檔**](https://docs.mizuki.mysqil.com/)
 
 🌏 **README 語言:**
 [**English**](./README.md) / [**中文**](./README.zh.md) / [**日本語**](./README.ja.md) / [**中文繁体**](./README.tw.md) /
 
-透過我們的綜合文檔快速開始。無論是自訂主題、配置功能，還是部署到生產環境，文檔涵蓋了您成功啟動部落格所需的所有內容。
+<img align="right" src="./public/assets/home/default-logo.webp" width="300" alt="HiYngaの随✏️记 logo">
+
+**HiYngaの随✏️记** 是我基於 Mizuki 持續完善的個人網站。下方仍保留原本 Mizuki 的文檔、連結、致謝與授權說明，同時也把這個倉庫作為我自己持續開發與開源整理的版本。
+
+這個倉庫也用來整理我在原模板基礎上的功能延伸、視覺調整與內容實踐，作為個人部落格版本的公開開發入口。
+
+<br clear="right" />
+
+你仍然可以直接參考原版 Mizuki 的完整文檔來快速上手。無論是自訂主題、配置功能，還是部署到正式環境，這些內容依然適合作為這個專案的主要說明。
 
 [📚 閱讀完整文檔](https://docs.mizuki.mysqil.com/) →
 
-![Mizuki Preview](./README.webp)
-
-<table>
-  <tr>
-    <td><img alt="" src="docs/image/1.webp"></td>
-    <td><img alt="" src="docs/image/2.webp"></td>
-    <td><img alt="" src="docs/image/3.webp"></td>
-  <tr>
-  <tr>
-    <td><img alt="" src="docs/image/4.webp"></td>
-    <td><img alt="" src="docs/image/5.webp"></td>
-    <td><img alt="" src="docs/image/6.webp"></td>
-  <tr>
-</table>
+![Mizuki-Ynga-Blog Preview](./README.png)
 
 ## 🚀 NEW: 自動解析度適配
 
@@ -111,8 +106,8 @@
 
 1. **克隆儲存庫：**
    ```bash
-   git clone https://github.com/matsuzaka-yuki/mizuki.git
-   cd mizuki
+   git clone https://github.com/yngang8023/ynga-personal-blog.git
+   cd ynga-personal-blog
    ```
 
 2. **安裝依賴：**

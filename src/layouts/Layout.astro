@@ -1,15 +1,11 @@
 ---
 import ConfigCarrier from "@components/misc/ConfigCarrier.astro";
 import MusicPlayer from "@components/widgets/music-player/MusicPlayer.svelte";
+import ConfirmDialog from "@components/widgets/common/ConfirmDialog.svelte";
 import ExternalLinkModal from "@components/widgets/common/ExternalLinkModal.svelte";
 import Pio from "@components/features/pio/Pio.svelte"; // 使用 Svelte 版本的 Pio 组件
 import { PageProgressBar } from "@components/control/PageProgressBar";
-import {
-	pioConfig,
-	profileConfig,
-	siteConfig,
-	umamiConfig,
-} from "@/config";
+import { pioConfig, profileConfig, siteConfig, umamiConfig } from "@/config";
 
 const BANNER_HEIGHT = 35;
 const BANNER_HEIGHT_EXTEND = 30;
@@ -76,8 +72,7 @@ const navbarTransparentMode =
 const shouldShowTopHighlight =
 	navbarTransparentMode === "full" || navbarTransparentMode === "semifull";
 const shouldLoadUmamiScript =
-	umamiConfig.enable &&
-	(import.meta.env.PROD || umamiConfig.trackInDev);
+	umamiConfig.enable && (import.meta.env.PROD || umamiConfig.trackInDev);
 
 // 获取默认banner图片的辅助函数
 const getDefaultBanner = (): string => {
@@ -220,7 +215,7 @@ if (siteConfig.font) {
 					defer
 					src={umamiConfig.scriptUrl}
 					data-website-id={umamiConfig.websiteId}
-				></script>
+				/>
 			)
 		}
 
@@ -270,9 +265,11 @@ if (siteConfig.font) {
 				style="display:none;visibility:hidden"></iframe></noscript
 		>
 		<!-- 页面顶部渐变高光效果 - 只在full和semifull模式下显示 -->
-		{!isMinimalShell && shouldShowTopHighlight && (
-			<div class="top-gradient-highlight" />
-		)}
+		{
+			!isMinimalShell && shouldShowTopHighlight && (
+				<div class="top-gradient-highlight" />
+			)
+		}
 
 		<ConfigCarrier />
 		{
@@ -289,6 +286,8 @@ if (siteConfig.font) {
 		<!-- Music Player - 核心始终加载（当enable=true），UI通过showFloatingPlayer控制 -->
 		{!disableMusicPlayer && <MusicPlayer client:idle />}
 
+		<ConfirmDialog client:load />
+
 		{
 			siteConfig.externalLink?.enable !== false && (
 				<ExternalLinkModal
@@ -303,9 +302,11 @@ if (siteConfig.font) {
 		{!isMinimalShell && pioConfig.enable && <Pio client:visible />}
 
 		<!-- increase the page height during page transition to prevent the scrolling animation from jumping -->
-		{!isMinimalShell && (
-			<div id="page-height-extend" class="hidden h-[300vh]"></div>
-		)}
+		{
+			!isMinimalShell && (
+				<div id="page-height-extend" class="hidden h-[300vh]" />
+			)
+		}
 	</body>
 </html>
 
@@ -338,7 +339,9 @@ if (siteConfig.font) {
 				transform: translateY(var(--bannerOffset));
 			}
 			.enable-banner.lg\:is-home #main-content-shell {
-				top: calc(var(--banner-height) + var(--banner-height-extend)) !important;
+				top: calc(
+					var(--banner-height) + var(--banner-height-extend)
+				) !important;
 			}
 		}
 

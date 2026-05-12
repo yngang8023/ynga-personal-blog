@@ -1,7 +1,7 @@
-# 🌸 Mizuki 
+<h1><img src="./public/assets/home/home.webp" width="64" height="64" align="absmiddle" alt="HiYnga icon"> Mizuki-Ynga-Blog 🌸</h1>
 <img align='right' src='logo.png' width='200px' alt="Mizuki logo">
 
-A modern, feature-rich static blog template built with [Astro](https://astro.build), featuring advanced functionality and beautiful design.
+A personal open-source blog project based on [Mizuki](https://github.com/matsuzaka-yuki/Mizuki), built with [Astro](https://astro.build), and continued with my own custom development and content structure.
 
 [![Node.js >= 20](https://img.shields.io/badge/node.js-%3E%3D20-brightgreen)](https://nodejs.org/)
 [![pnpm >= 9](https://img.shields.io/badge/pnpm-%3E%3D9-blue)](https://pnpm.io/)
@@ -9,29 +9,24 @@ A modern, feature-rich static blog template built with [Astro](https://astro.bui
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9.2-blue)](https://www.typescriptlang.org/)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg?logo=apache)](https://opensource.org/licenses/Apache-2.0)
 
-[**🖥️ Live Demo**](https://mizuki.mysqil.com/) | [**📝 Documentation**](https://docs.mizuki.mysqil.com/)
+[**🖥️ Live Preview**](https://ynga.kingcola-icg.cn/) | [**📦 Source Repo**](https://github.com/yngang8023/ynga-personal-blog) | [**📝 Documentation**](https://docs.mizuki.mysqil.com/)
 
 🌏 **README Languages:**
 [**English**](./README.md) / [**中文**](./README.zh.md) / [**日本語**](./README.ja.md) / [**中文繁体**](./README.tw.md) /
 
-Get started quickly with our comprehensive documentation. Whether you're customizing your theme, configuring features, or deploying to production, the documentation covers everything you need to launch your blog successfully.
+<img align="right" src="./public/assets/home/default-logo.webp" width="300" alt="HiYngaの随✏️记 logo">
+
+**HiYngaの随✏️记** is my personal site built from Mizuki. The original Mizuki documentation, links, acknowledgements, and license notes are intentionally preserved below, while this repository records my own ongoing development and customization.
+
+This repository is my open-source continuation of the original template, focused on adapting Mizuki into my own blog structure, visual style, and long-term content workflow.
+
+<br clear="right" />
+
+Get started quickly with the original Mizuki documentation. Whether you're customizing your theme, configuring features, or deploying to production, the documentation still covers everything needed to launch and continue developing this blog project.
 
 [📚 Read Full Documentation](https://docs.mizuki.mysqil.com/) →
 
-![Mizuki Preview](./README.webp)
-
-<table>
-  <tr>
-    <td><img alt="" src="docs/image/1.webp"></td>
-    <td><img alt="" src="docs/image/2.webp"></td>
-    <td><img alt="" src="docs/image/3.webp"></td>
-  <tr>
-  <tr>
-    <td><img alt="" src="docs/image/4.webp"></td>
-    <td><img alt="" src="docs/image/5.webp"></td>
-    <td><img alt="" src="docs/image/6.webp"></td>
-  <tr>
-</table>
+![Mizuki-Ynga-Blog Preview](./README.png)
 
 ## 🚀 NEW: Automatic Resolution Adaptation
 
@@ -109,8 +104,8 @@ Get started quickly with our comprehensive documentation. Whether you're customi
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/matsuzaka-yuki/mizuki.git
-   cd mizuki
+   git clone https://github.com/yngang8023/ynga-personal-blog.git
+   cd ynga-personal-blog
    ```
 
 2. **Install dependencies:**

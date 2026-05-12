@@ -26,7 +26,12 @@ import { commentConfig } from "@/config";
 						katexMacros,
 						katexStrict,
 					} from "../../utils/katex-options.mjs";
-					import { teardownWalineInstance } from "./waline-runtime-utils.js";
+					import {
+						createWalineDeleteConfirmBridge,
+						matchWalineDeleteButton,
+						refreshWalineStats,
+						teardownWalineInstance,
+					} from "./waline-runtime-utils.js";
 
 					const CONTAINER_ID = "waline";
 					const WRAPPER_ID = "waline-container";
@@ -210,10 +215,19 @@ import { commentConfig } from "@/config";
 						mountedContainer: null,
 						observer: null,
 						previewObserver: null,
+						statsObserver: null,
 						initialized: false,
 						loading: false,
 						initAttemptedPath: "",
 						previewTimer: null,
+						statsRefreshTimer: null,
+						statsAborters: null,
+						originalConfirm: window.confirm.bind(window),
+						confirmProxy: (message = "") =>
+							runtime.deleteConfirmBridge?.confirm(message) ??
+							runtime.originalConfirm(message),
+						deleteConfirmBridge: null,
+						deleteClickCaptureHandler: null,
 						bound: false,
 						schedulePreviewEnable: () => {
 							if (runtime.previewTimer !== null) {
@@ -224,6 +238,75 @@ import { commentConfig } from "@/config";
 								runtime.previewTimer = null;
 								syncPreviewVisibility();
 							}, 40);
+						},
+						refreshStats: () => {
+							const config = getRuntimeConfig();
+
+							if (!config?.serverURL || !getCommentShell()) {
+								return;
+							}
+
+							runtime.statsAborters?.abortCommentCount?.();
+							runtime.statsAborters?.abortPageviewCount?.();
+							runtime.statsAborters = refreshWalineStats({
+								serverURL: config.serverURL,
+								path: getCurrentPath(),
+								lang: config.lang,
+							});
+						},
+						scheduleStatsRefresh: () => {
+							if (runtime.statsRefreshTimer !== null) {
+								window.clearTimeout(
+									runtime.statsRefreshTimer,
+								);
+							}
+
+							runtime.statsRefreshTimer = window.setTimeout(
+								() => {
+									runtime.statsRefreshTimer = null;
+									runtime.refreshStats();
+								},
+								180,
+							);
+						},
+						observeCommentStats: () => {
+							const container =
+								document.getElementById(CONTAINER_ID);
+							const cards =
+								container?.querySelector<HTMLElement>(
+									".wl-cards",
+								) || null;
+
+							runtime.statsObserver?.disconnect();
+							runtime.statsObserver = null;
+
+							if (!cards) {
+								return;
+							}
+
+							runtime.statsObserver = new MutationObserver(
+								(mutations) => {
+									const hasCommentTreeChange =
+										mutations.some(
+											(mutation) =>
+												mutation.type ===
+													"childList" &&
+												(mutation.addedNodes.length >
+													0 ||
+													mutation.removedNodes
+														.length > 0),
+										);
+
+									if (hasCommentTreeChange) {
+										runtime.scheduleStatsRefresh();
+									}
+								},
+							);
+
+							runtime.statsObserver.observe(cards, {
+								childList: true,
+								subtree: true,
+							});
 						},
 						observePreviewDefaults: () => {
 							const container =
@@ -239,6 +322,7 @@ import { commentConfig } from "@/config";
 							runtime.previewObserver = new MutationObserver(
 								() => {
 									runtime.schedulePreviewEnable();
+									runtime.observeCommentStats();
 								},
 							);
 							runtime.previewObserver.observe(container, {
@@ -246,7 +330,71 @@ import { commentConfig } from "@/config";
 								subtree: true,
 							});
 
+							runtime.observeCommentStats();
 							runtime.schedulePreviewEnable();
+						},
+						installDeleteConfirmBridge: () => {
+							const container =
+								document.getElementById(CONTAINER_ID);
+
+							if (!container) {
+								return;
+							}
+
+							runtime.teardownDeleteConfirmBridge();
+							runtime.deleteConfirmBridge =
+								createWalineDeleteConfirmBridge({
+									resolveConfirm: () =>
+										window.__mizukiConfirm?.confirm ||
+										null,
+									nativeConfirm: runtime.originalConfirm,
+									matchDeleteButton: (target) =>
+										matchWalineDeleteButton(
+											target,
+											CONTAINER_ID,
+										),
+								});
+							runtime.deleteClickCaptureHandler = (
+								event: Event,
+							) => {
+								runtime.deleteConfirmBridge?.handleDeleteClick(
+									event,
+								);
+							};
+
+							container.addEventListener(
+								"click",
+								runtime.deleteClickCaptureHandler,
+								true,
+							);
+
+							if (window.confirm !== runtime.confirmProxy) {
+								window.confirm = runtime.confirmProxy;
+							}
+						},
+						teardownDeleteConfirmBridge: () => {
+							const container =
+								document.getElementById(CONTAINER_ID) ||
+								runtime.mountedContainer;
+
+							if (
+								container &&
+								runtime.deleteClickCaptureHandler
+							) {
+								container.removeEventListener(
+									"click",
+									runtime.deleteClickCaptureHandler,
+									true,
+								);
+							}
+
+							runtime.deleteClickCaptureHandler = null;
+							runtime.deleteConfirmBridge?.reset();
+							runtime.deleteConfirmBridge = null;
+
+							if (window.confirm === runtime.confirmProxy) {
+								window.confirm = runtime.originalConfirm;
+							}
 						},
 						mount: async () => {
 							const container =
@@ -260,13 +408,27 @@ import { commentConfig } from "@/config";
 							runtime.loading = true;
 
 							try {
+								runtime.teardownDeleteConfirmBridge();
 								runtime.previewObserver?.disconnect();
 								runtime.previewObserver = null;
+								runtime.statsObserver?.disconnect();
+								runtime.statsObserver = null;
 
 								if (runtime.previewTimer !== null) {
 									window.clearTimeout(runtime.previewTimer);
 									runtime.previewTimer = null;
 								}
+
+								if (runtime.statsRefreshTimer !== null) {
+									window.clearTimeout(
+										runtime.statsRefreshTimer,
+									);
+									runtime.statsRefreshTimer = null;
+								}
+
+								runtime.statsAborters?.abortCommentCount?.();
+								runtime.statsAborters?.abortPageviewCount?.();
+								runtime.statsAborters = null;
 
 								if (runtime.instance) {
 									const teardownResult =
@@ -294,6 +456,8 @@ import { commentConfig } from "@/config";
 								runtime.initialized = true;
 								runtime.initAttemptedPath = getCurrentPath();
 								runtime.observePreviewDefaults();
+								runtime.installDeleteConfirmBridge();
+								runtime.scheduleStatsRefresh();
 							} catch (error) {
 								console.error("[Waline] 初始化失败:", error);
 							} finally {
@@ -305,10 +469,22 @@ import { commentConfig } from "@/config";
 							runtime.observer = null;
 							runtime.previewObserver?.disconnect();
 							runtime.previewObserver = null;
+							runtime.statsObserver?.disconnect();
+							runtime.statsObserver = null;
 							if (runtime.previewTimer !== null) {
 								window.clearTimeout(runtime.previewTimer);
 								runtime.previewTimer = null;
 							}
+							if (runtime.statsRefreshTimer !== null) {
+								window.clearTimeout(
+									runtime.statsRefreshTimer,
+								);
+								runtime.statsRefreshTimer = null;
+							}
+							runtime.statsAborters?.abortCommentCount?.();
+							runtime.statsAborters?.abortPageviewCount?.();
+							runtime.statsAborters = null;
+							runtime.teardownDeleteConfirmBridge();
 							if (runtime.instance) {
 								const teardownResult =
 									teardownWalineInstance(
@@ -364,6 +540,7 @@ import { commentConfig } from "@/config";
 								runtime.initialized &&
 								runtime.initAttemptedPath === getCurrentPath()
 							) {
+								runtime.scheduleStatsRefresh();
 								return;
 							}
 
@@ -374,7 +551,10 @@ import { commentConfig } from "@/config";
 					window.__mizukiWalineRuntime = runtime;
 
 					const scheduleRefresh = () => {
-						window.setTimeout(() => runtime.refresh(), 160);
+						window.setTimeout(() => {
+							runtime.scheduleStatsRefresh();
+							runtime.refresh();
+						}, 160);
 					};
 
 					if (!runtime.bound) {

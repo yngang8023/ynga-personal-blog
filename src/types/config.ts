@@ -324,6 +324,7 @@ interface TwikooConfig {
 
 export interface WalineConfig {
 	serverURL: string;
+	assetMode?: "online" | "local";
 	lang?: string;
 	meta?: ("nick" | "mail" | "link")[];
 	requiredMeta?: ("nick" | "mail" | "link")[];
@@ -337,7 +338,7 @@ export interface WalineConfig {
 	reaction?: string[] | boolean;
 	emoji?:
 		| boolean
-		| (`//${string}` | `http://${string}` | `https://${string}`)[];
+		| (`/${string}` | `//${string}` | `http://${string}` | `https://${string}`)[];
 	search?: boolean;
 	imageUploader?: boolean;
 	pageview?: boolean | string;

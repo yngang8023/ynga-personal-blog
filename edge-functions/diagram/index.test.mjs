@@ -3,6 +3,8 @@ import test from "node:test";
 
 import { onRequest } from "./proxy.js";
 
+const ALLOWED_REFERER = "https://ynga.kingcola-icg.cn/posts/security-demo/";
+
 test("diagram proxy serves mermaid from unpkg through /diagram/mermaid.js", async () => {
 	const originalFetch = global.fetch;
 	let fetchArgs;
@@ -21,7 +23,12 @@ test("diagram proxy serves mermaid from unpkg through /diagram/mermaid.js", asyn
 
 	try {
 		const response = await onRequest({
-			request: new Request("https://example.com/diagram/mermaid.js"),
+			request: new Request("https://example.com/diagram/mermaid.js", {
+				headers: {
+					referer: ALLOWED_REFERER,
+					"sec-fetch-site": "same-origin",
+				},
+			}),
 			env: {},
 		});
 
@@ -67,6 +74,12 @@ test("diagram proxy serves plantuml svg through /diagram/plantuml and preserves 
 		const response = await onRequest({
 			request: new Request(
 				"https://example.com/diagram/plantuml/svg/SoWkIImgAStDuNBKjNEo2rAaA?foo=bar",
+				{
+					headers: {
+						referer: ALLOWED_REFERER,
+						"sec-fetch-site": "same-origin",
+					},
+				},
 			),
 			env: {},
 		});
@@ -92,3 +105,31 @@ test("diagram proxy serves plantuml svg through /diagram/plantuml and preserves 
 	}
 });
 
+test("diagram proxy blocks localhost-driven requests before hitting upstream", async () => {
+	const originalFetch = global.fetch;
+	let fetchArgs;
+
+	global.fetch = async (...args) => {
+		fetchArgs = args;
+		return new Response("should-not-run", { status: 200 });
+	};
+
+	try {
+		const response = await onRequest({
+			request: new Request("https://example.com/diagram/mermaid.js", {
+				headers: {
+					referer: "http://localhost:4321/posts/demo/",
+					"sec-fetch-site": "cross-site",
+				},
+			}),
+			env: {},
+		});
+
+		assert.equal(fetchArgs, undefined);
+		assert.equal(response.status, 403);
+		assert.equal(response.headers.get("x-edge-guard"), "blocked");
+		assert.match(await response.text(), /forbidden/i);
+	} finally {
+		global.fetch = originalFetch;
+	}
+});

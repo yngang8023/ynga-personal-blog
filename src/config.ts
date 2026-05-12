@@ -454,6 +454,80 @@ export const expressiveCodeConfig: ExpressiveCodeConfig = {
 	hideDuringThemeTransition: true,
 };
 
+const WALINE_ASSET_BASE = "/waline-assets" as const;
+const WALINE_ONLINE_ASSET_BASE =
+	"/waline-assets/@waline/emojis@1.4.0" as const;
+// 设置 Waline 表情资源模式：
+// - "local"：只使用 public/waline-assets 目录里已有的表情目录和图片
+// - "online"：基础表情仍优先走 public/waline-assets，额外扩展表情才走 /waline-assets/@waline/emojis@1.4.0/... 同域代理回源 unpkg
+const WALINE_ASSET_MODE = "local" as const;
+const WALINE_BASE_REACTION_ASSETS = [
+	"tw/1f44d.png",
+	"tw/1f970.png",
+	"tw/1f389.png",
+	"tw/1f525.png",
+	"tw/1f31f.png",
+	"tw/1f44f.png",
+	"tw/1f92f.png",
+] as const;
+const WALINE_BASE_EMOJI_PRESETS = [
+	"bmoji",
+	"qq",
+	"weibo",
+	"tieba",
+	"bilibili",
+	"alus",
+] as const;
+// 仅在 WALINE_ASSET_MODE === "online" 时生效。
+// 用来追加“本地 public/waline-assets 里没有，但你又想在 online 模式下额外启用”的 reaction 图片。
+// 写法是相对于 @waline/emojis@1.4.0 的资源路径，不要带开头斜杠。
+// 例如：
+// "tw/1f44d.png"
+// "weibo/xxx.png"
+// "bmoji/xxx.png"
+const WALINE_ONLINE_EXTRA_REACTION_ASSETS = [] as const;
+// 仅在 WALINE_ASSET_MODE === "online" 时生效。
+// 用来追加“本地 public/waline-assets 里没有，但你又想在 online 模式下额外启用”的 emoji 目录。
+// 写法是 @waline/emojis@1.4.0 下的一级目录名，不要带开头斜杠。
+// 例如：
+// "tw-emoji"
+// "soul-emoji"
+const WALINE_ONLINE_EXTRA_EMOJI_PRESETS = [] as const;
+
+function buildWalineReactionPaths(mode: "local" | "online") {
+	const basePaths = WALINE_BASE_REACTION_ASSETS.map(
+		(assetPath) => `${WALINE_ASSET_BASE}/${assetPath}`,
+	);
+
+	if (mode !== "online") {
+		return basePaths;
+	}
+
+	return [
+		...basePaths,
+		...WALINE_ONLINE_EXTRA_REACTION_ASSETS.map(
+			(assetPath) => `${WALINE_ONLINE_ASSET_BASE}/${assetPath}`,
+		),
+	];
+}
+
+function buildWalineEmojiPaths(mode: "local" | "online") {
+	const basePaths = WALINE_BASE_EMOJI_PRESETS.map(
+		(preset) => `${WALINE_ASSET_BASE}/${preset}`,
+	) as (`/${string}`)[];
+
+	if (mode !== "online") {
+		return basePaths;
+	}
+
+	return [
+		...basePaths,
+		...WALINE_ONLINE_EXTRA_EMOJI_PRESETS.map(
+			(preset) => `${WALINE_ONLINE_ASSET_BASE}/${preset}`,
+		),
+	] as (`/${string}`)[];
+}
+
 export const commentConfig: CommentConfig = {
 	enable: true, // 启用评论功能。当设置为 false 时，评论组件将不会显示在文章区域。
 	system: "waline", // 评论系统选择: "twikoo" | "giscus" | "waline"
@@ -478,6 +552,10 @@ export const commentConfig: CommentConfig = {
 	waline: {
 		// Waline 配置项说明：https://waline.js.org/reference/client/props.html
 		serverURL: "https://ynga.kingcola-icg.cn/waline/",
+		// Waline 表情资源模式：
+		// - "local"：只使用 public/waline-assets 目录里已有的表情目录和图片
+		// - "online"：基础表情仍优先走 public/waline-assets，额外扩展表情才走 /waline-assets/@waline/emojis@1.4.0/... 同域代理回源 unpkg
+		assetMode: WALINE_ASSET_MODE,
 		lang: "zh-CN",
 		meta: ["nick", "mail", "link"],
 		requiredMeta: ["nick", "mail"],
@@ -488,25 +566,15 @@ export const commentConfig: CommentConfig = {
 		login: "force",
 		noCopyright: false,
 		noRss: false,
-		reaction: [
-			// 国内访问建议使用国内表情链接，以下是 Waline 官方提供的国内表情链接示例
-			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f44d.png",
-			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f970.png",
-			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f389.png",
-			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f525.png",
-			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f31f.png",
-			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f44f.png",
-			// "https://unpkg.com/@waline/emojis@1.1.0/tw/1f917.png",
-			"https://unpkg.com/@waline/emojis@1.1.0/tw/1f92f.png",
-		],
-		emoji: [
-			"//unpkg.com/@waline/emojis@1.4.0/bmoji",
-			"//unpkg.com/@waline/emojis@1.4.0/qq",
-			"//unpkg.com/@waline/emojis@1.4.0/weibo",
-			"//unpkg.com/@waline/emojis@1.4.0/tieba",
-			"//unpkg.com/@waline/emojis@1.4.0/bilibili",
-			"//unpkg.com/@waline/emojis@1.4.0/alus",
-		],
+		// 基础 reaction 使用 public/waline-assets 下的相对资源路径
+		// 例如 "tw/1f44d.png"、"weibo/xxx.png"、"bmoji/xxx.png"
+		// 如果 assetMode === "online"，可以在 WALINE_ONLINE_EXTRA_REACTION_ASSETS 里追加远端图片相对路径
+		// 这些远端额外 reaction 会走 /waline-assets/@waline/emojis@1.4.0/{assetPath}
+		reaction: buildWalineReactionPaths(WALINE_ASSET_MODE),
+		// 基础 emoji 始终走 /waline-assets/{preset}
+		// 如果 assetMode === "online"，可以在 WALINE_ONLINE_EXTRA_EMOJI_PRESETS 里追加远端目录
+		// 这些远端额外 emoji 会走 /waline-assets/@waline/emojis@1.4.0/{preset}
+		emoji: buildWalineEmojiPaths(WALINE_ASSET_MODE),
 		pageview: true,
 		comment: true,
 		search: false,
@@ -536,12 +604,15 @@ export const announcementConfig: AnnouncementConfig = {
 	},
 };
 
+const MUSIC_PLAYER_MODE: MusicPlayerConfig["mode"] =
+	process.env.NODE_ENV === "production" ? "meting" : "local";
+
 export const musicPlayerConfig: MusicPlayerConfig = {
 	enable: true, // 启用音乐播放器功能
 	showFloatingPlayer: true, // 显示悬浮播放器 UI
 	floatingEntryMode: "fab", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
 	// floatingEntryMode: "default", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
-	mode: "local", // 音乐播放器模式，可选 "local" 或 "meting"，开发环境还是local，避免频繁请求第三方API
+	mode: MUSIC_PLAYER_MODE, // 开发环境默认 local，生产环境默认 meting
 	meting_api: [
 		// "https://meting-api-alpha-snowy.vercel.app/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
 		"https://meting.mysqil.com/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",

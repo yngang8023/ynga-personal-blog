@@ -1,4 +1,12 @@
+import {
+	guardProxyReadRequest,
+	guardProxyWriteRequest,
+	handleProxyPreflight,
+} from "../_shared/request-guard.js";
+
 const DEFAULT_WALINE_ORIGIN = "https://waline.kingcola-icg.cn";
+const READ_METHODS = new Set(["GET", "HEAD"]);
+const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
 
 const HOP_BY_HOP_REQUEST_HEADERS = [
 	"host",
@@ -51,8 +59,36 @@ function sanitizeUpstreamResponseHeaders(upstreamHeaders) {
 	return responseHeaders;
 }
 
+function buildMethodNotAllowedResponse() {
+	return new Response("Method Not Allowed", {
+		status: 405,
+		headers: {
+			allow: `${Array.from(READ_METHODS).join(", ")}, ${WRITE_METHODS.join(", ")}, OPTIONS`,
+			"cache-control": "no-store, no-transform",
+			"x-waline-proxy": "edgeone-pages",
+		},
+	});
+}
+
 export async function onRequest(context) {
 	const { request, env } = context;
+	const method = request.method.toUpperCase();
+
+	if (method === "OPTIONS") {
+		return handleProxyPreflight(request, env, WRITE_METHODS);
+	}
+
+	if (!READ_METHODS.has(method) && !WRITE_METHODS.includes(method)) {
+		return buildMethodNotAllowedResponse();
+	}
+
+	const guardResponse = READ_METHODS.has(method)
+		? guardProxyReadRequest(request, env)
+		: guardProxyWriteRequest(request, env);
+	if (guardResponse) {
+		return guardResponse;
+	}
+
 	const incomingUrl = new URL(request.url);
 	const upstreamPath =
 		incomingUrl.pathname.replace(/^\/waline(?=\/|$)/, "") || "/";
@@ -62,10 +98,10 @@ export async function onRequest(context) {
 	);
 
 	const upstreamResponse = await fetch(targetUrl.toString(), {
-		method: request.method,
+		method,
 		headers: buildUpstreamHeaders(request, incomingUrl),
 		body:
-			request.method === "GET" || request.method === "HEAD"
+			method === "GET" || method === "HEAD"
 				? undefined
 				: request.body,
 		redirect: "manual",
@@ -77,7 +113,7 @@ export async function onRequest(context) {
 	// on proxied JSON API responses.
 	const responseBody = await upstreamResponse.arrayBuffer();
 
-	return new Response(request.method === "HEAD" ? null : responseBody, {
+	return new Response(method === "HEAD" ? null : responseBody, {
 		status: upstreamResponse.status,
 		statusText: upstreamResponse.statusText,
 		headers: sanitizeUpstreamResponseHeaders(upstreamResponse.headers),

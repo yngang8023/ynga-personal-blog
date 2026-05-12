@@ -1,3 +1,5 @@
+import { guardProxyReadRequest } from "../_shared/request-guard.js";
+
 const MERMAID_ROUTE = "/diagram/mermaid.js";
 const MERMAID_UPSTREAM =
 	"https://unpkg.com/mermaid@11.12.0/dist/mermaid.min.js";
@@ -125,8 +127,30 @@ async function queueCacheWrite(context, cacheStore, cacheKey, response) {
 	await write;
 }
 
+function buildMethodNotAllowedResponse() {
+	return new Response("Method Not Allowed", {
+		status: 405,
+		headers: {
+			allow: "GET, HEAD",
+			"cache-control": "no-store, no-transform",
+			"x-diagram-proxy": "edgeone-pages",
+		},
+	});
+}
+
 export async function onRequest(context) {
 	const { request } = context;
+	const method = request.method.toUpperCase();
+
+	if (method !== "GET" && method !== "HEAD") {
+		return buildMethodNotAllowedResponse();
+	}
+
+	const guardResponse = guardProxyReadRequest(request, context.env);
+	if (guardResponse) {
+		return guardResponse;
+	}
+
 	const incomingUrl = new URL(request.url);
 	const route = resolveRoute(incomingUrl);
 
@@ -140,25 +164,25 @@ export async function onRequest(context) {
 		});
 	}
 
-	const cacheStore = request.method === "GET" ? getCacheStore() : null;
-	const cacheKey = request.method === "GET" ? buildCacheKey(request) : null;
+	const cacheStore = method === "GET" ? getCacheStore() : null;
+	const cacheKey = method === "GET" ? buildCacheKey(request) : null;
 	const cachedResponse = await readCachedResponse(cacheStore, cacheKey);
 	if (cachedResponse) {
 		return cachedResponse;
 	}
 
 	const upstreamResponse = await fetch(route.targetUrl, {
-		method: request.method,
+		method,
 		headers: buildUpstreamHeaders(request, incomingUrl),
 		body:
-			request.method === "GET" || request.method === "HEAD"
+			method === "GET" || method === "HEAD"
 				? undefined
 				: request.body,
 		redirect: "manual",
 	});
 
 	const response = new Response(
-		request.method === "HEAD" ? null : await upstreamResponse.arrayBuffer(),
+		method === "HEAD" ? null : await upstreamResponse.arrayBuffer(),
 		{
 			status: upstreamResponse.status,
 			statusText: upstreamResponse.statusText,

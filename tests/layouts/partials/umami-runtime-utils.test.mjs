@@ -123,3 +123,55 @@ test("createUmamiStatsClient serves short-lived cached stats but allows a fresh 
 	assert.doesNotMatch(statsUrls[0], /(?:^|[?&])_=/);
 	assert.match(statsUrls[1], /(?:^|[?&])_=\d+/);
 });
+
+test("createUmamiStatsClient aggregates only matching article paths for total reading count", async () => {
+	let metricsFetchCount = 0;
+
+	const client = createUmamiStatsClient({
+		shareUrl: "https://cloud.umami.is/analytics/us/share/demo-share",
+		proxyBasePath: "/umami",
+		statsCacheTtlMs: 3_000,
+		fetchImpl: async (url) => {
+			if (url === "/umami/share/demo-share") {
+				return Response.json({
+					websiteId: "website-demo",
+					token: "share-token",
+				});
+			}
+
+			if (url.includes("/umami/websites/website-demo/metrics/expanded?")) {
+				metricsFetchCount += 1;
+				return Response.json([
+					{
+						name: "/posts/demo-1/",
+						pageviews: 12,
+						visitors: 3,
+						visits: 4,
+					},
+					{
+						name: "/posts/demo-2/",
+						pageviews: 18,
+						visitors: 5,
+						visits: 6,
+					},
+					{
+						name: "/friends/",
+						pageviews: 99,
+						visitors: 20,
+						visits: 21,
+					},
+				]);
+			}
+
+			throw new Error(`Unexpected fetch url: ${url}`);
+		},
+	});
+
+	const total = await client.getArticleTotalViews([
+		"/posts/demo-1/",
+		"/posts/demo-2/",
+	]);
+
+	assert.equal(metricsFetchCount, 1);
+	assert.equal(total, 30);
+});

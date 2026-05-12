@@ -11,6 +11,8 @@ const UNSAFE_RESPONSE_HEADERS = [
 const CACHE_CONTROL_BY_ROUTE = {
 	share: "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400, no-transform",
 	stats: "public, max-age=5, s-maxage=5, stale-while-revalidate=15, no-transform",
+	metricsExpanded:
+		"public, max-age=5, s-maxage=5, stale-while-revalidate=15, no-transform",
 };
 
 function getApiBase(env) {
@@ -48,6 +50,16 @@ function resolveRoute(incomingUrl, apiBase) {
 		return {
 			cacheControl: CACHE_CONTROL_BY_ROUTE.stats,
 			targetUrl: `${apiBase}/websites/${statsMatch[1]}/stats${incomingUrl.search}`,
+		};
+	}
+
+	const metricsExpandedMatch = incomingUrl.pathname.match(
+		/^\/umami\/websites\/([^/]+)\/metrics\/expanded$/,
+	);
+	if (metricsExpandedMatch) {
+		return {
+			cacheControl: CACHE_CONTROL_BY_ROUTE.metricsExpanded,
+			targetUrl: `${apiBase}/websites/${metricsExpandedMatch[1]}/metrics/expanded${incomingUrl.search}`,
 		};
 	}
 

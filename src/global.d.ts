@@ -72,6 +72,12 @@ declare global {
 				visitors: number;
 				visits: number;
 			}>;
+			getArticleTotalViews: (
+				articlePaths: string[],
+				options?: {
+					fresh?: boolean;
+				},
+			) => Promise<number>;
 			clearCache: () => void;
 			umami?: {
 				clearCache: () => void;

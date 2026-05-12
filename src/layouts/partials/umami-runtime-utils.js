@@ -1,6 +1,7 @@
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_STATS_CACHE_TTL_MS = 3_000;
 const SITE_STATS_CACHE_KEY = "__site__";
+const ARTICLE_TOTAL_CACHE_KEY_PREFIX = "__article_total__";
 
 function trimTrailingSlash(value) {
 	return value.replace(/\/+$/, "");
@@ -18,6 +19,19 @@ function normalizeStats(stats) {
 		visitors: stats?.visitors?.value ?? stats?.visitors ?? 0,
 		visits: stats?.visits?.value ?? stats?.visits ?? 0,
 	};
+}
+
+function normalizeExpandedMetricRows(rows) {
+	if (!Array.isArray(rows)) {
+		return [];
+	}
+
+	return rows
+		.map((row) => ({
+			name: typeof row?.name === "string" ? row.name : "",
+			pageviews: Number(row?.pageviews ?? 0),
+		}))
+		.filter((row) => row.name.length > 0);
 }
 
 export function parseUmamiShareUrl(rawUrl) {
@@ -193,10 +207,123 @@ export function createUmamiStatsClient({
 		}
 	};
 
+	const getArticleTotalViews = async (articlePaths, { fresh = false } = {}) => {
+		const uniquePaths = Array.from(
+			new Set((articlePaths || []).filter(Boolean)),
+		);
+
+		if (uniquePaths.length === 0) {
+			return 0;
+		}
+
+		const cacheKey = `${ARTICLE_TOTAL_CACHE_KEY_PREFIX}:${uniquePaths.join("|")}`;
+		const cached = statsState.get(cacheKey);
+		const currentTime = now();
+
+		if (
+			!fresh &&
+			cached &&
+			cached?.value !== null &&
+			typeof cached.expiresAt === "number" &&
+			cached.expiresAt > currentTime
+		) {
+			return cached.value;
+		}
+
+		if (cached?.promise) {
+			return cached.promise;
+		}
+
+		const totalPromise = (async () => {
+			const shareData = await getShareData();
+			const pathSet = new Set(uniquePaths);
+			const limit = 500;
+			let offset = 0;
+			let totalViews = 0;
+			let matchedPathCount = 0;
+
+			while (true) {
+				const params = new URLSearchParams({
+					startAt: "0",
+					endAt: currentTime.toString(),
+					type: "path",
+					limit: String(limit),
+					offset: String(offset),
+				});
+
+				if (fresh) {
+					params.set("_", now().toString());
+				}
+
+				const response = await fetchWithTimeout(
+					buildProxyUrl(
+						proxyBasePath,
+						`/websites/${shareData.websiteId}/metrics/expanded?${params.toString()}`,
+					),
+					{
+						headers: {
+							accept: "application/json",
+							"x-umami-share-token": shareData.token,
+							"x-umami-share-context": "1",
+						},
+					},
+				);
+
+				if (!response.ok) {
+					throw new Error(
+						`获取文章总阅读量失败: ${response.status}`,
+					);
+				}
+
+				const rows = normalizeExpandedMetricRows(await response.json());
+				if (rows.length === 0) {
+					break;
+				}
+
+				for (const row of rows) {
+					if (pathSet.has(row.name)) {
+						totalViews += row.pageviews;
+						matchedPathCount += 1;
+					}
+				}
+
+				if (rows.length < limit || matchedPathCount >= pathSet.size) {
+					break;
+				}
+
+				offset += limit;
+			}
+
+			statsState.set(cacheKey, {
+				value: totalViews,
+				promise: null,
+				expiresAt: now() + statsCacheTtlMs,
+			});
+			return totalViews;
+		})();
+
+		statsState.set(cacheKey, {
+			value: cached?.value ?? null,
+			promise: totalPromise,
+			expiresAt: cached?.expiresAt ?? 0,
+		});
+
+		try {
+			return await totalPromise;
+		} catch (error) {
+			const current = statsState.get(cacheKey);
+			if (current?.promise === totalPromise) {
+				statsState.delete(cacheKey);
+			}
+			throw error;
+		}
+	};
+
 	return {
 		getStats,
 		getSiteStats: (options) => getStats(undefined, options),
 		getPageStats: (path, options) => getStats(path, options),
+		getArticleTotalViews,
 		clearCache,
 	};
 }

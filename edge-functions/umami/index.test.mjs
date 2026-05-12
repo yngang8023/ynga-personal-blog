@@ -92,6 +92,52 @@ test("umami proxy serves stats with a short cache policy", async () => {
 	}
 });
 
+test("umami proxy serves expanded path metrics with a short cache policy", async () => {
+	const originalFetch = global.fetch;
+	let fetchArgs;
+
+	global.fetch = async (...args) => {
+		fetchArgs = args;
+		return Response.json([
+			{
+				name: "/posts/demo/",
+				pageviews: 12,
+			},
+		]);
+	};
+
+	try {
+		const response = await onRequest({
+			request: new Request(
+				"https://ynga.kingcola-icg.cn/umami/websites/website-demo/metrics/expanded?startAt=0&endAt=123&type=path&limit=500&offset=0",
+				{
+					headers: {
+						referer: ALLOWED_REFERER,
+						"sec-fetch-site": "same-origin",
+					},
+				},
+			),
+			env: {},
+		});
+
+		assert.equal(
+			fetchArgs[0],
+			"https://cloud.umami.is/analytics/us/api/websites/website-demo/metrics/expanded?startAt=0&endAt=123&type=path&limit=500&offset=0",
+		);
+		assert.equal(response.status, 200);
+		assert.equal(response.headers.get("x-umami-proxy"), "edgeone-pages");
+		assert.match(response.headers.get("cache-control") ?? "", /max-age=5/);
+		assert.deepEqual(await response.json(), [
+			{
+				name: "/posts/demo/",
+				pageviews: 12,
+			},
+		]);
+	} finally {
+		global.fetch = originalFetch;
+	}
+});
+
 test("umami proxy blocks localhost-driven requests before reaching upstream", async () => {
 	const originalFetch = global.fetch;
 	let fetchArgs;

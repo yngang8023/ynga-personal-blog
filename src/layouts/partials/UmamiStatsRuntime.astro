@@ -76,6 +76,11 @@ const runtimeConfig = JSON.stringify({
 							client.getSiteStats(options),
 						getPageStats: (path, options) =>
 							client.getPageStats(path, options),
+						getArticleTotalViews: (articlePaths, options) =>
+							client.getArticleTotalViews(
+								articlePaths,
+								options,
+							),
 						clearCache: () => client.clearCache(),
 						umami: {
 							clearCache: () => client.clearCache(),

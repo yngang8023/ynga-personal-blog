@@ -7,11 +7,12 @@ const siteStatsPath = path.resolve(
 	"src/components/widgets/site-stats/SiteStats.astro",
 );
 
-test("site stats widget uses Umami site-level aggregate stats instead of summing every post path", async () => {
+test("site stats widget uses article-path aggregate stats for total reading count", async () => {
 	const source = await readFile(siteStatsPath, "utf8");
 
-	assert.match(source, /window\.oddmisc\.getSiteStats\(/);
+	assert.match(source, /window\.oddmisc\.getArticleTotalViews\(/);
+	assert.match(source, /const postPaths = posts\.map\(/);
 	assert.doesNotMatch(source, /postPaths\.map\(/);
 	assert.doesNotMatch(source, /window\.oddmisc\.getStats\(path\)/);
-	assert.doesNotMatch(source, /pageviewsList\.reduce/);
+	assert.doesNotMatch(source, /window\.oddmisc\.getSiteStats\(/);
 });

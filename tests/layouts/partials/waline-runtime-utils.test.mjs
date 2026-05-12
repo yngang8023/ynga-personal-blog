@@ -308,6 +308,32 @@ test("syncWalineCommentCountDisplay creates Waline internal count when comments 
 	assert.equal(prependedNode, created);
 });
 
+test("syncWalineCommentCountDisplay updates the existing Waline count node in place", () => {
+	const badge = { textContent: "1" };
+	const countElement = {
+		textContent: "1",
+		remove() {},
+	};
+	const walineCountContainer = {
+		querySelector(selector) {
+			return selector === ".wl-num" ? countElement : null;
+		},
+		prepend() {
+			throw new Error("should not prepend when an existing count node exists");
+		},
+	};
+
+	const result = syncWalineCommentCountDisplay({
+		count: 2,
+		badgeElement: badge,
+		walineCountContainer,
+	});
+
+	assert.equal(result, 2);
+	assert.equal(badge.textContent, "2");
+	assert.equal(countElement.textContent, "2");
+});
+
 test("createWalineDeleteConfirmBridge replays an approved delete click and bypasses native confirm once", async () => {
 	let nativeConfirmCalls = 0;
 	let replayedConfirmResult = null;

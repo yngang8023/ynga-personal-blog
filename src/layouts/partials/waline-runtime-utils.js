@@ -155,6 +155,10 @@ export function syncWalineCommentCountDisplay({
 		walineCountContainer.querySelector?.(".wl-num") || null;
 
 	if (normalizedCount > 0) {
+		if (currentCountElement) {
+			currentCountElement.textContent = normalizedCount.toString();
+		}
+
 		const nextCountElement =
 			currentCountElement ||
 			createCountElement?.() ||

@@ -27,5 +27,8 @@ test("theme optimizer does not treat the article body as a heavy element during 
 		temporaryTransitionStyles,
 		/\.is-theme-transitioning \.float-panel:not\(\.float-panel-closed\),/,
 	);
+	assert.doesNotMatch(source, /this\.hideOffscreenHeavyElements\(\)/);
+	assert.doesNotMatch(source, /function hideOffscreenHeavyElements/);
+	assert.doesNotMatch(source, /getBoundingClientRect\(\)/);
 	assert.doesNotMatch(source, /use-view-transition/);
 });

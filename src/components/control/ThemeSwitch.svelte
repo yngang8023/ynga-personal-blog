@@ -16,7 +16,7 @@
 
 	async function switchScheme(
 		newMode: LIGHT_DARK_MODE,
-		trigger?: HTMLElement | null,
+		trigger?: HTMLElement | { x: number; y: number } | null,
 	) {
 		// 防止连续快速点击
 		if (isChanging) {
@@ -32,7 +32,7 @@
 		}
 	}
 
-	function toggleScheme(trigger?: HTMLElement | null) {
+	function toggleScheme(trigger?: HTMLElement | { x: number; y: number } | null) {
 		if (isChanging) {
 			return;
 		}
@@ -47,7 +47,7 @@
 	}
 
 	function handleToggleClick(event: MouseEvent & { currentTarget: EventTarget & HTMLButtonElement }) {
-		toggleScheme(event.currentTarget);
+		toggleScheme({ x: event.clientX, y: event.clientY });
 	}
 
 	// 添加 Swup 钩子监听，确保在页面切换后同步主题状态

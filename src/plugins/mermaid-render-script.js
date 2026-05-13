@@ -1028,6 +1028,18 @@
 		return rect.bottom >= -120 && rect.top <= viewportHeight + 240;
 	}
 
+	function updateHostVisibility(host, isVisible) {
+		if (!host) {
+			return;
+		}
+
+		host.dataset.likelyVisible = isVisible ? "true" : "false";
+	}
+
+	function getThemeSwitchVisibleHosts(host) {
+		return host?.dataset?.likelyVisible === "true";
+	}
+
 	function scheduleIdleWork(callback) {
 		if ("requestIdleCallback" in window) {
 			window.requestIdleCallback(callback, { timeout: 900 });
@@ -1269,6 +1281,7 @@
 		diagramObserver = new IntersectionObserver(
 			(entries) => {
 				entries.forEach((entry) => {
+					updateHostVisibility(entry.target, entry.isIntersecting);
 					if (!entry.isIntersecting) {
 						return;
 					}
@@ -1291,6 +1304,9 @@
 		}
 
 		diagramObserver.observe(host);
+		if (!host.dataset.likelyVisible) {
+			updateHostVisibility(host, isLikelyVisible(host));
+		}
 	}
 
 	function refreshVisibleDiagrams(force = false) {
@@ -1362,7 +1378,7 @@
 			});
 			const { visibleHosts, deferredHosts } = splitHostsForThemeSwitch(
 				hosts,
-				isLikelyVisible,
+				getThemeSwitchVisibleHosts,
 			);
 
 			cancelThemePrewarm();

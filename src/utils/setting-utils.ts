@@ -15,7 +15,6 @@ const THEME_VEIL_SETTLE_MS = 72;
 const THEME_SWITCH_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
 const THEME_VEIL_MAX_OPACITY = 0.56;
 const THEME_VEIL_SETTLE_OPACITY = 0.34;
-const THEME_VEIL_BLUR = "blur(14px)";
 const THEME_SWITCH_FALLBACK_ORIGIN = {
 	x: "calc(100vw - 3rem)",
 	y: "3rem",
@@ -111,24 +110,6 @@ function updateThemeTransitionOrigin(
 	root.style.setProperty("--theme-switch-origin-y", y);
 }
 
-function resolveThemeBackdropColor(
-	root: HTMLElement = document.documentElement,
-): string {
-	const rootBackgroundColor = getComputedStyle(root).backgroundColor;
-	if (rootBackgroundColor && rootBackgroundColor !== "rgba(0, 0, 0, 0)") {
-		return rootBackgroundColor;
-	}
-
-	const bodyBackgroundColor = document.body
-		? getComputedStyle(document.body).backgroundColor
-		: "";
-	if (bodyBackgroundColor && bodyBackgroundColor !== "rgba(0, 0, 0, 0)") {
-		return bodyBackgroundColor;
-	}
-
-	return getComputedStyle(root).getPropertyValue("--page-bg").trim() || "#f6f3ed";
-}
-
 function getThemeVeilSpotlight(nextTheme: LIGHT_DARK_MODE): string {
 	return nextTheme === DARK_MODE
 		? "rgba(15, 23, 42, 0.22)"
@@ -210,8 +191,6 @@ function cleanupThemeTransitionVeil(veil: HTMLDivElement): void {
 	veil.style.setProperty("visibility", "hidden", "important");
 	veil.style.setProperty("transition", "none", "important");
 	veil.style.setProperty("background-color", "transparent", "important");
-	veil.style.removeProperty("backdrop-filter");
-	veil.style.removeProperty("-webkit-backdrop-filter");
 }
 
 async function runMaskedThemeSwitch(
@@ -221,44 +200,24 @@ async function runMaskedThemeSwitch(
 ): Promise<void> {
 	const root = beginThemeTransition(nextTheme, options);
 	const veil = ensureThemeTransitionVeil();
-	const oldSurfaceColor = resolveThemeBackdropColor(root);
 
 	clearThemeTransitionTimer();
 	veil.style.setProperty("transition", "none", "important");
 	veil.style.setProperty("visibility", "visible", "important");
-	veil.style.setProperty("background-color", oldSurfaceColor, "important");
-	veil.style.setProperty(
-		"backdrop-filter",
-		`${THEME_VEIL_BLUR} saturate(0.92)`,
-		"important",
-	);
-	veil.style.setProperty(
-		"-webkit-backdrop-filter",
-		`${THEME_VEIL_BLUR} saturate(0.92)`,
-		"important",
-	);
 	veil.style.setProperty(
 		"opacity",
 		String(THEME_VEIL_MAX_OPACITY),
 		"important",
 	);
 
-	// Force the translucent veil to cover the page before switching theme tokens.
-	void veil.offsetHeight;
 	performThemeChange();
 
 	requestAnimationFrame(() => {
-		const newSurfaceColor = resolveThemeBackdropColor(root);
-
 		veil.style.setProperty(
 			"transition",
-			[
-				`opacity ${THEME_SWITCH_TRANSITION_MS}ms ${THEME_SWITCH_EASING}`,
-				`background-color ${THEME_SWITCH_TRANSITION_MS}ms ${THEME_SWITCH_EASING}`,
-			].join(", "),
+			`opacity ${THEME_SWITCH_TRANSITION_MS}ms ${THEME_SWITCH_EASING}`,
 			"important",
 		);
-		veil.style.setProperty("background-color", newSurfaceColor, "important");
 		veil.style.setProperty(
 			"opacity",
 			String(THEME_VEIL_SETTLE_OPACITY),

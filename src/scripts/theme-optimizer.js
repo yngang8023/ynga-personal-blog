@@ -9,7 +9,7 @@
  * - 只更新可见代码块，延迟屏幕外代码块
  * - 主题切换期间临时禁用重型元素动画和过渡
  * - 强制 GPU 合成层，减少重绘重排
- * - 使用 content-visibility 隐藏屏幕外元素
+ * - 避免主题切换期间触发整页同步布局
  */
 
 class ThemeOptimizer {
@@ -387,10 +387,7 @@ class ThemeOptimizer {
 		// 1. 临时禁用重型元素动画
 		this.disableHeavyAnimations();
 
-		// 2. 隐藏视口外的重型元素
-		this.hideOffscreenHeavyElements();
-
-		// 3. 强制 GPU 合成层
+		// 2. 强制 GPU 合成层
 		this.forceCompositing();
 	}
 
@@ -456,36 +453,6 @@ class ThemeOptimizer {
 		);
 	}
 
-	hideOffscreenHeavyElements() {
-		const viewportHeight = window.innerHeight;
-		const scrollTop = window.scrollY;
-
-		this.hiddenElements = [];
-
-		this.heavySelectors.forEach((selector) => {
-			const elements = document.querySelectorAll(selector);
-			elements.forEach((element) => {
-				if (this.shouldKeepVisibleDuringThemeSwitch(element)) {
-					return;
-				}
-
-				const rect = element.getBoundingClientRect();
-				const elementTop = rect.top + scrollTop;
-				const elementBottom = elementTop + rect.height;
-
-				// 完全在视口外（增加200px边距）
-				if (
-					elementBottom < scrollTop - 200 ||
-					elementTop > scrollTop + viewportHeight + 200
-				) {
-					const originalVisibility = element.style.contentVisibility;
-					element.style.contentVisibility = "hidden";
-					this.hiddenElements.push({ element, originalVisibility });
-				}
-			});
-		});
-	}
-
 	forceCompositing() {
 		const criticalElements = document.querySelectorAll(`
       .expressive-code,
@@ -515,17 +482,6 @@ class ThemeOptimizer {
 				if (this.tempStyleSheet && this.tempStyleSheet.parentNode) {
 					this.tempStyleSheet.remove();
 					this.tempStyleSheet = null;
-				}
-
-				// 恢复隐藏的元素
-				if (this.hiddenElements) {
-					this.hiddenElements.forEach(
-						({ element, originalVisibility }) => {
-							element.style.contentVisibility =
-								originalVisibility || "";
-						},
-					);
-					this.hiddenElements = null;
 				}
 
 				// 恢复合成层设置

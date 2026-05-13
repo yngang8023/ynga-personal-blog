@@ -3,9 +3,9 @@ import test from "node:test";
 
 import {
 	createWalineDeleteConfirmBridge,
-	getWalineCommentMutationDelta,
+	applyWalineCommentCountDelta,
 	refreshWalineStats,
-	resolveWalineCommentCount,
+	resolveWalineBaseCommentCount,
 	syncWalineCommentCountDisplay,
 	teardownWalineInstance,
 } from "../../../src/layouts/partials/waline-runtime-utils.js";
@@ -141,115 +141,62 @@ test("refreshWalineStats can skip remote comment counter refresh while preservin
 	]);
 });
 
-test("getWalineCommentMutationDelta only tracks single comment insertions and removals", () => {
-	const makeNode = (className) => ({
-		classList: {
-			contains(name) {
-				return name === className;
-			},
-		},
-	});
-	const cardsTarget = makeNode("wl-cards");
-	const quoteTarget = makeNode("wl-quote");
-	const rootCard = makeNode("wl-card-item");
-	const nestedCard = makeNode("wl-card-item");
-
+test("resolveWalineBaseCommentCount prefers the freshest visible count", () => {
 	assert.equal(
-		getWalineCommentMutationDelta([
-			{
-				type: "childList",
-				target: cardsTarget,
-				addedNodes: [rootCard],
-				removedNodes: [],
-			},
-		]),
-		1,
-	);
-
-	assert.equal(
-		getWalineCommentMutationDelta([
-			{
-				type: "childList",
-				target: cardsTarget,
-				addedNodes: [],
-				removedNodes: [rootCard],
-			},
-		]),
-		-1,
-	);
-
-	assert.equal(
-		getWalineCommentMutationDelta([
-			{
-				type: "childList",
-				target: quoteTarget,
-				addedNodes: [nestedCard],
-				removedNodes: [],
-			},
-		]),
-		1,
-	);
-
-	assert.equal(
-		getWalineCommentMutationDelta([
-			{
-				type: "childList",
-				target: cardsTarget,
-				addedNodes: [rootCard, rootCard],
-				removedNodes: [],
-			},
-		]),
-		0,
-	);
-
-	assert.equal(
-		getWalineCommentMutationDelta([
-			{
-				type: "childList",
-				target: cardsTarget,
-				addedNodes: [rootCard],
-				removedNodes: [rootCard],
-			},
-		]),
-		0,
-	);
-});
-
-test("resolveWalineCommentCount falls back to the observed root delta when Waline keeps the stale total", () => {
-	assert.equal(
-		resolveWalineCommentCount({
+		resolveWalineBaseCommentCount({
 			displayedCount: 1,
 			lastKnownCount: 1,
-			pendingRootDelta: -1,
-		}),
-		0,
-	);
-
-	assert.equal(
-		resolveWalineCommentCount({
-			displayedCount: 0,
-			lastKnownCount: 0,
-			pendingRootDelta: 1,
+			badgeCount: 0,
 		}),
 		1,
 	);
 
 	assert.equal(
-		resolveWalineCommentCount({
-			displayedCount: 8,
+		resolveWalineBaseCommentCount({
+			displayedCount: 0,
+			lastKnownCount: 3,
+			badgeCount: 4,
+		}),
+		0,
+	);
+
+	assert.equal(
+		resolveWalineBaseCommentCount({
+			displayedCount: Number.NaN,
 			lastKnownCount: 7,
-			pendingRootDelta: 1,
+			badgeCount: 8,
 		}),
 		8,
 	);
 
 	assert.equal(
-		resolveWalineCommentCount({
-			displayedCount: 1,
-			lastKnownCount: 0,
-			pendingRootDelta: 0,
+		resolveWalineBaseCommentCount({
+			displayedCount: Number.NaN,
+			lastKnownCount: Number.NaN,
+			badgeCount: Number.NaN,
 		}),
 		0,
+	);
+});
+
+test("applyWalineCommentCountDelta applies additive updates from a stable base", () => {
+	assert.equal(
+		applyWalineCommentCountDelta({
+			displayedCount: 2,
+			lastKnownCount: 2,
+			badgeCount: 2,
+			delta: 1,
+		}),
+		3,
+	);
+	assert.equal(
+		applyWalineCommentCountDelta({
+			displayedCount: 2,
+			lastKnownCount: 2,
+			badgeCount: 2,
+			delta: -1,
+		}),
+		1,
 	);
 });
 

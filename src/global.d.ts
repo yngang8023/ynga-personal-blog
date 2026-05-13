@@ -197,19 +197,24 @@ declare global {
 			mountedContainer: HTMLElement | null;
 			observer: IntersectionObserver | null;
 			previewObserver: MutationObserver | null;
-			statsObserver: MutationObserver | null;
 			initialized: boolean;
 			loading: boolean;
 			initAttemptedPath: string;
 			previewTimer: number | null;
 			statsRefreshTimer: number | null;
-			commentCountSyncTimer: number | null;
 			statsAborters: {
 				abortCommentCount: (() => void) | null;
 				abortPageviewCount: (() => void) | null;
 			} | null;
 			lastCommentCount: number | null;
-			pendingCommentMutationDelta: number;
+			fetchBridge: {
+				install: () => void;
+				restore: () => void;
+				proxy: (
+					input: RequestInfo | URL,
+					init?: RequestInit,
+				) => Promise<Response>;
+			} | null;
 			originalConfirm: typeof window.confirm;
 			confirmProxy: typeof window.confirm;
 			deleteConfirmBridge: {
@@ -221,11 +226,14 @@ declare global {
 			bound: boolean;
 			schedulePreviewEnable: () => void;
 			observePreviewDefaults: () => void;
-			refreshStats: () => void;
+			refreshStats: (options?: {
+				refreshCommentCount?: boolean;
+			}) => void;
 			syncCommentCountFromWaline: () => void;
-			scheduleCommentCountSync: () => void;
-			scheduleStatsRefresh: () => void;
-			observeCommentStats: () => void;
+			syncCommentCountDelta: (delta: number) => void;
+			scheduleStatsRefresh: (options?: {
+				refreshCommentCount?: boolean;
+			}) => void;
 			installDeleteConfirmBridge: () => void;
 			teardownDeleteConfirmBridge: () => void;
 			mount: () => Promise<void>;

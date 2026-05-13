@@ -59,67 +59,45 @@ function isWalineCardItem(node) {
 	);
 }
 
-export function getWalineCommentMutationDelta(mutations) {
-	let addedCount = 0;
-	let removedCount = 0;
-
-	for (const mutation of mutations) {
-		if (mutation?.type !== "childList") {
-			continue;
-		}
-
-		addedCount += Array.from(mutation.addedNodes || []).filter(
-			isWalineCardItem,
-		).length;
-		removedCount += Array.from(mutation.removedNodes || []).filter(
-			isWalineCardItem,
-		).length;
-	}
-
-	if (addedCount === 1 && removedCount === 0) {
-		return 1;
-	}
-
-	if (removedCount === 1 && addedCount === 0) {
-		return -1;
-	}
-
-	return 0;
+function isValidCount(value) {
+	return typeof value === "number" && !Number.isNaN(value);
 }
 
-export function resolveWalineCommentCount({
+export function resolveWalineBaseCommentCount({
 	displayedCount,
+	badgeCount,
 	lastKnownCount,
-	pendingRootDelta = 0,
+	fallbackCount = 0,
 }) {
-	const hasDisplayedCount =
-		typeof displayedCount === "number" &&
-		!Number.isNaN(displayedCount);
-	const hasLastKnownCount =
-		typeof lastKnownCount === "number" &&
-		!Number.isNaN(lastKnownCount);
-
-	if (pendingRootDelta === 0) {
-		if (hasLastKnownCount) {
-			return Math.max(0, lastKnownCount);
-		}
-
-		if (hasDisplayedCount) {
-			return Math.max(0, displayedCount);
-		}
-
-		return null;
+	if (isValidCount(displayedCount)) {
+		return Math.max(0, displayedCount);
 	}
 
-	if (hasLastKnownCount) {
-		return Math.max(0, lastKnownCount + pendingRootDelta);
+	if (isValidCount(badgeCount)) {
+		return Math.max(0, badgeCount);
 	}
 
-	if (hasDisplayedCount) {
-		return Math.max(0, displayedCount + pendingRootDelta);
+	if (isValidCount(lastKnownCount)) {
+		return Math.max(0, lastKnownCount);
 	}
 
-	return null;
+	return Math.max(0, fallbackCount);
+}
+
+export function applyWalineCommentCountDelta({
+	displayedCount,
+	badgeCount,
+	lastKnownCount,
+	delta,
+}) {
+	return Math.max(
+		0,
+		resolveWalineBaseCommentCount({
+			displayedCount,
+			badgeCount,
+			lastKnownCount,
+		}) + delta,
+	);
 }
 
 /**
@@ -155,7 +133,10 @@ export function syncWalineCommentCountDisplay({
 		walineCountContainer.querySelector?.(".wl-num") || null;
 
 	if (normalizedCount > 0) {
-		if (currentCountElement) {
+		if (
+			currentCountElement &&
+			currentCountElement.textContent !== normalizedCount.toString()
+		) {
 			currentCountElement.textContent = normalizedCount.toString();
 		}
 
@@ -165,8 +146,9 @@ export function syncWalineCommentCountDisplay({
 			null;
 
 		if (nextCountElement) {
-			nextCountElement.textContent =
-				normalizedCount.toString();
+			if (nextCountElement.textContent !== normalizedCount.toString()) {
+				nextCountElement.textContent = normalizedCount.toString();
+			}
 
 			if (!currentCountElement) {
 				walineCountContainer.prepend?.(nextCountElement);

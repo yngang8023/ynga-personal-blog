@@ -27,11 +27,11 @@ import { commentConfig } from "@/config";
 						katexStrict,
 					} from "../../utils/katex-options.mjs";
 					import {
+						applyWalineCommentCountDelta,
 						createWalineDeleteConfirmBridge,
-						getWalineCommentMutationDelta,
 						matchWalineDeleteButton,
 						refreshWalineStats,
-						resolveWalineCommentCount,
+						resolveWalineBaseCommentCount,
 						syncWalineCommentCountDisplay,
 						teardownWalineInstance,
 					} from "./waline-runtime-utils.js";
@@ -53,6 +53,12 @@ import { commentConfig } from "@/config";
 						document.querySelector<HTMLElement>(
 							".waline-comment-count",
 						);
+
+					const getCommentCountBadgeValue = () => {
+						const badgeText =
+							getCommentCountBadge()?.textContent?.trim() ?? "";
+						return Number.parseInt(badgeText, 10);
+					};
 
 					const getWalineCountValue = () =>
 						document.querySelector<HTMLElement>(
@@ -89,6 +95,100 @@ import { commentConfig } from "@/config";
 						commentEditor.querySelector<HTMLTextAreaElement>(
 							".wl-editor",
 						);
+
+					const createWalineFetchBridge = () => {
+						const nativeFetch = window.fetch.bind(window);
+						const isWalineCommentMutation = (
+							url: string,
+							method: string,
+						) => {
+							const normalizedMethod = method.toUpperCase();
+							return (
+								normalizedMethod === "POST" ||
+								normalizedMethod === "DELETE"
+							) && /\/comment(?:\/|$|\?)/.test(url);
+						};
+
+						return {
+							install() {
+								if (window.fetch === this.proxy) {
+									return;
+								}
+
+								window.fetch = this.proxy;
+							},
+							restore() {
+								if (window.fetch === this.proxy) {
+									window.fetch = nativeFetch;
+								}
+							},
+							proxy(input: RequestInfo | URL, init?: RequestInit) {
+								const url =
+									typeof input === "string"
+										? input
+										: input instanceof URL
+											? input.toString()
+											: input.url;
+								const method =
+									init?.method ||
+									(typeof input !== "string" &&
+									!("method" in input)
+										? "GET"
+										: (input as Request).method) ||
+									"GET";
+								const request = nativeFetch(input, init);
+
+								if (!isWalineCommentMutation(url, method)) {
+									return request;
+								}
+
+								return request.then(
+									async (response: Response) => {
+										if (response.ok) {
+											let payload: {
+												errno?: number;
+											} | null = null;
+
+											try {
+												payload = await response
+													.clone()
+													.json();
+											} catch {
+												payload = null;
+											}
+
+											if (
+												!payload ||
+												typeof payload.errno !==
+													"number" ||
+												payload.errno === 0
+											) {
+												const normalizedMethod =
+													method.toUpperCase();
+												const delta =
+													normalizedMethod ===
+													"DELETE"
+														? -1
+														: 1;
+
+												runtime.syncCommentCountDelta(
+													delta,
+												);
+												runtime.scheduleStatsRefresh(
+													{
+														refreshCommentCount:
+															false,
+													},
+												);
+											}
+										}
+
+										return response;
+									},
+								);
+							},
+						};
+					};
 
 					const isPreviewVisible = (previewPanel: HTMLElement) =>
 						getComputedStyle(previewPanel).display !== "none";
@@ -233,16 +333,14 @@ import { commentConfig } from "@/config";
 						mountedContainer: null,
 						observer: null,
 						previewObserver: null,
-						statsObserver: null,
 						initialized: false,
 						loading: false,
 						initAttemptedPath: "",
 						previewTimer: null,
 						statsRefreshTimer: null,
 						statsAborters: null,
-						commentCountSyncTimer: null,
 						lastCommentCount: null,
-						pendingCommentMutationDelta: 0,
+						fetchBridge: null,
 						originalConfirm: window.confirm.bind(window),
 						confirmProxy: (message = "") =>
 							runtime.deleteConfirmBridge?.confirm(message) ??
@@ -260,7 +358,11 @@ import { commentConfig } from "@/config";
 								syncPreviewVisibility();
 							}, 40);
 						},
-						refreshStats: () => {
+						refreshStats: (
+							options: {
+								refreshCommentCount?: boolean;
+							} = {},
+						) => {
 							const config = getRuntimeConfig();
 
 							if (!config?.serverURL || !getCommentShell()) {
@@ -274,7 +376,7 @@ import { commentConfig } from "@/config";
 								path: getCurrentPath(),
 								lang: config.lang,
 								refreshCommentCount:
-									runtime.pendingCommentMutationDelta === 0,
+									options.refreshCommentCount ?? true,
 							});
 						},
 						syncCommentCountFromWaline: () => {
@@ -293,17 +395,13 @@ import { commentConfig } from "@/config";
 								10,
 							);
 							const resolvedCount =
-								resolveWalineCommentCount({
+								resolveWalineBaseCommentCount({
 									displayedCount,
+									badgeCount:
+										getCommentCountBadgeValue(),
 									lastKnownCount:
 										runtime.lastCommentCount,
-									pendingRootDelta:
-										runtime.pendingCommentMutationDelta,
 								});
-
-							if (resolvedCount === null) {
-								return;
-							}
 
 							runtime.lastCommentCount =
 								syncWalineCommentCountDisplay({
@@ -317,22 +415,54 @@ import { commentConfig } from "@/config";
 										return element;
 									},
 								});
-							runtime.pendingCommentMutationDelta = 0;
 						},
-						scheduleCommentCountSync: () => {
-							if (runtime.commentCountSyncTimer !== null) {
-								window.clearTimeout(
-									runtime.commentCountSyncTimer,
-								);
+						syncCommentCountDelta: (delta: number) => {
+							const badge = getCommentCountBadge();
+							const walineCountContainer =
+								getWalineCountContainer();
+							if (!badge && !walineCountContainer) {
+								return;
 							}
 
-							runtime.commentCountSyncTimer =
-								window.setTimeout(() => {
-									runtime.commentCountSyncTimer = null;
-									runtime.syncCommentCountFromWaline();
-								}, 120);
+							const walineCountText =
+								getWalineCountValue()?.textContent?.trim() ??
+								"";
+							const displayedCount = Number.parseInt(
+								walineCountText,
+								10,
+							);
+							const nextCount =
+								applyWalineCommentCountDelta({
+									displayedCount,
+									badgeCount:
+										getCommentCountBadgeValue(),
+									lastKnownCount:
+										runtime.lastCommentCount,
+									delta,
+								});
+
+							runtime.lastCommentCount =
+								syncWalineCommentCountDisplay({
+									count: nextCount,
+									badgeElement: badge,
+									walineCountContainer,
+									createCountElement: () => {
+										const element =
+											document.createElement("span");
+										element.className = "wl-num";
+										return element;
+									},
+								});
+
+							window.setTimeout(() => {
+								runtime.syncCommentCountFromWaline();
+							}, 120);
 						},
-						scheduleStatsRefresh: () => {
+						scheduleStatsRefresh: (
+							options: {
+								refreshCommentCount?: boolean;
+							} = {},
+						) => {
 							if (runtime.statsRefreshTimer !== null) {
 								window.clearTimeout(
 									runtime.statsRefreshTimer,
@@ -342,59 +472,10 @@ import { commentConfig } from "@/config";
 							runtime.statsRefreshTimer = window.setTimeout(
 								() => {
 									runtime.statsRefreshTimer = null;
-									runtime.refreshStats();
-									runtime.scheduleCommentCountSync();
+									runtime.refreshStats(options);
 								},
 								180,
 							);
-						},
-						observeCommentStats: () => {
-							const container =
-								document.getElementById(CONTAINER_ID);
-							const cards =
-								container?.querySelector<HTMLElement>(
-									".wl-cards",
-								) || null;
-
-							runtime.statsObserver?.disconnect();
-							runtime.statsObserver = null;
-
-							if (!cards) {
-								return;
-							}
-
-							runtime.statsObserver = new MutationObserver(
-								(mutations) => {
-									const mutationDelta =
-										getWalineCommentMutationDelta(
-											mutations,
-										);
-									const hasCommentTreeChange =
-										mutations.some(
-											(mutation) =>
-												mutation.type ===
-													"childList" &&
-												(mutation.addedNodes.length >
-													0 ||
-													mutation.removedNodes
-														.length > 0),
-										);
-
-									if (hasCommentTreeChange) {
-										if (mutationDelta !== 0) {
-											runtime.pendingCommentMutationDelta +=
-												mutationDelta;
-											runtime.scheduleCommentCountSync();
-										}
-										runtime.scheduleStatsRefresh();
-									}
-								},
-							);
-
-							runtime.statsObserver.observe(cards, {
-								childList: true,
-								subtree: true,
-							});
 						},
 						observePreviewDefaults: () => {
 							const container =
@@ -410,7 +491,6 @@ import { commentConfig } from "@/config";
 							runtime.previewObserver = new MutationObserver(
 								() => {
 									runtime.schedulePreviewEnable();
-									runtime.observeCommentStats();
 								},
 							);
 							runtime.previewObserver.observe(container, {
@@ -418,7 +498,6 @@ import { commentConfig } from "@/config";
 								subtree: true,
 							});
 
-							runtime.observeCommentStats();
 							runtime.schedulePreviewEnable();
 						},
 						installDeleteConfirmBridge: () => {
@@ -499,8 +578,6 @@ import { commentConfig } from "@/config";
 								runtime.teardownDeleteConfirmBridge();
 								runtime.previewObserver?.disconnect();
 								runtime.previewObserver = null;
-								runtime.statsObserver?.disconnect();
-								runtime.statsObserver = null;
 
 								if (runtime.previewTimer !== null) {
 									window.clearTimeout(runtime.previewTimer);
@@ -514,20 +591,12 @@ import { commentConfig } from "@/config";
 									runtime.statsRefreshTimer = null;
 								}
 
-								if (
-									runtime.commentCountSyncTimer !== null
-								) {
-									window.clearTimeout(
-										runtime.commentCountSyncTimer,
-									);
-									runtime.commentCountSyncTimer = null;
-								}
-
 								runtime.statsAborters?.abortCommentCount?.();
 								runtime.statsAborters?.abortPageviewCount?.();
 								runtime.statsAborters = null;
 								runtime.lastCommentCount = null;
-								runtime.pendingCommentMutationDelta = 0;
+								runtime.fetchBridge?.restore?.();
+								runtime.fetchBridge = null;
 
 								if (runtime.instance) {
 									const teardownResult =
@@ -554,10 +623,13 @@ import { commentConfig } from "@/config";
 								runtime.mountedContainer = container;
 								runtime.initialized = true;
 								runtime.initAttemptedPath = getCurrentPath();
+								runtime.fetchBridge =
+									createWalineFetchBridge();
+								runtime.fetchBridge.install();
 								runtime.observePreviewDefaults();
 								runtime.installDeleteConfirmBridge();
 								runtime.scheduleStatsRefresh();
-								runtime.scheduleCommentCountSync();
+								runtime.syncCommentCountFromWaline();
 							} catch (error) {
 								console.error("[Waline] 初始化失败:", error);
 							} finally {
@@ -569,8 +641,6 @@ import { commentConfig } from "@/config";
 							runtime.observer = null;
 							runtime.previewObserver?.disconnect();
 							runtime.previewObserver = null;
-							runtime.statsObserver?.disconnect();
-							runtime.statsObserver = null;
 							if (runtime.previewTimer !== null) {
 								window.clearTimeout(runtime.previewTimer);
 								runtime.previewTimer = null;
@@ -581,19 +651,12 @@ import { commentConfig } from "@/config";
 								);
 								runtime.statsRefreshTimer = null;
 							}
-							if (
-								runtime.commentCountSyncTimer !== null
-							) {
-								window.clearTimeout(
-									runtime.commentCountSyncTimer,
-								);
-								runtime.commentCountSyncTimer = null;
-							}
 							runtime.statsAborters?.abortCommentCount?.();
 							runtime.statsAborters?.abortPageviewCount?.();
 							runtime.statsAborters = null;
 							runtime.lastCommentCount = null;
-							runtime.pendingCommentMutationDelta = 0;
+							runtime.fetchBridge?.restore?.();
+							runtime.fetchBridge = null;
 							runtime.teardownDeleteConfirmBridge();
 							if (runtime.instance) {
 								const teardownResult =

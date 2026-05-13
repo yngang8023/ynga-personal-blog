@@ -136,6 +136,10 @@ export const ja: Translation = {
 	[Key.musicPlayerProgress]: "再生状況",
 	[Key.musicPlayerCover]: "カバー",
 	[Key.musicPlayerPlaylist]: "プレイリスト",
+	[Key.musicPlayerLyrics]: "歌詞",
+	[Key.musicPlayerLyricsEmpty]: "歌詞はありません",
+	[Key.musicPlayerLyricsLoading]: "歌詞を読み込み中...",
+	[Key.musicPlayerLyricsFailed]: "歌詞を読み込めませんでした",
 	[Key.musicPlayerLoading]: "読み込み中...",
 	[Key.musicPlayerErrorPlaylist]: "プレイリストを取得できませんでした。",
 	[Key.musicPlayerErrorSong]:

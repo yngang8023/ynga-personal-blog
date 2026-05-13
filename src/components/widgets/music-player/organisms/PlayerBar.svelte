@@ -4,12 +4,17 @@
 
 	import Key from "../../../../i18n/i18nKey";
 	import { i18n } from "../../../../i18n/translation";
+	import LyricsPanel from "../molecules/LyricsPanel.svelte";
 	import PlayerControls from "../molecules/PlayerControls.svelte";
 	import ProgressControl from "../molecules/ProgressControl.svelte";
 	import TrackDisplay from "../molecules/TrackDisplay.svelte";
 	import VolumeControl from "../molecules/VolumeControl.svelte";
 	import type { Song } from "../types";
 	import type { RepeatMode } from "../types";
+	import type {
+		LyricLine,
+		LyricsStatus,
+	} from "../utils/lyrics";
 
 	interface Props {
 		song: Song;
@@ -25,6 +30,10 @@
 		isMuted: boolean;
 		isVolumeDragging: boolean;
 		isHidden: boolean;
+		showLyrics: boolean;
+		lyrics: LyricLine[];
+		lyricsStatus: LyricsStatus;
+		currentLyricIndex: number;
 		volumeBarRef: Action<HTMLElement, undefined>;
 		onPlayClick: () => void;
 		onPrevClick: () => void;
@@ -37,6 +46,8 @@
 		onSliderPointerDown: (event: PointerEvent) => void;
 		onSliderKeyDown: (event: KeyboardEvent) => void;
 		onHideClick: () => void;
+		onLyricsClick: () => void;
+		onLyricClick: (time: number) => void;
 		onPlaylistClick: () => void;
 		onCollapseClick: () => void;
 	}
@@ -55,6 +66,10 @@
 		isMuted,
 		isVolumeDragging,
 		isHidden,
+		showLyrics,
+		lyrics,
+		lyricsStatus,
+		currentLyricIndex,
 		volumeBarRef,
 		onPlayClick,
 		onPrevClick,
@@ -67,6 +82,8 @@
 		onSliderPointerDown,
 		onSliderKeyDown,
 		onHideClick,
+		onLyricsClick,
+		onLyricClick,
 		onPlaylistClick,
 		onCollapseClick,
 	}: Props = $props();
@@ -87,8 +104,17 @@
 		size="expanded"
 		showControls
 		{showPlaylist}
+		{showLyrics}
 		{onHideClick}
+		{onLyricsClick}
 		{onPlaylistClick}
+	/>
+	<LyricsPanel
+		show={showLyrics}
+		{lyrics}
+		{lyricsStatus}
+		currentLyricIndex={currentLyricIndex}
+		onLyricClick={onLyricClick}
 	/>
 	<ProgressControl
 		{currentTime}

@@ -22,6 +22,7 @@
 	const shouldRenderFloatingUi =
 		showFloatingPlayer && musicPlayerConfig.enable;
 	let unsubscribe: (() => void) | undefined;
+	let showLyrics = false;
 
 	function togglePlay() {
 		musicPlayerStore.toggle();
@@ -157,6 +158,20 @@
 
 	function togglePlaylist() {
 		musicPlayerStore.togglePlaylist();
+		if (!state.showPlaylist) {
+			showLyrics = false;
+		}
+	}
+
+	function toggleLyrics() {
+		showLyrics = !showLyrics;
+		if (showLyrics && state.showPlaylist) {
+			musicPlayerStore.togglePlaylist();
+		}
+	}
+
+	function seekLyric(time: number) {
+		musicPlayerStore.seek(time);
 	}
 
 	function toggleExpanded() {
@@ -271,6 +286,10 @@
 				isShuffled={state.isShuffled}
 				isRepeating={state.isRepeating}
 				showPlaylist={state.showPlaylist}
+				{showLyrics}
+				lyrics={state.lyrics}
+				lyricsStatus={state.lyricsStatus}
+				currentLyricIndex={state.currentLyricIndex}
 				canSkip={canSkip()}
 				volume={state.volume}
 				isMuted={state.isMuted}
@@ -288,6 +307,8 @@
 				onSliderPointerDown={startVolumeDrag}
 				onSliderKeyDown={handleVolumeKeyDown}
 				onHideClick={toggleHidden}
+				onLyricsClick={toggleLyrics}
+				onLyricClick={seekLyric}
 				onPlaylistClick={togglePlaylist}
 				onCollapseClick={toggleExpanded}
 			/>

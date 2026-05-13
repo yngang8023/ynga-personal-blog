@@ -16,11 +16,13 @@
 		size?: "mini" | "expanded";
 		showControls?: boolean;
 		showPlaylist?: boolean;
+		showLyrics?: boolean;
 		onCoverClick?: () => void;
 		onInfoClick?: () => void;
 		onHideClick?: () => void;
 		onExpandClick?: () => void;
 		onPlaylistClick?: () => void;
+		onLyricsClick?: () => void;
 	}
 
 	const {
@@ -32,11 +34,13 @@
 		size = "mini",
 		showControls = false,
 		showPlaylist = false,
+		showLyrics = false,
 		onCoverClick,
 		onInfoClick,
 		onHideClick,
 		onExpandClick,
 		onPlaylistClick,
+		onLyricsClick,
 	}: Props = $props();
 </script>
 
@@ -107,6 +111,19 @@
 				>
 					<Icon
 						icon="material-symbols:visibility-off"
+						class="text-lg"
+					/>
+				</button>
+				<button
+					class="btn-plain w-8 h-8 rounded-lg flex items-center justify-center"
+					class:text-[var(--primary)]={showLyrics}
+					onclick={onLyricsClick}
+					title={i18n(Key.musicPlayerLyrics)}
+				>
+					<Icon
+						icon={showLyrics
+							? "material-symbols:subtitles-rounded"
+							: "material-symbols:subtitles-off-rounded"}
 						class="text-lg"
 					/>
 				</button>

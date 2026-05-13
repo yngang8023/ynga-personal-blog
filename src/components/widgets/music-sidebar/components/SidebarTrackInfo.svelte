@@ -1,6 +1,8 @@
 <script lang="ts">
 	import Icon from "@iconify/svelte";
 
+	import Key from "../../../../i18n/i18nKey";
+	import { i18n } from "../../../../i18n/translation";
 	import type { Song } from "../../music-player/types";
 
 	interface Props {
@@ -9,8 +11,10 @@
 		duration: number;
 		volume: number;
 		isMuted: boolean;
+		showLyrics?: boolean;
 		onToggleMute: () => void;
 		onSetVolume: (volume: number) => void;
+		onLyricsClick?: () => void;
 	}
 
 	const {
@@ -19,8 +23,10 @@
 		duration,
 		volume,
 		isMuted,
+		showLyrics = false,
 		onToggleMute,
 		onSetVolume,
+		onLyricsClick,
 	}: Props = $props();
 
 	const currentTimeLabel = $derived(
@@ -78,6 +84,21 @@
 <div class="flex flex-col min-w-0 flex-1 overflow-hidden">
 	<div class="title-row">
 		<span class="title-text truncate">{currentSong.title}</span>
+		<button
+			type="button"
+			class="lyrics-btn"
+			class:active={showLyrics}
+			onclick={onLyricsClick}
+			aria-label={i18n(Key.musicPlayerLyrics)}
+			title={i18n(Key.musicPlayerLyrics)}
+		>
+			<Icon
+				icon={showLyrics
+					? "material-symbols:subtitles-rounded"
+					: "material-symbols:subtitles-off-rounded"}
+				class="text-base"
+			/>
+		</button>
 	</div>
 	<div class="artist-row">
 		<span class="artist-text truncate">{currentSong.artist}</span>
@@ -130,12 +151,43 @@
 <style>
 	.title-row {
 		margin-bottom: 0.06rem;
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		min-width: 0;
 	}
 
 	.title-text {
 		font-weight: 600;
 		color: var(--content-main);
 		line-height: 1.1;
+		min-width: 0;
+		flex: 1;
+	}
+
+	.lyrics-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.45rem;
+		height: 1.45rem;
+		border-radius: 0.45rem;
+		color: var(--content-meta);
+		flex: 0 0 auto;
+		transition:
+			color 150ms ease,
+			background-color 150ms ease,
+			transform 150ms ease;
+	}
+
+	.lyrics-btn:hover,
+	.lyrics-btn.active {
+		color: var(--primary);
+		background: color-mix(in srgb, var(--primary) 10%, transparent);
+	}
+
+	.lyrics-btn:active {
+		transform: scale(0.94);
 	}
 
 	:global(.dark) .title-text {

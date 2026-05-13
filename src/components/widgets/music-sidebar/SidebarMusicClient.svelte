@@ -4,7 +4,7 @@
 	import type { MusicPlayerState } from "@/stores/musicPlayerStore";
 	import { musicPlayerStore } from "@/stores/musicPlayerStore";
 
-	import type { Song } from "../music-player/types";
+	import SidebarLyricsPanel from "../music-player/molecules/LyricsPanel.svelte";
 	import SidebarControls from "./components/SidebarControls.svelte";
 	import SidebarCover from "./components/SidebarCover.svelte";
 	import SidebarPlaylist from "./components/SidebarPlaylist.svelte";
@@ -13,6 +13,7 @@
 
 	let state: MusicPlayerState = $state(musicPlayerStore.getState());
 	let showPlaylist = $state(false);
+	let showLyrics = $state(false);
 
 	function handleStateUpdate(event: Event) {
 		const custom = event as CustomEvent<MusicPlayerState>;
@@ -52,6 +53,16 @@
 
 	function togglePlaylistView() {
 		showPlaylist = !showPlaylist;
+		if (showPlaylist) {
+			showLyrics = false;
+		}
+	}
+
+	function toggleLyricsView() {
+		showLyrics = !showLyrics;
+		if (showLyrics) {
+			showPlaylist = false;
+		}
 	}
 
 	function playIndex(index: number) {
@@ -84,10 +95,20 @@
 			duration={state.duration}
 			volume={state.volume}
 			isMuted={state.isMuted}
+			{showLyrics}
 			onToggleMute={toggleMute}
 			onSetVolume={setVolume}
+			onLyricsClick={toggleLyricsView}
 		/>
 	</div>
+
+	<SidebarLyricsPanel
+		show={showLyrics}
+		lyrics={state.lyrics}
+		lyricsStatus={state.lyricsStatus}
+		currentLyricIndex={state.currentLyricIndex}
+		onLyricClick={seek}
+	/>
 
 	<SidebarProgress
 		currentTime={state.currentTime}

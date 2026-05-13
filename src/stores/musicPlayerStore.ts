@@ -8,6 +8,11 @@ import {
 	STORAGE_KEY_VOLUME,
 } from "@/components/widgets/music-player/constants";
 import type { RepeatMode, Song } from "@/components/widgets/music-player/types";
+import {
+	resolveLyrics,
+	type LyricLine,
+	type LyricsStatus,
+} from "@/components/widgets/music-player/utils/lyrics";
 import { musicPlayerConfig } from "@/config";
 
 export interface MusicPlayerState {
@@ -29,6 +34,9 @@ export interface MusicPlayerState {
 	isHidden: boolean;
 	autoplayFailed: boolean;
 	willAutoPlay: boolean;
+	lyrics: LyricLine[];
+	lyricsStatus: LyricsStatus;
+	currentLyricIndex: number;
 }
 
 function getAssetPath(path: string): string {
@@ -87,6 +95,9 @@ class MusicPlayerStore {
 			isHidden: false,
 			autoplayFailed: false,
 			willAutoPlay: false,
+			lyrics: [],
+			lyricsStatus: "none",
+			currentLyricIndex: -1,
 		};
 	}
 
@@ -152,6 +163,7 @@ class MusicPlayerStore {
 		this.audio.addEventListener("timeupdate", () => {
 			if (this.audio) {
 				this.state.currentTime = this.audio.currentTime;
+				this.updateCurrentLyricIndex();
 				this.broadcastState();
 			}
 		});
@@ -366,6 +378,7 @@ class MusicPlayerStore {
 			cover: song.pic ?? "",
 			url: song.url ?? "",
 			duration: dur,
+			lrc: song.lrc ?? song.lyric ?? "",
 		};
 	}
 
@@ -384,12 +397,15 @@ class MusicPlayerStore {
 		}
 		if (song.url !== this.state.currentSong.url) {
 			this.state.currentSong = { ...song };
+			this.state.currentTime = 0;
+			this.state.currentLyricIndex = -1;
 			if (song.url) {
 				this.state.isLoading = true;
 			} else {
 				this.state.isLoading = false;
 			}
 		}
+		this.loadLyrics(song);
 		this.state.willAutoPlay = autoPlay;
 		if (this.audio) {
 			if (this.audio.src && song.url) {
@@ -399,6 +415,48 @@ class MusicPlayerStore {
 			this.audio.load();
 		}
 		this.broadcastState();
+	}
+
+	private async loadLyrics(song: Song): Promise<void> {
+		const lrc = song.lrc?.trim() ?? "";
+		const currentUrl = song.url;
+		this.state.lyrics = [];
+		this.state.currentLyricIndex = -1;
+		this.state.lyricsStatus = lrc ? "loading" : "none";
+		this.broadcastState();
+
+		if (!lrc) {
+			return;
+		}
+
+		const result = await resolveLyrics(lrc);
+		if (this.state.currentSong.url !== currentUrl) {
+			return;
+		}
+
+		this.state.lyrics = result.lines;
+		this.state.lyricsStatus = result.status;
+		this.updateCurrentLyricIndex();
+		this.broadcastState();
+	}
+
+	private updateCurrentLyricIndex(): void {
+		const { lyrics, currentTime } = this.state;
+		if (lyrics.length === 0) {
+			this.state.currentLyricIndex = -1;
+			return;
+		}
+
+		let nextIndex = -1;
+		for (let index = 0; index < lyrics.length; index += 1) {
+			if (currentTime >= lyrics[index].time) {
+				nextIndex = index;
+			} else {
+				break;
+			}
+		}
+
+		this.state.currentLyricIndex = nextIndex;
 	}
 
 	private showError(message: string): void {
@@ -494,6 +552,7 @@ class MusicPlayerStore {
 		if (time >= 0 && time <= this.state.duration) {
 			this.audio.currentTime = time;
 			this.state.currentTime = time;
+			this.updateCurrentLyricIndex();
 			this.broadcastState();
 		}
 	}
@@ -588,6 +647,7 @@ class MusicPlayerStore {
 		const newTime = percent * this.state.duration;
 		this.audio.currentTime = newTime;
 		this.state.currentTime = newTime;
+		this.updateCurrentLyricIndex();
 		this.broadcastState();
 	}
 

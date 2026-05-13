@@ -12,6 +12,7 @@ export const LOCAL_PLAYLIST: Song[] = [
 		cover: "assets/music/cover/dazbee.webp",
 		url: "assets/music/url/dazbee.mp3",
 		duration: 0,
+		lrc: "",
 	},
 	{
 		id: 2,
@@ -20,6 +21,7 @@ export const LOCAL_PLAYLIST: Song[] = [
 		cover: "assets/music/cover/hitori.webp",
 		url: "assets/music/url/hitori.mp3",
 		duration: 240,
+		lrc: "",
 	},
 	{
 		id: 3,
@@ -28,6 +30,7 @@ export const LOCAL_PLAYLIST: Song[] = [
 		cover: "assets/music/cover/xryx.webp",
 		url: "assets/music/url/xryx.mp3",
 		duration: 180,
+		lrc: "",
 	},
 	{
 		id: 4,
@@ -36,6 +39,7 @@ export const LOCAL_PLAYLIST: Song[] = [
 		cover: "assets/music/cover/cl.webp",
 		url: "assets/music/url/cl.mp3",
 		duration: 200,
+		lrc: "",
 	},
 ];
 
@@ -46,6 +50,7 @@ export const DEFAULT_SONG: Song = {
 	url: "",
 	duration: 0,
 	id: 0,
+	lrc: "",
 };
 
 export const DEFAULT_METING_API =

@@ -5,6 +5,7 @@ export interface Song {
 	cover: string;
 	url: string;
 	duration: number;
+	lrc?: string;
 }
 
 export type PlayerMode = "local" | "meting";

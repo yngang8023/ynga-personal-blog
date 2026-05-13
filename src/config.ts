@@ -622,15 +622,16 @@ export const announcementConfig: AnnouncementConfig = {
 	},
 };
 
-const MUSIC_PLAYER_MODE: MusicPlayerConfig["mode"] =
-	process.env.NODE_ENV === "production" ? "meting" : "local";
+// const MUSIC_PLAYER_MODE: MusicPlayerConfig["mode"] =
+// 	process.env.NODE_ENV === "production" ? "meting" : "local";
 
 export const musicPlayerConfig: MusicPlayerConfig = {
 	enable: true, // 启用音乐播放器功能
 	showFloatingPlayer: true, // 显示悬浮播放器 UI
 	floatingEntryMode: "fab", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
 	// floatingEntryMode: "default", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
-	mode: MUSIC_PLAYER_MODE, // 开发环境默认 local，生产环境默认 meting
+	// mode: MUSIC_PLAYER_MODE, // 开发环境默认 local，生产环境默认 meting
+	mode: "meting", // 开发环境默认 local，生产环境默认 meting
 	meting_api: [
 		"https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r",
 		"https://api.moeyao.cn/meting/?server=:server&type=:type&id=:id",

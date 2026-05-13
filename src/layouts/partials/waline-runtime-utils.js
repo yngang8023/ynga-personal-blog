@@ -49,16 +49,6 @@ export function refreshWalineStats({
 	};
 }
 
-function isWalineCardItem(node) {
-	return (
-		node &&
-		typeof node === "object" &&
-		"classList" in node &&
-		typeof node.classList?.contains === "function" &&
-		node.classList.contains("wl-card-item")
-	);
-}
-
 function isValidCount(value) {
 	return typeof value === "number" && !Number.isNaN(value);
 }
@@ -129,17 +119,20 @@ export function syncWalineCommentCountDisplay({
 		return normalizedCount;
 	}
 
-	const currentCountElement =
-		walineCountContainer.querySelector?.(".wl-num") || null;
+	const countNodeList =
+		walineCountContainer.querySelectorAll?.(".wl-num") || null;
+	const countElements =
+		countNodeList && countNodeList.length > 0
+			? Array.from(countNodeList)
+			: (() => {
+					const singleCountElement =
+						walineCountContainer.querySelector?.(".wl-num") ||
+						null;
+					return singleCountElement ? [singleCountElement] : [];
+				})();
+	const currentCountElement = countElements[0] || null;
 
 	if (normalizedCount > 0) {
-		if (
-			currentCountElement &&
-			currentCountElement.textContent !== normalizedCount.toString()
-		) {
-			currentCountElement.textContent = normalizedCount.toString();
-		}
-
 		const nextCountElement =
 			currentCountElement ||
 			createCountElement?.() ||
@@ -154,8 +147,14 @@ export function syncWalineCommentCountDisplay({
 				walineCountContainer.prepend?.(nextCountElement);
 			}
 		}
-	} else if (currentCountElement) {
-		currentCountElement.remove?.();
+
+		for (const duplicateCountElement of countElements.slice(1)) {
+			duplicateCountElement.remove?.();
+		}
+	} else {
+		for (const countElement of countElements) {
+			countElement.remove?.();
+		}
 	}
 
 	return normalizedCount;

@@ -281,6 +281,87 @@ test("syncWalineCommentCountDisplay updates the existing Waline count node in pl
 	assert.equal(countElement.textContent, "2");
 });
 
+test("syncWalineCommentCountDisplay deduplicates repeated Waline count nodes after a delete", () => {
+	const badge = { textContent: "4" };
+	let removed = 0;
+
+	const primaryCountElement = {
+		textContent: "4",
+		remove() {
+			throw new Error("should keep the first count node");
+		},
+	};
+
+	const duplicateCountElement = {
+		textContent: "3",
+		remove() {
+			removed += 1;
+		},
+	};
+
+	const walineCountContainer = {
+		querySelectorAll(selector) {
+			return selector === ".wl-num"
+				? [primaryCountElement, duplicateCountElement]
+				: [];
+		},
+		prepend() {
+			throw new Error("should not prepend when a count node already exists");
+		},
+	};
+
+	const result = syncWalineCommentCountDisplay({
+		count: 3,
+		badgeElement: badge,
+		walineCountContainer,
+	});
+
+	assert.equal(result, 3);
+	assert.equal(badge.textContent, "3");
+	assert.equal(primaryCountElement.textContent, "3");
+	assert.equal(removed, 1);
+});
+
+test("syncWalineCommentCountDisplay removes all repeated Waline count nodes when total reaches zero", () => {
+	const badge = { textContent: "2" };
+	let removed = 0;
+
+	const firstCountElement = {
+		textContent: "2",
+		remove() {
+			removed += 1;
+		},
+	};
+
+	const secondCountElement = {
+		textContent: "1",
+		remove() {
+			removed += 1;
+		},
+	};
+
+	const walineCountContainer = {
+		querySelectorAll(selector) {
+			return selector === ".wl-num"
+				? [firstCountElement, secondCountElement]
+				: [];
+		},
+		prepend() {
+			throw new Error("should not prepend when removing stale nodes");
+		},
+	};
+
+	const result = syncWalineCommentCountDisplay({
+		count: 0,
+		badgeElement: badge,
+		walineCountContainer,
+	});
+
+	assert.equal(result, 0);
+	assert.equal(badge.textContent, "0");
+	assert.equal(removed, 2);
+});
+
 test("createWalineDeleteConfirmBridge replays an approved delete click and bypasses native confirm once", async () => {
 	let nativeConfirmCalls = 0;
 	let replayedConfirmResult = null;

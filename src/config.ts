@@ -16,6 +16,10 @@
 	SidebarLayoutConfig,
 	SiteConfig,
 } from "./types/config";
+import {
+	MESSAGE_PAGE_PATH,
+	MESSAGE_PAGE_TITLE,
+} from "./constants/message-page";
 import { LinkPreset } from "./types/config";
 
 // 移除i18n导入以避免循环依赖
@@ -58,6 +62,7 @@ export const siteConfig: SiteConfig = {
 		anime: false, // 番剧页面开关
 		diary: true, // 日记页面开关
 		friends: true, // 友链页面开关
+		message: true, // 留言页面开关
 		projects: true, // 项目页面开关
 		skills: true, // 技能页面开关
 		timeline: false, // 时间线页面开关
@@ -289,6 +294,11 @@ export const navBarConfig: NavBarConfig = {
 	links: [
 		LinkPreset.Home,
 		LinkPreset.Archive,
+		{
+			name: MESSAGE_PAGE_TITLE,
+			url: MESSAGE_PAGE_PATH,
+			icon: "material-symbols:chat-rounded",
+		},
 		// 支持自定义导航栏链接，支持多级菜单
 		{
 			name: "Links",
@@ -622,6 +632,8 @@ export const musicPlayerConfig: MusicPlayerConfig = {
 	// floatingEntryMode: "default", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
 	mode: MUSIC_PLAYER_MODE, // 开发环境默认 local，生产环境默认 meting
 	meting_api: [
+		"https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r",
+		"https://api.moeyao.cn/meting/?server=:server&type=:type&id=:id",
 		// "https://meting-api-alpha-snowy.vercel.app/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
 		"https://meting.mysqil.com/api?server=:server&type=:type&id=:id&auth=:auth&r=:r",
 		"https://api.injahow.cn/meting/?server=:server&type=:type&id=:id&auth=:auth&r=:r",

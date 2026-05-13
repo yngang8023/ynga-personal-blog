@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { rehypePlantuml } from "../../src/plugins/rehype-plantuml.mjs";
 
-test("rehypePlantuml rewrites plantuml placeholders into interactive image containers", () => {
+test("rehypePlantuml rewrites plantuml placeholders into interactive resident-theme image containers", () => {
 	const tree = {
 		type: "root",
 		children: [
@@ -57,39 +57,68 @@ test("rehypePlantuml rewrites plantuml placeholders into interactive image conta
 	assert.equal(firstNode.properties.class, "plantuml-diagram-container");
 	assert.equal(secondNode.properties.class, "plantuml-diagram-container");
 
-	const firstImage =
-		firstWrapper.children[1];
 	const placeholder = firstWrapper.children[0];
+	const firstLightImage = firstWrapper.children[1];
+	const firstDarkImage = firstWrapper.children[2];
 	assert.equal(placeholder.tagName, "div");
 	assert.deepEqual(placeholder.properties.className, ["plantuml-loading"]);
 	assert.equal(placeholder.children[0].value, "PlantUML 图表加载中...");
 
-	assert.equal(firstImage.tagName, "img");
-	assert.deepEqual(firstImage.properties.className, ["plantuml-image"]);
-	assert.match(firstImage.properties.src, /^data:image\/svg\+xml/);
+	assert.equal(firstLightImage.tagName, "img");
+	assert.deepEqual(firstLightImage.properties.className, [
+		"plantuml-image",
+		"plantuml-image-light",
+	]);
+	assert.match(firstLightImage.properties.src, /^data:image\/svg\+xml/);
 	assert.equal(
-		firstImage.properties["data-light-src"] || firstImage.properties.dataLightSrc,
+		firstLightImage.properties["data-light-src"] ||
+			firstLightImage.properties.dataLightSrc,
 		"https://example.com/light.svg",
 	);
 	assert.equal(
-		firstImage.properties["data-dark-src"] || firstImage.properties.dataDarkSrc,
+		firstLightImage.properties["data-dark-src"] ||
+			firstLightImage.properties.dataDarkSrc,
 		"https://example.com/dark.svg",
 	);
 	assert.equal(
-		firstImage.properties["data-light-sources"] || firstImage.properties.dataLightSources,
+		firstLightImage.properties["data-light-sources"] ||
+			firstLightImage.properties.dataLightSources,
 		JSON.stringify([
 			"https://example.com/light.svg",
 			"https://backup.example.com/light.svg",
 		]),
 	);
 	assert.equal(
-		firstImage.properties["data-dark-sources"] || firstImage.properties.dataDarkSources,
+		firstLightImage.properties["data-dark-sources"] ||
+			firstLightImage.properties.dataDarkSources,
 		JSON.stringify([
 			"https://example.com/dark.svg",
 			"https://backup.example.com/dark.svg",
 		]),
 	);
-	assert.equal(firstImage.properties.alt, "Alice to Bob");
+	assert.equal(firstLightImage.properties.alt, "Alice to Bob");
+	assert.equal(
+		firstLightImage.properties["data-plantuml-theme"] ||
+			firstLightImage.properties.dataPlantumlTheme,
+		"light",
+	);
+	assert.equal(
+		firstLightImage.properties.hidden,
+		undefined,
+	);
+
+	assert.equal(firstDarkImage.tagName, "img");
+	assert.deepEqual(firstDarkImage.properties.className, [
+		"plantuml-image",
+		"plantuml-image-dark",
+	]);
+	assert.match(firstDarkImage.properties.src, /^data:image\/svg\+xml/);
+	assert.equal(
+		firstDarkImage.properties["data-plantuml-theme"] ||
+			firstDarkImage.properties.dataPlantumlTheme,
+		"dark",
+	);
+	assert.equal(firstDarkImage.properties.hidden, true);
 
 	const sourceBase64 =
 		firstWrapper.properties["data-source-base64"] ||
@@ -100,7 +129,7 @@ test("rehypePlantuml rewrites plantuml placeholders into interactive image conta
 		"@startuml\nAlice -> Bob\n@enduml",
 	);
 	assert.equal(firstWrapper.properties["data-loading"] || firstWrapper.properties.dataLoading, "true");
-	assert.equal(firstWrapper.children.length, 2);
+	assert.equal(firstWrapper.children.length, 3);
 
 	assert.equal(scriptNode.tagName, "script");
 	assert.match(scriptNode.children[0].value, /window\.plantumlInitialized/);

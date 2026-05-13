@@ -16,6 +16,10 @@ test("plantuml render script supports theme-aware image switching and fullscreen
 	assert.match(script, /data-dark-src/);
 	assert.match(script, /data-light-sources/);
 	assert.match(script, /data-dark-sources/);
+	assert.match(script, /plantuml-image-light/);
+	assert.match(script, /plantuml-image-dark/);
+	assert.match(script, /querySelectorAll\("\.plantuml-image"\)/);
+	assert.match(script, /data-plantuml-theme/);
 	assert.match(script, /plantuml-controls/);
 	assert.match(script, /plantuml-fullscreen-overlay/);
 	assert.match(script, /window\.open\(.*_blank/);
@@ -48,6 +52,8 @@ test("plantuml render script supports theme-aware image switching and fullscreen
 		script,
 		/if\s*\(isPlaceholderSource\(currentSrc\)\)\s*\{\s*return;\s*\}/,
 	);
+	assert.match(script, /img\.hidden = !isActiveThemeImage/);
+	assert.doesNotMatch(script, /newImg\.className = "plantuml-image";/);
 	assert.doesNotMatch(script, /下载 SVG/);
 	assert.doesNotMatch(script, /downloadCurrentSvg/);
 	assert.match(script, /astro:page-load/);

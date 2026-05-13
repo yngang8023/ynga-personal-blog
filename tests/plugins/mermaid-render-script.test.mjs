@@ -61,8 +61,10 @@ test("mermaid render script prewarms alternate theme caches and defers theme swa
 
 	assert.match(script, /let mermaidWorkPromise = Promise\.resolve\(\)/);
 	assert.match(script, /function runMermaidTask\(/);
+	assert.match(script, /function splitHostsForThemeSwitch\(/);
+	assert.match(script, /function getMermaidThemePrewarmHosts\(/);
 	assert.match(script, /function yieldToMainThread\(/);
-	assert.match(script, /function prewarmThemeCache\(/);
+	assert.match(script, /function prewarmThemeCache\(hosts,\s*theme,\s*options = \{\}\)/);
 	assert.match(script, /function scheduleThemeSwitch\(/);
 	assert.match(script, /const preparedRenderCache = new Map\(\)/);
 	assert.match(script, /function ensureDiagramShell\(/);
@@ -71,6 +73,11 @@ test("mermaid render script prewarms alternate theme caches and defers theme swa
 		script,
 		/requestAnimationFrame\(\(\)\s*=>\s*\{[\s\S]*?applyThemeFromCache\(/,
 	);
+	assert.match(
+		script,
+		/prewarmThemeCache\(\s*prewarmPlan\.deferredHosts,\s*theme,\s*\{\s*limit:\s*THEME_PREWARM_LIMIT\s*\}\s*,?\s*\)/,
+	);
 	assert.match(script, /scheduleIdleWork\(\(\)\s*=>\s*prewarmThemeCache\(/);
+	assert.doesNotMatch(script, /window\.__diagramThemeUtils/);
 	assert.doesNotMatch(script, /void loadMermaidLibrary\(\)/);
 });

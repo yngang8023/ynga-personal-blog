@@ -385,6 +385,101 @@
 		return getThemeSourcesForImage(img, themeMode)[0] || "";
 	}
 
+	function getContainerImages(container) {
+		return Array.from(container?.querySelectorAll(".plantuml-image") || []);
+	}
+
+	function getThemeImage(container, themeMode) {
+		return (
+			container?.querySelector(`.plantuml-image[data-plantuml-theme="${themeMode}"]`) ||
+			null
+		);
+	}
+
+	function getActiveThemeImage(container) {
+		const themeMode = container?.dataset.activeThemeMode || getCurrentThemeMode();
+		return getThemeImage(container, themeMode) || container?.querySelector(".plantuml-image") || null;
+	}
+
+	function cloneThemeImage(img, themeMode) {
+		const nextImg = new Image();
+		nextImg.className =
+			themeMode === "dark"
+				? "plantuml-image plantuml-image-dark"
+				: "plantuml-image plantuml-image-light";
+		nextImg.alt = img?.alt || "PlantUML diagram";
+		nextImg.src = PLANTUML_PLACEHOLDER_SVG;
+		nextImg.hidden = themeMode !== "light";
+		nextImg.setAttribute("data-plantuml-theme", themeMode);
+		nextImg.setAttribute(
+			"data-light-src",
+			img?.getAttribute("data-light-src") || "",
+		);
+		nextImg.setAttribute(
+			"data-dark-src",
+			img?.getAttribute("data-dark-src") || "",
+		);
+		nextImg.setAttribute(
+			"data-light-sources",
+			img?.getAttribute("data-light-sources") || "",
+		);
+		nextImg.setAttribute(
+			"data-dark-sources",
+			img?.getAttribute("data-dark-sources") || "",
+		);
+		nextImg.loading = "lazy";
+		nextImg.decoding = "async";
+		return nextImg;
+	}
+
+	function ensureResidentImages(container) {
+		const wrapper = getWrapper(container);
+		if (!wrapper) {
+			return [];
+		}
+
+		const images = getContainerImages(container);
+		if (images.length >= 2) {
+			return images;
+		}
+
+		const firstImage = images[0];
+		if (!firstImage) {
+			return [];
+		}
+
+		const lightImage =
+			getThemeImage(container, "light") ||
+			(firstImage.getAttribute("data-plantuml-theme") === "light"
+				? firstImage
+				: cloneThemeImage(firstImage, "light"));
+		const darkImage =
+			getThemeImage(container, "dark") ||
+			(firstImage.getAttribute("data-plantuml-theme") === "dark"
+				? firstImage
+				: cloneThemeImage(firstImage, "dark"));
+
+		if (!lightImage.isConnected) {
+			wrapper.appendChild(lightImage);
+		}
+		if (!darkImage.isConnected) {
+			wrapper.appendChild(darkImage);
+		}
+
+		return [lightImage, darkImage];
+	}
+
+	function updateImageVisibility(container, themeMode) {
+		const images = getContainerImages(container);
+		images.forEach((img) => {
+			const isActiveThemeImage =
+				(img.getAttribute("data-plantuml-theme") || "light") === themeMode;
+			img.hidden = !isActiveThemeImage;
+			img.setAttribute("aria-hidden", isActiveThemeImage ? "false" : "true");
+		});
+		container.dataset.activeThemeMode = themeMode;
+	}
+
 	function getThemeSourcesForImage(img, themeMode) {
 		const lightSources = parseSourceList(
 			img.getAttribute("data-light-sources") || img.dataset.lightSources || "",
@@ -408,8 +503,7 @@
 	function scheduleThemePreload(themeMode, containers) {
 		const queue = containers
 			.filter((container) => container?.dataset?.plantumlActivated === "true")
-			.map((container) => container?.querySelector(".plantuml-image"))
-			.filter(Boolean)
+			.flatMap((container) => getContainerImages(container))
 			.flatMap((img) => getThemeSourcesForImage(img, themeMode))
 			.filter(Boolean)
 			.slice(0, 4);
@@ -496,19 +590,20 @@
 		themeMode = getCurrentThemeMode(),
 		options = {},
 	) {
-		const img = container?.querySelector(".plantuml-image");
-		if (!img) {
+		const images = ensureResidentImages(container);
+		const activeImage = getThemeImage(container, themeMode);
+		if (images.length === 0 || !activeImage) {
 			return;
 		}
 
 		const force = options.force === true;
-		const sources = getThemeSourcesForImage(img, themeMode);
+		const sources = getThemeSourcesForImage(activeImage, themeMode);
 		if (sources.length === 0) {
 			return;
 		}
 
-		const currentSrc = img.getAttribute("src") || "";
-		const activeTheme = img.dataset.activeThemeMode || "";
+		const currentSrc = activeImage.getAttribute("src") || "";
+		const activeTheme = container.dataset.activeThemeMode || "";
 		if (
 			!force &&
 			activeTheme === themeMode &&
@@ -516,19 +611,45 @@
 			!isPlaceholderSource(currentSrc) &&
 			isSourceLoaded(currentSrc)
 		) {
+			updateImageVisibility(container, themeMode);
 			setLoadingState(container, false);
 			return;
 		}
 
 		const requestId = String(
-			Number.parseInt(img.dataset.themeRequestId || "0", 10) + 1,
+			Math.max(
+				0,
+				...images.map((img) =>
+					Number.parseInt(img.dataset.themeRequestId || "0", 10),
+				),
+			) + 1,
 		);
-		img.dataset.themeRequestId = requestId;
+		images.forEach((img) => {
+			img.dataset.themeRequestId = requestId;
+		});
 		container.dataset.pendingThemeMode = themeMode;
 		setLoadingState(container, true);
 
-		void resolveThemeSource(container, img, themeMode, requestId).then((resolved) => {
-			if (resolved || img.dataset.themeRequestId !== requestId) {
+		void Promise.allSettled(
+			images.map((img) => {
+				const targetTheme = img.getAttribute("data-plantuml-theme") || "light";
+				return resolveThemeSource(container, img, targetTheme, requestId);
+			}),
+		).then((results) => {
+			if (images.some((img) => img.dataset.themeRequestId !== requestId)) {
+				return;
+			}
+
+			updateImageVisibility(container, themeMode);
+
+			const resolved = results
+				.map((result) =>
+					result.status === "fulfilled" ? result.value : "",
+				)
+				.filter(Boolean);
+			if (resolved.length > 0) {
+				setLoadingState(container, false);
+				observeInteraction(container);
 				return;
 			}
 
@@ -561,32 +682,16 @@
 				loading.textContent = "PlantUML 图表加载中...";
 				wrapper.appendChild(loading);
 
-				const newImg = new Image();
-				newImg.className = "plantuml-image";
-				newImg.alt = img.alt;
-				newImg.src = PLANTUML_PLACEHOLDER_SVG;
-				newImg.setAttribute(
-					"data-light-src",
-					img.getAttribute("data-light-src") || "",
-				);
-				newImg.setAttribute(
-					"data-dark-src",
-					img.getAttribute("data-dark-src") || "",
-				);
-				newImg.setAttribute(
-					"data-light-sources",
-					img.getAttribute("data-light-sources") || "",
-				);
-				newImg.setAttribute(
-					"data-dark-sources",
-					img.getAttribute("data-dark-sources") || "",
-				);
-				newImg.loading = "lazy";
-				newImg.decoding = "async";
+				const seedImage = activeImage || images[0];
+				const newLightImg = cloneThemeImage(seedImage, "light");
+				const newDarkImg = cloneThemeImage(seedImage, "dark");
 
-				wrapper.appendChild(newImg);
-				bindErrorHandler(newImg, container);
-				bindLoadHandler(newImg, container);
+				wrapper.appendChild(newLightImg);
+				wrapper.appendChild(newDarkImg);
+				bindErrorHandler(newLightImg, container);
+				bindLoadHandler(newLightImg, container);
+				bindErrorHandler(newDarkImg, container);
+				bindLoadHandler(newDarkImg, container);
 				activateContainer(container, { force: true });
 			});
 
@@ -664,23 +769,15 @@
 				loading.textContent = "PlantUML 图表加载中...";
 				wrapper.appendChild(loading);
 
-				const newImg = new Image();
-				newImg.className = "plantuml-image";
-				newImg.alt = img.alt;
-				newImg.setAttribute(
-					"data-light-src",
-					img.getAttribute("data-light-src") || "",
-				);
-				newImg.setAttribute(
-					"data-dark-src",
-					img.getAttribute("data-dark-src") || "",
-				);
-				newImg.loading = "lazy";
-				newImg.decoding = "async";
+				const newLightImg = cloneThemeImage(img, "light");
+				const newDarkImg = cloneThemeImage(img, "dark");
 
-				wrapper.appendChild(newImg);
-				bindErrorHandler(newImg, container);
-				bindLoadHandler(newImg, container);
+				wrapper.appendChild(newLightImg);
+				wrapper.appendChild(newDarkImg);
+				bindErrorHandler(newLightImg, container);
+				bindLoadHandler(newLightImg, container);
+				bindErrorHandler(newDarkImg, container);
+				bindLoadHandler(newDarkImg, container);
 				activateContainer(container, { force: true });
 			});
 
@@ -827,7 +924,7 @@
 			return;
 		}
 
-		const img = container.querySelector(".plantuml-image");
+		const img = getActiveThemeImage(container);
 		if (!img) {
 			return;
 		}
@@ -837,11 +934,12 @@
 		const state = { scale: 1, translateX: 0, translateY: 0 };
 		const sourceCode = getSourceCode(container);
 		const sourcePanel = createSourcePanel(container);
+		const getInteractiveImage = () => getActiveThemeImage(container);
 		const toggleSource = () => {
 			sourcePanel.hidden = !sourcePanel.hidden;
 		};
 		const openOriginal = () => {
-			const currentSrc = img.getAttribute("src");
+			const currentSrc = getInteractiveImage()?.getAttribute("src");
 			if (!currentSrc) {
 				return;
 			}
@@ -850,8 +948,14 @@
 		};
 
 		const applyTransform = () => {
-			img.style.transformOrigin = "center center";
-			img.style.transform = `translate(${state.translateX}px, ${state.translateY}px) scale(${state.scale})`;
+			const currentImg = getInteractiveImage();
+			if (!currentImg) {
+				return;
+			}
+			getContainerImages(container).forEach((node) => {
+				node.style.transformOrigin = "center center";
+				node.style.transform = `translate(${state.translateX}px, ${state.translateY}px) scale(${state.scale})`;
+			});
 		};
 
 		const clampScale = (next) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, next));
@@ -871,7 +975,7 @@
 			}
 
 			if (typeof originX === "number" && typeof originY === "number") {
-				const rect = img.getBoundingClientRect();
+				const rect = (getInteractiveImage() || img).getBoundingClientRect();
 				const cx = rect.left + rect.width / 2;
 				const cy = rect.top + rect.height / 2;
 				const dx = originX - cx;
@@ -1008,7 +1112,7 @@
 	}
 
 	function openFullscreen(container) {
-		const sourceImg = container.querySelector(".plantuml-image");
+		const sourceImg = getActiveThemeImage(container);
 		if (!sourceImg) {
 			return;
 		}
@@ -1188,15 +1292,18 @@
 		const containers = document.querySelectorAll(".plantuml-diagram-container");
 
 		containers.forEach((container) => {
-			const img = container.querySelector(".plantuml-image");
-			if (!img) {
+			const images = ensureResidentImages(container);
+			if (images.length === 0) {
 				return;
 			}
 
 			setLoadingState(container, false);
 			container.dataset.pendingThemeMode = getCurrentThemeMode();
-			bindErrorHandler(img, container);
-			bindLoadHandler(img, container);
+			updateImageVisibility(container, getCurrentThemeMode());
+			images.forEach((img) => {
+				bindErrorHandler(img, container);
+				bindLoadHandler(img, container);
+			});
 			observeActivation(container);
 		});
 

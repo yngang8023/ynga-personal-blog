@@ -1,0 +1,289 @@
+---
+import Comment from "@components/comment/Waline.astro";
+import { PageHeader } from "@components/features/page-header";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+
+import { commentConfig, siteConfig } from "../config";
+import {
+	MESSAGE_PAGE_INTRO_PARAGRAPHS,
+	MESSAGE_PAGE_NOTE_ITEMS,
+	MESSAGE_PAGE_PATH,
+	MESSAGE_PAGE_SUBTITLE,
+	MESSAGE_PAGE_TITLE,
+} from "../constants/message-page";
+
+export const prerender = true;
+
+if (!siteConfig.featurePages.message) {
+	return Astro.redirect("/404/");
+}
+
+const showMessageComment =
+	commentConfig?.enable && commentConfig.system === "waline";
+---
+
+<MainGridLayout
+	title={MESSAGE_PAGE_TITLE}
+	description={MESSAGE_PAGE_SUBTITLE}
+>
+	<script>
+		import("../scripts/right-sidebar-layout.js");
+	</script>
+
+	<div
+		class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32"
+	>
+		<div class="card-base z-10 px-4 py-6 sm:px-6 lg:px-9 relative w-full">
+			<PageHeader
+				title={MESSAGE_PAGE_TITLE}
+				subtitle={MESSAGE_PAGE_SUBTITLE}
+			/>
+
+			<section class="message-hero-grid">
+				<article class="message-panel message-panel-primary">
+					<div class="message-panel-badge">Message</div>
+					<h2 class="message-panel-title">在这里留下你想说的话</h2>
+					<div class="message-panel-copy">
+						{
+							MESSAGE_PAGE_INTRO_PARAGRAPHS.map((paragraph) => (
+								<p>{paragraph}</p>
+							))
+						}
+					</div>
+				</article>
+
+				<aside class="message-panel message-panel-secondary">
+					<h2 class="message-side-title">留言小提示</h2>
+					<ul class="message-note-list">
+						{
+							MESSAGE_PAGE_NOTE_ITEMS.map((item) => (
+								<li>{item}</li>
+							))
+						}
+					</ul>
+				</aside>
+			</section>
+
+			{
+				showMessageComment && (
+					<section class="mt-6 sm:mt-8">
+						<div class="card-base comment-panel-card px-3.5 py-4 sm:p-6">
+							<Comment
+								path={MESSAGE_PAGE_PATH}
+								title="留言区"
+								commentLabel="留言"
+								pageViewsLabel="浏览"
+								placeholder="写点什么吧。可以是建议、问候、近况，也可以只是路过时留下的一句话。"
+								sofa="还没有新的留言，欢迎成为第一个在这里开口的人。"
+								reactionTitle=""
+								reaction={false}
+							/>
+						</div>
+					</section>
+				)
+			}
+		</div>
+	</div>
+</MainGridLayout>
+
+<style>
+	.message-hero-grid {
+		--message-panel-border: color-mix(
+			in oklch,
+			var(--line-divider) 72%,
+			var(--primary) 28%
+		);
+		--message-panel-shadow: color-mix(
+			in oklch,
+			var(--primary) 14%,
+			transparent
+		);
+		--message-panel-highlight: color-mix(
+			in oklch,
+			var(--primary) 20%,
+			transparent
+		);
+		--message-panel-primary-bg: linear-gradient(
+				135deg,
+				color-mix(in oklch, var(--card-bg) 92%, white 8%),
+				color-mix(in oklch, var(--card-bg) 84%, var(--primary) 16%)
+			),
+			radial-gradient(
+				circle at top right,
+				var(--message-panel-highlight),
+				transparent 36%
+			);
+		--message-panel-secondary-bg: linear-gradient(
+			180deg,
+			color-mix(in oklch, var(--card-bg) 96%, white 4%),
+			color-mix(in oklch, var(--card-bg) 88%, var(--primary) 12%)
+		);
+		--message-badge-bg: color-mix(
+			in oklch,
+			var(--card-bg) 82%,
+			var(--primary) 18%
+		);
+		--message-badge-border: color-mix(
+			in oklch,
+			var(--line-divider) 64%,
+			var(--primary) 36%
+		);
+		--message-badge-color: color-mix(
+			in oklch,
+			var(--primary) 72%,
+			black 28%
+		);
+		--message-title-color: color-mix(
+			in oklch,
+			var(--tw-prose-headings, black) 86%,
+			var(--primary) 14%
+		);
+		--message-body-color: color-mix(
+			in oklch,
+			var(--tw-prose-body, black) 84%,
+			var(--primary) 16%
+		);
+		--message-dot-color: color-mix(
+			in oklch,
+			var(--primary) 78%,
+			white 22%
+		);
+		--message-dot-ring: color-mix(
+			in oklch,
+			var(--primary) 16%,
+			transparent
+		);
+	}
+
+	.message-hero-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1.45fr) minmax(16rem, 0.95fr);
+		gap: 1rem;
+		align-items: stretch;
+	}
+
+	.message-panel {
+		position: relative;
+		overflow: hidden;
+		border-radius: calc(var(--radius-large) - 0.2rem);
+		border: 1px solid var(--message-panel-border);
+		box-shadow:
+			0 16px 40px var(--message-panel-shadow),
+			inset 0 1px 0 rgb(255 255 255 / 0.7);
+	}
+
+	.message-panel-primary {
+		padding: 1.3rem 1.2rem 1.25rem;
+		background: var(--message-panel-primary-bg);
+	}
+
+	.message-panel-secondary {
+		padding: 1.2rem 1.05rem;
+		background: var(--message-panel-secondary-bg);
+	}
+
+	.message-panel-badge {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.34rem 0.72rem;
+		border-radius: 999px;
+		font-size: 0.78rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--message-badge-color);
+		background: var(--message-badge-bg);
+		border: 1px solid var(--message-badge-border);
+	}
+
+	.message-panel-title,
+	.message-side-title {
+		margin: 0;
+		color: var(--message-title-color);
+	}
+
+	.message-panel-title {
+		margin-top: 0.9rem;
+		font-size: clamp(1.35rem, 2vw, 1.8rem);
+		line-height: 1.35;
+		font-weight: 800;
+	}
+
+	.message-side-title {
+		font-size: 1rem;
+		font-weight: 700;
+	}
+
+	.message-panel-copy {
+		margin-top: 0.95rem;
+		display: grid;
+		gap: 0.8rem;
+		color: var(--message-body-color);
+		line-height: 1.9;
+		font-size: 0.96rem;
+	}
+
+	.message-panel-copy p {
+		margin: 0;
+	}
+
+	.message-note-list {
+		margin: 0.95rem 0 0;
+		padding: 0;
+		list-style: none;
+		display: grid;
+		gap: 0.7rem;
+	}
+
+	.message-note-list li {
+		position: relative;
+		padding-left: 1rem;
+		color: var(--message-body-color);
+		line-height: 1.8;
+		font-size: 0.92rem;
+	}
+
+	.message-note-list li::before {
+		content: "";
+		position: absolute;
+		left: 0;
+		top: 0.72rem;
+		width: 0.42rem;
+		height: 0.42rem;
+		border-radius: 999px;
+		background: var(--message-dot-color);
+		box-shadow: 0 0 0 0.18rem var(--message-dot-ring);
+	}
+
+	:global(.dark) .message-panel {
+		box-shadow:
+			0 18px 34px color-mix(in oklch, black 18%, var(--primary) 4%),
+			inset 0 1px 0 rgb(255 255 255 / 0.04);
+	}
+
+	@media (max-width: 900px) {
+		.message-hero-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	@media (max-width: 640px) {
+		.message-panel-primary,
+		.message-panel-secondary {
+			padding: 1rem 0.95rem;
+		}
+
+		.message-panel-title {
+			font-size: 1.2rem;
+		}
+
+		.message-panel-copy {
+			font-size: 0.92rem;
+			line-height: 1.8;
+		}
+
+		.message-note-list li {
+			font-size: 0.9rem;
+		}
+	}
+</style>

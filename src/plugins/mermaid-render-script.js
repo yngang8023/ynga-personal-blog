@@ -215,6 +215,41 @@
 		return `${theme}::${code}`;
 	}
 
+	function splitHostsForThemeSwitch(hosts, isVisible) {
+		const visibleHosts = [];
+		const deferredHosts = [];
+
+		for (const host of hosts) {
+			if (!host) {
+				continue;
+			}
+
+			if (isVisible(host)) {
+				visibleHosts.push(host);
+			} else {
+				deferredHosts.push(host);
+			}
+		}
+
+		return {
+			visibleHosts,
+			deferredHosts,
+		};
+	}
+
+	function getMermaidThemePrewarmHosts({
+		visibleHosts,
+		deferredHosts,
+		isPrepared,
+	}) {
+		const immediateHosts = visibleHosts.filter((host) => !isPrepared(host));
+
+		return {
+			immediateHosts,
+			deferredHosts,
+		};
+	}
+
 	function runMermaidTask(task) {
 		const nextTask = mermaidWorkPromise.catch(() => undefined).then(task);
 		mermaidWorkPromise = nextTask.then(
@@ -1116,10 +1151,14 @@
 		return misses;
 	}
 
-	function prewarmThemeCache(hosts, theme) {
-		const queue = hosts
-			.filter((host) => host?.isConnected)
-			.slice(0, THEME_PREWARM_LIMIT);
+	function prewarmThemeCache(hosts, theme, options = {}) {
+		const limit = Number.isFinite(options.limit)
+			? Math.max(0, options.limit)
+			: Number.POSITIVE_INFINITY;
+		let queue = hosts.filter((host) => host?.isConnected);
+		if (Number.isFinite(limit)) {
+			queue = queue.slice(0, limit);
+		}
 		if (queue.length === 0) {
 			return;
 		}
@@ -1165,15 +1204,36 @@
 		});
 	}
 
-	function scheduleThemePrewarm(theme, hosts = getAllDiagramHosts()) {
-		const queue = hosts
-			.filter((host) => host?.isConnected)
-			.slice(0, THEME_PREWARM_LIMIT);
+	function scheduleThemePrewarm(theme, hosts = getAllDiagramHosts(), options = {}) {
+		const queue = hosts.filter((host) => host?.isConnected);
 		if (queue.length === 0) {
 			return;
 		}
 
-		scheduleIdleWork(() => prewarmThemeCache(queue, theme));
+		const prewarmPlan = getMermaidThemePrewarmHosts({
+			visibleHosts: options.treatAsDeferred === true ? [] : queue,
+			deferredHosts: options.treatAsDeferred === true ? queue : [],
+			isPrepared: (host) => {
+				const code = host?.getAttribute("data-mermaid-code") || "";
+				return preparedRenderCache.has(getCacheKey(theme, code.trim()));
+			},
+		});
+
+		if (prewarmPlan.immediateHosts.length > 0) {
+			scheduleIdleWork(() =>
+				prewarmThemeCache(prewarmPlan.immediateHosts, theme),
+			);
+		}
+
+		if (prewarmPlan.deferredHosts.length > 0) {
+			scheduleIdleWork(() =>
+				prewarmThemeCache(
+					prewarmPlan.deferredHosts,
+					theme,
+					{ limit: THEME_PREWARM_LIMIT },
+				),
+			);
+		}
 	}
 
 	function scheduleIdlePrefetch(hosts, force = false) {
@@ -1290,17 +1350,13 @@
 			closeFullscreen();
 
 			const hosts = getAllDiagramHosts();
-			const visibleHosts = [];
-			const deferredHosts = [];
-
 			hosts.forEach((host) => {
 				observeHost(host);
-				if (isLikelyVisible(host)) {
-					visibleHosts.push(host);
-				} else {
-					deferredHosts.push(host);
-				}
 			});
+			const { visibleHosts, deferredHosts } = splitHostsForThemeSwitch(
+				hosts,
+				isLikelyVisible,
+			);
 
 			const missingVisible = applyThemeFromCache(visibleHosts, nextTheme);
 			if (missingVisible.length > 0) {
@@ -1313,8 +1369,12 @@
 				});
 			}
 
-			scheduleThemePrewarm(nextTheme, deferredHosts);
-			scheduleThemePrewarm(getOppositeTheme(nextTheme), visibleHosts);
+			window.requestAnimationFrame(() => {
+				scheduleThemePrewarm(nextTheme, deferredHosts, {
+					treatAsDeferred: true,
+				});
+				scheduleThemePrewarm(getOppositeTheme(nextTheme), visibleHosts);
+			});
 		});
 	}
 

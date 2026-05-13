@@ -17,7 +17,7 @@ test("mermaid render script lazy-renders visible diagrams and caches themed SVG 
 	assert.doesNotMatch(script, /unpkg\.com\/mermaid@11\.12\.0\/dist\/mermaid\.min\.js/);
 	assert.match(script, /const renderCache = new Map\(\)/);
 	assert.match(script, /new IntersectionObserver\(/);
-	assert.match(script, /requestIdleCallback/);
+	assert.match(script, /const IDLE_PREFETCH_LIMIT = 0/);
 	assert.match(
 		script,
 		/window\.dispatchEvent\(\s*new CustomEvent\("mermaid:render:start"/,
@@ -56,47 +56,64 @@ test("mermaid render script uses safe literal theme colors and centers fullscree
 	);
 });
 
-test("mermaid render script prewarms alternate theme caches and defers theme swaps off the mutation path", async () => {
+test("mermaid render script uses adaptive CSS variables and keeps theme swaps off the render path", async () => {
 	const script = await readScript();
 
+	assert.match(script, /const ADAPTIVE_THEME = "adaptive"/);
+	assert.match(script, /const IDLE_PREFETCH_LIMIT = 0/);
 	assert.match(script, /let mermaidWorkPromise = Promise\.resolve\(\)/);
 	assert.match(script, /const pendingRenderCache = new Map\(\)/);
 	assert.match(script, /function runMermaidTask\(/);
 	assert.match(script, /function cancelThemePrewarm\(/);
-	assert.match(script, /function splitHostsForThemeSwitch\(/);
-	assert.match(script, /function getMermaidThemePrewarmHosts\(/);
+	assert.match(script, /function ensureAdaptiveMermaidThemeStyle\(/);
+	assert.match(script, /function getMermaidRenderPalette\(/);
+	assert.match(script, /function adaptMermaidSvgToCssVariables\(/);
+	assert.match(script, /function replaceAllSvgColorTokens\(/);
+	assert.match(script, /function getCssVariableName\(/);
+	assert.match(script, /--mermaid-\$\{toKebabCase\(key\)\}/);
+	assert.match(script, /`var\(\$\{getCssVariableName\(variableKey\)\}\)`/);
 	assert.match(script, /function updateHostVisibility\(/);
-	assert.match(script, /function getThemeSwitchVisibleHosts\(/);
 	assert.match(script, /function yieldToMainThread\(/);
-	assert.match(script, /function prewarmThemeCache\(hosts,\s*theme,\s*options = \{\}\)/);
 	assert.match(script, /function scheduleThemeSwitch\(/);
 	assert.match(script, /const preparedRenderCache = new Map\(\)/);
 	assert.match(script, /function ensureDiagramShell\(/);
 	assert.match(script, /stage\.replaceChildren\(prepared\.svg\)/);
-	assert.match(
-		script,
-		/requestAnimationFrame\(\(\)\s*=>\s*\{[\s\S]*?applyThemeFromCache\(/,
-	);
-	assert.match(
-		script,
-		/prewarmThemeCache\(\s*prewarmPlan\.deferredHosts,\s*theme,\s*\{\s*limit:\s*THEME_PREWARM_LIMIT\s*\}\s*,?\s*\)/,
-	);
-	assert.match(script, /const nextPrewarmHost = queue\.shift\(\)/);
-	assert.match(
-		script,
-		/void getPreparedDiagram\(code,\s*theme\)\.catch\(\(\) => undefined\)\.finally\(\(\) => \{/,
-	);
-	assert.match(script, /cancelThemePrewarm\(\);\s*const missingVisible = applyThemeFromCache/);
 	assert.match(script, /const pending = pendingRenderCache\.get\(cacheKey\)/);
-	assert.match(
-		script,
-		/splitHostsForThemeSwitch\(\s*hosts,\s*getThemeSwitchVisibleHosts,\s*\)/,
-	);
-	assert.match(script, /scheduleIdleWork\(\(\)\s*=>\s*prewarmThemeCache\(/);
-	assert.doesNotMatch(
-		script,
-		/splitHostsForThemeSwitch\(\s*hosts,\s*isLikelyVisible,\s*\)/,
-	);
+	assert.match(script, /function markMountedDiagramsTheme\(/);
+	assert.match(script, /markMountedDiagramsTheme\(hosts,\s*nextTheme\)/);
+	assert.doesNotMatch(script, /const missingVisible = applyThemeFromCache/);
+	assert.doesNotMatch(script, /missingVisible\.forEach/);
+	assert.doesNotMatch(script, /if \(nextTheme === currentTheme\)/);
+	const scheduleThemeSwitchBody = script.match(
+		/function scheduleThemeSwitch\(\)\s*\{(?<content>[\s\S]*?)\n\t\}/,
+	)?.groups?.content;
+	assert.ok(scheduleThemeSwitchBody);
+	assert.doesNotMatch(scheduleThemeSwitchBody, /queueDiagramRender/);
+	assert.doesNotMatch(scheduleThemeSwitchBody, /drainRenderQueue/);
+	assert.doesNotMatch(scheduleThemeSwitchBody, /scheduleThemePrewarm/);
+	assert.doesNotMatch(script, /diagramObserver\.unobserve\(entry\.target\)/);
+	assert.doesNotMatch(script, /scheduleThemePrewarm\(getOppositeTheme\(currentTheme\),\s*visibleHosts\)/);
 	assert.doesNotMatch(script, /window\.__diagramThemeUtils/);
 	assert.doesNotMatch(script, /void loadMermaidLibrary\(\)/);
+});
+
+test("mermaid render script feeds official hex colors to Mermaid and adapts output SVG colors afterward", async () => {
+	const script = await readScript();
+
+	const getMermaidConfigBody = script.match(
+		/function getMermaidConfig\(theme\)\s*\{(?<content>[\s\S]*?)\n\t\}/,
+	)?.groups?.content;
+	assert.ok(getMermaidConfigBody);
+	assert.match(getMermaidConfigBody, /theme:\s*"base"/);
+	assert.match(getMermaidConfigBody, /getMermaidRenderPalette\(\)/);
+	assert.doesNotMatch(getMermaidConfigBody, /var\(--mermaid-/);
+	assert.doesNotMatch(script, /function getAdaptiveMermaidPalette\(/);
+
+	const buildPreparedDiagramBody = script.match(
+		/function buildPreparedDiagram\(cacheKey, svgMarkup\)\s*\{(?<content>[\s\S]*?)\n\t\}/,
+	)?.groups?.content;
+	assert.ok(buildPreparedDiagramBody);
+	assert.match(buildPreparedDiagramBody, /const adaptiveSvgMarkup = adaptMermaidSvgToCssVariables\(svgMarkup\)/);
+	assert.match(buildPreparedDiagramBody, /parseSvgMarkup\(adaptiveSvgMarkup\)/);
+	assert.match(buildPreparedDiagramBody, /assertNotMermaidErrorSvg\(svg, adaptiveSvgMarkup\)/);
 });

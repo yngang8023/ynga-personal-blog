@@ -13,8 +13,8 @@
 	const ZOOM_STEP = 1.2;
 	const OBSERVER_MARGIN = "280px 0px 280px 0px";
 	const MERMAID_SCRIPT_SOURCES = ["/diagram/mermaid.js"];
-	const IDLE_PREFETCH_LIMIT = 2;
-	const THEME_PREWARM_LIMIT = 3;
+	const ADAPTIVE_THEME = "adaptive";
+	const IDLE_PREFETCH_LIMIT = 0;
 	const renderCache = new Map();
 	const pendingRenderCache = new Map();
 	const preparedRenderCache = new Map();
@@ -195,60 +195,19 @@
 	let diagramObserver = null;
 	let themeObserver = null;
 	let fullscreenOverlay = null;
+	let adaptiveThemeStyleInjected = false;
 	let renderSequence = 0;
 	let drainingQueuePromise = null;
 	let idleBatchToken = 0;
-	let prewarmBatchToken = 0;
 	let resizeFrame = 0;
 	let themeSwitchFrame = 0;
 
 	function getCurrentTheme() {
-		return document.documentElement.classList.contains("dark")
-			? "dark"
-			: "default";
-	}
-
-	function getOppositeTheme(theme) {
-		return theme === "dark" ? "default" : "dark";
+		return ADAPTIVE_THEME;
 	}
 
 	function getCacheKey(theme, code) {
 		return `${theme}::${code}`;
-	}
-
-	function splitHostsForThemeSwitch(hosts, isVisible) {
-		const visibleHosts = [];
-		const deferredHosts = [];
-
-		for (const host of hosts) {
-			if (!host) {
-				continue;
-			}
-
-			if (isVisible(host)) {
-				visibleHosts.push(host);
-			} else {
-				deferredHosts.push(host);
-			}
-		}
-
-		return {
-			visibleHosts,
-			deferredHosts,
-		};
-	}
-
-	function getMermaidThemePrewarmHosts({
-		visibleHosts,
-		deferredHosts,
-		isPrepared,
-	}) {
-		const immediateHosts = visibleHosts.filter((host) => !isPrepared(host));
-
-		return {
-			immediateHosts,
-			deferredHosts,
-		};
 	}
 
 	function runMermaidTask(task) {
@@ -261,26 +220,106 @@
 	}
 
 	function cancelThemePrewarm() {
-		prewarmBatchToken += 1;
 		idleBatchToken += 1;
 	}
 
+	function toKebabCase(value) {
+		return value
+			.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+			.replace(/(\d+)/g, "-$1")
+			.replace(/^-/, "")
+			.toLowerCase();
+	}
+
+	function getCssVariableName(key) {
+		return `--mermaid-${toKebabCase(key)}`;
+	}
+
+	function getMermaidRenderPalette() {
+		return {
+			...MERMAID_THEME_PALETTES.default,
+		};
+	}
+
+	function getPreferredColorVariableKey(hexColor, fallbackKey) {
+		const preferredKeys = {
+			"#ffffff": "mainBkg",
+			"#f8fafc": "secondBkg",
+			"#e2e8f0": "tertiaryColor",
+			"#0f172a": "textColor",
+			"#94a3b8": "primaryBorderColor",
+			"#cbd5e1": "secondaryBorderColor",
+			"#334155": "lineColor",
+		};
+		return preferredKeys[hexColor.toLowerCase()] || fallbackKey;
+	}
+
+	function getMermaidSvgColorReplacements() {
+		const replacements = new Map();
+		Object.entries(MERMAID_THEME_PALETTES.default).forEach(([key, value]) => {
+			if (!/^#[0-9a-f]{6}$/i.test(value)) {
+				return;
+			}
+
+			const normalizedColor = value.toLowerCase();
+			const variableKey = getPreferredColorVariableKey(normalizedColor, key);
+			replacements.set(normalizedColor, `var(${getCssVariableName(variableKey)})`);
+		});
+
+		return Array.from(replacements.entries()).sort(
+			([colorA], [colorB]) => colorB.length - colorA.length,
+		);
+	}
+
+	function replaceAllSvgColorTokens(markup, color, replacement) {
+		const colorToken = color.replace("#", "");
+		return markup.replace(new RegExp(`#${colorToken}\\b`, "gi"), replacement);
+	}
+
+	function adaptMermaidSvgToCssVariables(svgMarkup) {
+		return getMermaidSvgColorReplacements().reduce(
+			(markup, [color, replacement]) =>
+				replaceAllSvgColorTokens(markup, color, replacement),
+			svgMarkup,
+		);
+	}
+
+	function createPaletteCss(selector, paletteName) {
+		const palette = MERMAID_THEME_PALETTES[paletteName];
+		const lines = Object.entries(palette).map(([key, value]) => {
+			return `  ${getCssVariableName(key)}: ${value};`;
+		});
+		return `${selector} {\n${lines.join("\n")}\n}`;
+	}
+
+	function ensureAdaptiveMermaidThemeStyle() {
+		if (adaptiveThemeStyleInjected) {
+			return;
+		}
+
+		adaptiveThemeStyleInjected = true;
+		const style = document.createElement("style");
+		style.id = "mermaid-adaptive-theme-vars";
+		style.textContent = [
+			createPaletteCss(":root", "default"),
+			createPaletteCss(":root.dark", "dark"),
+		].join("\n\n");
+		document.head.appendChild(style);
+	}
+
 	function getMermaidConfig(theme) {
-		const isDark = theme === "dark";
-		const palette = isDark
-			? MERMAID_THEME_PALETTES.dark
-			: MERMAID_THEME_PALETTES.default;
+		const palette = getMermaidRenderPalette();
 
 		return {
 			startOnLoad: false,
 			theme: "base",
-			darkMode: isDark,
+			darkMode: false,
 			securityLevel: "loose",
 			errorLevel: "warn",
 			logLevel: "error",
 			suppressErrorRendering: true,
 			themeVariables: {
-				darkMode: isDark,
+				darkMode: false,
 				fontFamily: "inherit",
 				fontSize: "16px",
 				...palette,
@@ -548,8 +587,9 @@
 			return clonePreparedDiagram(cachedPrepared);
 		}
 
-		const svg = parseSvgMarkup(svgMarkup);
-		assertNotMermaidErrorSvg(svg, svgMarkup);
+		const adaptiveSvgMarkup = adaptMermaidSvgToCssVariables(svgMarkup);
+		const svg = parseSvgMarkup(adaptiveSvgMarkup);
+		assertNotMermaidErrorSvg(svg, adaptiveSvgMarkup);
 		const dimensions = getSvgDimensions(svg);
 		normalizeSvgElement(svg, dimensions);
 
@@ -1036,26 +1076,6 @@
 		host.dataset.likelyVisible = isVisible ? "true" : "false";
 	}
 
-	function getThemeSwitchVisibleHosts(host) {
-		return host?.dataset?.likelyVisible === "true";
-	}
-
-	function scheduleIdleWork(callback) {
-		if ("requestIdleCallback" in window) {
-			window.requestIdleCallback(callback, { timeout: 900 });
-			return;
-		}
-
-		window.setTimeout(
-			() =>
-				callback({
-					didTimeout: true,
-					timeRemaining: () => 0,
-				}),
-			40,
-		);
-	}
-
 	function queueDiagramRender(host, options = {}) {
 		const force = options.force === true;
 		const priority = options.priority || "normal";
@@ -1152,9 +1172,7 @@
 		return drainingQueuePromise;
 	}
 
-	function applyThemeFromCache(hosts, theme) {
-		const misses = [];
-
+	function markMountedDiagramsTheme(hosts, theme) {
 		hosts.forEach((host) => {
 			if (!host?.isConnected) {
 				return;
@@ -1165,94 +1183,13 @@
 				return;
 			}
 
-			const cachedPrepared = preparedRenderCache.get(
-				getCacheKey(theme, code.trim()),
-			);
-			if (!cachedPrepared) {
-				misses.push(host);
+			if (host.querySelector(".mermaid-stage svg")) {
+				host.dataset.renderedTheme = theme;
+				host.dataset.mermaidState = "ready";
+				setContainerReady(host, true);
 				return;
 			}
-
-			mountDiagram(host, clonePreparedDiagram(cachedPrepared), theme);
 		});
-
-		return misses;
-	}
-
-	function prewarmThemeCache(hosts, theme, options = {}) {
-		const limit = Number.isFinite(options.limit)
-			? Math.max(0, options.limit)
-			: Number.POSITIVE_INFINITY;
-		let queue = hosts.filter((host) => host?.isConnected);
-		if (Number.isFinite(limit)) {
-			queue = queue.slice(0, limit);
-		}
-		if (queue.length === 0) {
-			return;
-		}
-
-		const token = ++prewarmBatchToken;
-		const pump = () => {
-			if (token !== prewarmBatchToken) {
-				return;
-			}
-
-			while (queue.length > 0) {
-				const nextPrewarmHost = queue.shift();
-				const code = nextPrewarmHost?.getAttribute("data-mermaid-code") || "";
-				if (!code.trim()) {
-					continue;
-				}
-
-				const cacheKey = getCacheKey(theme, code.trim());
-				if (preparedRenderCache.has(cacheKey)) {
-					continue;
-				}
-
-				void getPreparedDiagram(code, theme).catch(() => undefined).finally(() => {
-					if (token !== prewarmBatchToken || queue.length === 0) {
-						return;
-					}
-
-					scheduleIdleWork(pump);
-				});
-				return;
-			}
-		};
-
-		pump();
-	}
-
-	function scheduleThemePrewarm(theme, hosts = getAllDiagramHosts(), options = {}) {
-		const queue = hosts.filter((host) => host?.isConnected);
-		if (queue.length === 0) {
-			return;
-		}
-
-		const prewarmPlan = getMermaidThemePrewarmHosts({
-			visibleHosts: options.treatAsDeferred === true ? [] : queue,
-			deferredHosts: options.treatAsDeferred === true ? queue : [],
-			isPrepared: (host) => {
-				const code = host?.getAttribute("data-mermaid-code") || "";
-				return preparedRenderCache.has(getCacheKey(theme, code.trim()));
-			},
-		});
-
-		if (prewarmPlan.immediateHosts.length > 0) {
-			scheduleIdleWork(() =>
-				prewarmThemeCache(prewarmPlan.immediateHosts, theme),
-			);
-		}
-
-		if (prewarmPlan.deferredHosts.length > 0) {
-			scheduleIdleWork(() =>
-				prewarmThemeCache(
-					prewarmPlan.deferredHosts,
-					theme,
-					{ limit: THEME_PREWARM_LIMIT },
-				),
-			);
-		}
 	}
 
 	function scheduleIdlePrefetch(hosts, force = false) {
@@ -1264,12 +1201,10 @@
 		}
 
 		const token = ++idleBatchToken;
-		scheduleIdleWork(() => {
-			if (token !== idleBatchToken) {
-				return;
+		window.requestAnimationFrame(() => {
+			if (token === idleBatchToken) {
+				queue.forEach((host) => queueDiagramRender(host));
 			}
-
-			prewarmThemeCache(queue, getCurrentTheme());
 		});
 	}
 
@@ -1286,7 +1221,6 @@
 						return;
 					}
 
-					diagramObserver.unobserve(entry.target);
 					queueDiagramRender(entry.target, { priority: "high" });
 				});
 			},
@@ -1351,7 +1285,6 @@
 
 		return drainRenderQueue().finally(() => {
 			dispatchRenderDone(visibleHosts.length, hosts.length);
-			scheduleThemePrewarm(getOppositeTheme(currentTheme), visibleHosts);
 		});
 	}
 
@@ -1365,10 +1298,6 @@
 			themeSwitchFrame = 0;
 
 			const nextTheme = getCurrentTheme();
-			if (nextTheme === currentTheme) {
-				return;
-			}
-
 			currentTheme = nextTheme;
 			closeFullscreen();
 
@@ -1376,29 +1305,9 @@
 			hosts.forEach((host) => {
 				observeHost(host);
 			});
-			const { visibleHosts, deferredHosts } = splitHostsForThemeSwitch(
-				hosts,
-				getThemeSwitchVisibleHosts,
-			);
 
 			cancelThemePrewarm();
-			const missingVisible = applyThemeFromCache(visibleHosts, nextTheme);
-			if (missingVisible.length > 0) {
-				dispatchRenderStart(missingVisible.length, hosts.length);
-				missingVisible.forEach((host) =>
-					queueDiagramRender(host, { force: true, priority: "high" }),
-				);
-				void drainRenderQueue().finally(() => {
-					dispatchRenderDone(missingVisible.length, hosts.length);
-				});
-			}
-
-			window.requestAnimationFrame(() => {
-				scheduleThemePrewarm(nextTheme, deferredHosts, {
-					treatAsDeferred: true,
-				});
-				scheduleThemePrewarm(getOppositeTheme(nextTheme), visibleHosts);
-			});
+			markMountedDiagramsTheme(hosts, nextTheme);
 		});
 	}
 
@@ -1459,6 +1368,7 @@
 
 	async function initialize() {
 		try {
+			ensureAdaptiveMermaidThemeStyle();
 			setupThemeObserver();
 			setupEventListeners();
 			window.renderMermaidDiagrams = renderMermaidDiagrams;

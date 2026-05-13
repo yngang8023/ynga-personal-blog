@@ -25,3 +25,26 @@ test("main theme transition styles expose a lightweight translucent theme veil",
 	assert.doesNotMatch(source, /::view-transition-/);
 	assert.doesNotMatch(source, /use-coordinated-theme-transition/);
 });
+
+test("main theme transition styles suppress expensive article and diagram transitions", async () => {
+	const source = await readMainCss();
+
+	assert.match(source, /\.is-theme-transitioning :where\(\s*\.custom-md/);
+	assert.match(source, /\.is-theme-transitioning :where\([\s\S]*?\.mermaid-diagram-container/);
+	assert.match(source, /\.is-theme-transitioning :where\([\s\S]*?\.plantuml-diagram-container/);
+	assert.match(source, /transition:\s*none !important;/);
+	assert.match(source, /animation:\s*none !important;/);
+	assert.match(source, /\.is-theme-transitioning :where\(\.mermaid-stage,\s*\.plantuml-image\)/);
+	assert.match(source, /will-change:\s*auto !important;/);
+});
+
+test("main styles isolate long article blocks with content visibility", async () => {
+	const source = await readMainCss();
+
+	assert.match(source, /#post-container\s+\.custom-md\s*>\s*:where\(/);
+	assert.match(source, /content-visibility:\s*auto;/);
+	assert.match(source, /contain-intrinsic-size:\s*auto 360px;/);
+	assert.match(source, /contain:\s*layout paint style;/);
+	assert.doesNotMatch(source, /#post-container\s+\.custom-md\s*>\s*:where\([^)]*h1/);
+	assert.doesNotMatch(source, /#post-container\s+\.custom-md\s*>\s*:where\([^)]*section/);
+});

@@ -455,9 +455,6 @@ class ThemeOptimizer {
 
 	forceCompositing() {
 		const criticalElements = document.querySelectorAll(`
-      .expressive-code,
-      .post-card,
-      .widget,
       #navbar
     `);
 

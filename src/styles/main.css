@@ -76,6 +76,15 @@ html {
   scroll-margin-top: var(--sidebar-sticky-top, calc(var(--navbar-height, 4.5rem) + var(--sidebar-sticky-gap, 1rem)));
 }
 
+#post-container .custom-md > :where(p, blockquote, ul, ol, table, pre, figure, details, .mermaid-diagram-container, .plantuml-diagram-container, .expressive-code) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 360px;
+}
+
+#post-container .custom-md > :where(.mermaid-diagram-container, .plantuml-diagram-container) {
+  contain: layout paint style;
+}
+
 html::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -186,6 +195,22 @@ html.dark::-webkit-scrollbar-thumb:hover,
     transition: opacity var(--theme-switch-duration, 220ms) cubic-bezier(0.22, 1, 0.36, 1) !important;
     animation: none !important;
     visibility: visible;
+  }
+
+  .is-theme-transitioning :where(
+      .custom-md,
+      .custom-md *,
+      .mermaid-diagram-container,
+      .mermaid-diagram-container *,
+      .plantuml-diagram-container,
+      .plantuml-diagram-container *
+    ) {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .is-theme-transitioning :where(.mermaid-stage, .plantuml-image) {
+    will-change: auto !important;
   }
 
   /* 在主题切换时禁用代码块的复杂效果以提升性能 */

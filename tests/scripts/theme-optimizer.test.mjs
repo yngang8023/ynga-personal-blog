@@ -32,3 +32,16 @@ test("theme optimizer does not treat the article body as a heavy element during 
 	assert.doesNotMatch(source, /getBoundingClientRect\(\)/);
 	assert.doesNotMatch(source, /use-view-transition/);
 });
+
+test("theme optimizer avoids mass compositing writes during theme switches", async () => {
+	const source = await readThemeOptimizer();
+	const forceCompositingBody = source.match(
+		/forceCompositing\(\)\s*\{(?<content>[\s\S]*?)\n\t\}/,
+	)?.groups?.content;
+
+	assert.ok(forceCompositingBody);
+	assert.doesNotMatch(forceCompositingBody, /\.expressive-code/);
+	assert.doesNotMatch(forceCompositingBody, /\.post-card/);
+	assert.doesNotMatch(forceCompositingBody, /\.widget/);
+	assert.match(forceCompositingBody, /#navbar/);
+});

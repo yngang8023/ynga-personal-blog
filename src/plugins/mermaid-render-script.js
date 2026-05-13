@@ -16,6 +16,7 @@
 	const IDLE_PREFETCH_LIMIT = 2;
 	const THEME_PREWARM_LIMIT = 3;
 	const renderCache = new Map();
+	const pendingRenderCache = new Map();
 	const preparedRenderCache = new Map();
 	const renderQueue = [];
 	const MERMAID_THEME_PALETTES = {
@@ -259,6 +260,11 @@
 		return nextTask;
 	}
 
+	function cancelThemePrewarm() {
+		prewarmBatchToken += 1;
+		idleBatchToken += 1;
+	}
+
 	function getMermaidConfig(theme) {
 		const isDark = theme === "dark";
 		const palette = isDark
@@ -369,7 +375,12 @@
 			return cached;
 		}
 
-		return runMermaidTask(async () => {
+		const pending = pendingRenderCache.get(cacheKey);
+		if (pending) {
+			return pending;
+		}
+
+		const renderPromise = runMermaidTask(async () => {
 			const existing = renderCache.get(cacheKey);
 			if (existing) {
 				return existing;
@@ -382,7 +393,12 @@
 			);
 			renderCache.set(cacheKey, svg);
 			return svg;
+		}).finally(() => {
+			pendingRenderCache.delete(cacheKey);
 		});
+
+		pendingRenderCache.set(cacheKey, renderPromise);
+		return renderPromise;
 	}
 
 	async function getPreparedDiagram(code, theme) {
@@ -1164,23 +1180,14 @@
 		}
 
 		const token = ++prewarmBatchToken;
-		const pump = (deadline) => {
+		const pump = () => {
 			if (token !== prewarmBatchToken) {
 				return;
 			}
 
 			while (queue.length > 0) {
-				if (
-					deadline &&
-					!deadline.didTimeout &&
-					typeof deadline.timeRemaining === "function" &&
-					deadline.timeRemaining() < 10
-				) {
-					break;
-				}
-
-				const nextHost = queue.shift();
-				const code = nextHost?.getAttribute("data-mermaid-code") || "";
+				const nextPrewarmHost = queue.shift();
+				const code = nextPrewarmHost?.getAttribute("data-mermaid-code") || "";
 				if (!code.trim()) {
 					continue;
 				}
@@ -1190,18 +1197,18 @@
 					continue;
 				}
 
-				void getPreparedDiagram(code, theme).catch(() => undefined);
-			}
+				void getPreparedDiagram(code, theme).catch(() => undefined).finally(() => {
+					if (token !== prewarmBatchToken || queue.length === 0) {
+						return;
+					}
 
-			if (queue.length > 0) {
-				scheduleIdleWork(pump);
+					scheduleIdleWork(pump);
+				});
+				return;
 			}
 		};
 
-		pump({
-			didTimeout: false,
-			timeRemaining: () => 18,
-		});
+		pump();
 	}
 
 	function scheduleThemePrewarm(theme, hosts = getAllDiagramHosts(), options = {}) {
@@ -1358,6 +1365,7 @@
 				isLikelyVisible,
 			);
 
+			cancelThemePrewarm();
 			const missingVisible = applyThemeFromCache(visibleHosts, nextTheme);
 			if (missingVisible.length > 0) {
 				dispatchRenderStart(missingVisible.length, hosts.length);

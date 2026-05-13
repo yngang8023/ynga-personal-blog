@@ -60,7 +60,9 @@ test("mermaid render script prewarms alternate theme caches and defers theme swa
 	const script = await readScript();
 
 	assert.match(script, /let mermaidWorkPromise = Promise\.resolve\(\)/);
+	assert.match(script, /const pendingRenderCache = new Map\(\)/);
 	assert.match(script, /function runMermaidTask\(/);
+	assert.match(script, /function cancelThemePrewarm\(/);
 	assert.match(script, /function splitHostsForThemeSwitch\(/);
 	assert.match(script, /function getMermaidThemePrewarmHosts\(/);
 	assert.match(script, /function yieldToMainThread\(/);
@@ -77,6 +79,13 @@ test("mermaid render script prewarms alternate theme caches and defers theme swa
 		script,
 		/prewarmThemeCache\(\s*prewarmPlan\.deferredHosts,\s*theme,\s*\{\s*limit:\s*THEME_PREWARM_LIMIT\s*\}\s*,?\s*\)/,
 	);
+	assert.match(script, /const nextPrewarmHost = queue\.shift\(\)/);
+	assert.match(
+		script,
+		/void getPreparedDiagram\(code,\s*theme\)\.catch\(\(\) => undefined\)\.finally\(\(\) => \{/,
+	);
+	assert.match(script, /cancelThemePrewarm\(\);\s*const missingVisible = applyThemeFromCache/);
+	assert.match(script, /const pending = pendingRenderCache\.get\(cacheKey\)/);
 	assert.match(script, /scheduleIdleWork\(\(\)\s*=>\s*prewarmThemeCache\(/);
 	assert.doesNotMatch(script, /window\.__diagramThemeUtils/);
 	assert.doesNotMatch(script, /void loadMermaidLibrary\(\)/);

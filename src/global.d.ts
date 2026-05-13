@@ -197,6 +197,7 @@ declare global {
 			mountedContainer: HTMLElement | null;
 			observer: IntersectionObserver | null;
 			previewObserver: MutationObserver | null;
+			countObserver: MutationObserver | null;
 			initialized: boolean;
 			loading: boolean;
 			initAttemptedPath: string;
@@ -234,6 +235,7 @@ declare global {
 			scheduleStatsRefresh: (options?: {
 				refreshCommentCount?: boolean;
 			}) => void;
+			observeCommentCountDisplay: () => void;
 			installDeleteConfirmBridge: () => void;
 			teardownDeleteConfirmBridge: () => void;
 			mount: () => Promise<void>;

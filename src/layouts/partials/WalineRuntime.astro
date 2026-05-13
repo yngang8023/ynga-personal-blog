@@ -28,6 +28,7 @@ import { commentConfig } from "@/config";
 					} from "../../utils/katex-options.mjs";
 					import {
 						applyWalineCommentCountDelta,
+						createWalineCommentCountObserver,
 						createWalineDeleteConfirmBridge,
 						matchWalineDeleteButton,
 						refreshWalineStats,
@@ -333,6 +334,7 @@ import { commentConfig } from "@/config";
 						mountedContainer: null,
 						observer: null,
 						previewObserver: null,
+						countObserver: null,
 						initialized: false,
 						loading: false,
 						initAttemptedPath: "",
@@ -477,6 +479,25 @@ import { commentConfig } from "@/config";
 								180,
 							);
 						},
+						observeCommentCountDisplay: () => {
+							const walineCountContainer =
+								getWalineCountContainer();
+
+							runtime.countObserver?.disconnect();
+							runtime.countObserver = null;
+
+							if (!walineCountContainer) {
+								return;
+							}
+
+							runtime.countObserver =
+								createWalineCommentCountObserver({
+									walineCountContainer,
+									onCountMutation: () => {
+										runtime.syncCommentCountFromWaline();
+									},
+								});
+						},
 						observePreviewDefaults: () => {
 							const container =
 								document.getElementById(CONTAINER_ID);
@@ -578,6 +599,8 @@ import { commentConfig } from "@/config";
 								runtime.teardownDeleteConfirmBridge();
 								runtime.previewObserver?.disconnect();
 								runtime.previewObserver = null;
+								runtime.countObserver?.disconnect();
+								runtime.countObserver = null;
 
 								if (runtime.previewTimer !== null) {
 									window.clearTimeout(runtime.previewTimer);
@@ -627,6 +650,7 @@ import { commentConfig } from "@/config";
 									createWalineFetchBridge();
 								runtime.fetchBridge.install();
 								runtime.observePreviewDefaults();
+								runtime.observeCommentCountDisplay();
 								runtime.installDeleteConfirmBridge();
 								runtime.scheduleStatsRefresh();
 								runtime.syncCommentCountFromWaline();
@@ -641,6 +665,8 @@ import { commentConfig } from "@/config";
 							runtime.observer = null;
 							runtime.previewObserver?.disconnect();
 							runtime.previewObserver = null;
+							runtime.countObserver?.disconnect();
+							runtime.countObserver = null;
 							if (runtime.previewTimer !== null) {
 								window.clearTimeout(runtime.previewTimer);
 								runtime.previewTimer = null;

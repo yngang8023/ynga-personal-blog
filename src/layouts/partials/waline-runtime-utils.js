@@ -160,6 +160,32 @@ export function syncWalineCommentCountDisplay({
 	return normalizedCount;
 }
 
+export function createWalineCommentCountObserver({
+	walineCountContainer,
+	onCountMutation,
+	MutationObserverImpl = MutationObserver,
+}) {
+	if (!walineCountContainer || typeof onCountMutation !== "function") {
+		return null;
+	}
+
+	const observer = new MutationObserverImpl((mutations) => {
+		if (
+			mutations.some(
+				(mutation) => mutation?.type === "childList",
+			)
+		) {
+			onCountMutation();
+		}
+	});
+
+	observer.observe(walineCountContainer, {
+		childList: true,
+	});
+
+	return observer;
+}
+
 export function matchWalineDeleteButton(target, containerId = "waline") {
 	if (!(target instanceof Element)) {
 		return null;

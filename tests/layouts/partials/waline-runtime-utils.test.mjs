@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+	createWalineCommentCountObserver,
 	createWalineDeleteConfirmBridge,
 	applyWalineCommentCountDelta,
 	refreshWalineStats,
@@ -360,6 +361,56 @@ test("syncWalineCommentCountDisplay removes all repeated Waline count nodes when
 	assert.equal(result, 0);
 	assert.equal(badge.textContent, "0");
 	assert.equal(removed, 2);
+});
+
+test("createWalineCommentCountObserver only reacts to Waline count child-list mutations", () => {
+	let observedTarget = null;
+	let observedOptions = null;
+	let recordedCallback = null;
+	let syncCalls = 0;
+
+	class FakeMutationObserver {
+		constructor(callback) {
+			recordedCallback = callback;
+		}
+
+		observe(target, options) {
+			observedTarget = target;
+			observedOptions = options;
+		}
+
+		disconnect() {}
+	}
+
+	const walineCountContainer = { id: "waline-count" };
+
+	const observer = createWalineCommentCountObserver({
+		walineCountContainer,
+		MutationObserverImpl: FakeMutationObserver,
+		onCountMutation: () => {
+			syncCalls += 1;
+		},
+	});
+
+	assert.ok(observer instanceof FakeMutationObserver);
+	assert.equal(observedTarget, walineCountContainer);
+	assert.deepEqual(observedOptions, {
+		childList: true,
+	});
+
+	recordedCallback?.([
+		{
+			type: "attributes",
+		},
+	]);
+	assert.equal(syncCalls, 0);
+
+	recordedCallback?.([
+		{
+			type: "childList",
+		},
+	]);
+	assert.equal(syncCalls, 1);
 });
 
 test("createWalineDeleteConfirmBridge replays an approved delete click and bypasses native confirm once", async () => {

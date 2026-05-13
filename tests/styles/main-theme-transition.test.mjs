@@ -39,6 +39,19 @@ test("main theme transition styles suppress expensive article and diagram transi
 	assert.match(source, /will-change:\s*auto !important;/);
 });
 
+test("main theme transition keeps article detail content visible", async () => {
+	const source = await readMainCss();
+	const articleVisibilityRule = source.match(
+		/\.is-theme-transitioning\s+#post-container\s+\.custom-md\.onload-animation\s*\{(?<content>[\s\S]*?)\n\s*\}/,
+	)?.groups?.content;
+
+	assert.ok(articleVisibilityRule);
+	assert.match(articleVisibilityRule, /opacity:\s*1 !important;/);
+	assert.match(articleVisibilityRule, /animation:\s*none !important;/);
+	assert.match(articleVisibilityRule, /transform:\s*none !important;/);
+	assert.match(articleVisibilityRule, /content-visibility:\s*visible !important;/);
+});
+
 test("main styles isolate long article blocks with content visibility", async () => {
 	const source = await readMainCss();
 

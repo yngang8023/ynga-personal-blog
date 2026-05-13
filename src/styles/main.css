@@ -210,6 +210,13 @@ html.dark::-webkit-scrollbar-thumb:hover,
     will-change: auto !important;
   }
 
+  .is-theme-transitioning #post-container .custom-md.onload-animation {
+    opacity: 1 !important;
+    animation: none !important;
+    transform: none !important;
+    content-visibility: visible !important;
+  }
+
   /* 在主题切换时禁用代码块的复杂效果以提升性能 */
   .is-theme-transitioning .expressive-code,
   .is-theme-transitioning .expressive-code * {

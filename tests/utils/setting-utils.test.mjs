@@ -11,8 +11,8 @@ test("theme switching uses a lightweight translucent theme veil", async () => {
 	const source = await readSettingUtils();
 
 	assert.match(source, /const THEME_TRANSITION_VEIL_ID = "theme-transition-veil"/);
-	assert.match(source, /const THEME_VEIL_MAX_OPACITY = 0\.56/);
-	assert.match(source, /const THEME_VEIL_SETTLE_OPACITY = 0\.34/);
+	assert.match(source, /const THEME_VEIL_MAX_OPACITY = 0\.18/);
+	assert.match(source, /const THEME_VEIL_SETTLE_OPACITY = 0\.08/);
 	assert.match(source, /function ensureThemeTransitionVeil\(\)/);
 	assert.match(source, /function updateThemeTransitionOrigin\(/);
 	assert.match(source, /function runMaskedThemeSwitch\(/);

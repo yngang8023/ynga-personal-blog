@@ -20,6 +20,21 @@ const DEFAULT_OPTIONS = {
 };
 
 const PLANTUML_LANGUAGES = new Set(["plantuml", "puml", "uml"]);
+const REMOTE_INCLUDE_REWRITES = [
+	{
+		pattern:
+			/^\s*!includeurl\s+https:\/\/raw\.githubusercontent\.com\/plantuml-stdlib\/C4-PlantUML\/(?:master|main)\/C4_Container\.puml\s*$/gim,
+		replacement: "!include <C4/C4_Container>",
+	},
+];
+
+function rewriteRemoteIncludes(source) {
+	return REMOTE_INCLUDE_REWRITES.reduce(
+		(nextSource, { pattern, replacement }) =>
+			nextSource.replace(pattern, replacement),
+		source,
+	);
+}
 
 function resolveServers(config) {
 	const input =
@@ -55,7 +70,8 @@ export function remarkPlantuml(options = {}) {
 				return;
 			}
 
-			const code = typeof node.value === "string" ? node.value : "";
+			const code =
+				typeof node.value === "string" ? rewriteRemoteIncludes(node.value) : "";
 			if (!code.trim()) {
 				return;
 			}

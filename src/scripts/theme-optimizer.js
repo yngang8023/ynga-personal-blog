@@ -19,8 +19,8 @@ class ThemeOptimizer {
 		this.pendingThemeUpdate = null;
 		this.codeBlockObserver = null;
 
-		// 从配置中获取是否在主题切换时隐藏代码块的设置
-		this.hideCodeBlocksDuringTransition = true; // 默认值为true
+		// 保持代码块可见，避免长文主题切换时出现大面积空白。
+		this.hideCodeBlocksDuringTransition = false;
 		this.initFromConfig();
 
 		// 性能优化相关
@@ -125,15 +125,9 @@ class ThemeOptimizer {
 		const codeBlocks = document.querySelectorAll(".expressive-code");
 
 		codeBlocks.forEach((block) => {
-			// 确保代码块有正确的类
-			if (this.hideCodeBlocksDuringTransition) {
-				block.classList.add("hide-during-transition");
-			} else {
-				block.classList.remove("hide-during-transition");
-			}
-
-			// 强制重新计算样式
-			void block.offsetWidth;
+			block.classList.remove("hide-during-transition");
+			block.style.removeProperty("content-visibility");
+			block.style.removeProperty("opacity");
 		});
 
 		// 检查当前是否处于主题切换状态
@@ -142,16 +136,10 @@ class ThemeOptimizer {
 		);
 
 		if (isTransitioning) {
-			// 如果正在切换主题，确保样式立即应用
+			// 如果正在切换主题，保持代码块可见但禁用过渡。
 			codeBlocks.forEach((block) => {
-				if (block.classList.contains("hide-during-transition")) {
-					block.style.setProperty(
-						"content-visibility",
-						"hidden",
-						"important",
-					);
-					block.style.setProperty("opacity", "0.99", "important");
-				}
+				block.style.setProperty("content-visibility", "visible", "important");
+				block.style.setProperty("opacity", "1", "important");
 			});
 		} else {
 			// 如果不在切换状态，确保样式恢复正常
@@ -174,12 +162,10 @@ class ThemeOptimizer {
 				configCarrier.dataset.hideCodeBlocksDuringTransition !==
 					undefined
 			) {
-				this.hideCodeBlocksDuringTransition =
-					configCarrier.dataset.hideCodeBlocksDuringTransition ===
-					"true";
+				this.hideCodeBlocksDuringTransition = false;
 			}
 		} catch (error) {
-			this.hideCodeBlocksDuringTransition = true; // 默认启用隐藏
+			this.hideCodeBlocksDuringTransition = false;
 		}
 	}
 
@@ -188,13 +174,7 @@ class ThemeOptimizer {
 		const codeBlocks = document.querySelectorAll(".expressive-code");
 
 		codeBlocks.forEach((block) => {
-			if (this.hideCodeBlocksDuringTransition) {
-				// 默认行为：添加类以便在主题切换时隐藏
-				block.classList.add("hide-during-transition");
-			} else {
-				// 如果配置为不隐藏，移除类
-				block.classList.remove("hide-during-transition");
-			}
+			block.classList.remove("hide-during-transition");
 		});
 
 		// 确保临时样式表中的规则与当前设置一致
@@ -207,14 +187,7 @@ class ThemeOptimizer {
 			// 获取当前内容
 			let content = this.tempStyleSheet.textContent;
 
-			// 更新代码块隐藏规则
-			const hideRule = `.is-theme-transitioning .expressive-code {
-        content-visibility: hidden !important;
-        /* 避免闪烁 */
-        opacity: 0.99;
-      }`;
-
-			const showRule = `.is-theme-transitioning .expressive-code:not(.hide-during-transition) {
+			const showRule = `.is-theme-transitioning .expressive-code {
         /* 保持代码块可见，但禁用过渡效果 */
         content-visibility: visible !important;
         opacity: 1 !important;
@@ -222,7 +195,7 @@ class ThemeOptimizer {
 
 			// 检查是否已存在这些规则，如果不存在则添加
 			if (!content.includes(".is-theme-transitioning .expressive-code")) {
-				content += "\n" + hideRule + "\n" + showRule;
+				content += "\n" + showRule;
 				this.tempStyleSheet.textContent = content;
 			}
 		}
@@ -277,12 +250,7 @@ class ThemeOptimizer {
 			codeBlocks.forEach((block) => {
 				this.codeBlockObserver.observe(block);
 
-				// 根据配置设置代码块在主题切换时的行为
-				if (this.hideCodeBlocksDuringTransition) {
-					block.classList.add("hide-during-transition");
-				} else {
-					block.classList.remove("hide-during-transition");
-				}
+				block.classList.remove("hide-during-transition");
 			});
 		});
 	}
@@ -424,17 +392,7 @@ class ThemeOptimizer {
         visibility: hidden !important;
       }
       
-      /* 在主题切换期间临时隐藏代码块以提升性能 */
-      /* 这个行为可以通过配置文件中的 expressiveCodeConfig.hideDuringThemeTransition 控制 */
       .is-theme-transitioning .expressive-code {
-        content-visibility: hidden !important;
-        /* 避免闪烁 */
-        opacity: 0.99;
-      }
-      
-      /* 当禁用隐藏代码块功能时（通过JavaScript动态控制） */
-      .is-theme-transitioning .expressive-code:not(.hide-during-transition) {
-        /* 保持代码块可见，但禁用过渡效果 */
         content-visibility: visible !important;
         opacity: 1 !important;
       }

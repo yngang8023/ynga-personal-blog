@@ -1248,7 +1248,7 @@ database Redis as 会话缓存
 
 ```plantuml
 @startuml
-!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+!include <C4/C4_Container>
 
 Person(user, "博客访客", "阅读文章与搜索内容")
 

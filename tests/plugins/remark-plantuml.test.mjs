@@ -101,3 +101,31 @@ test("remarkPlantuml also accepts puml and uml aliases", () => {
 
 	assert.equal(otherTree.children[0].type, "plantuml");
 });
+
+test("remarkPlantuml rewrites remote C4-PlantUML GitHub includes to PlantUML stdlib includes", () => {
+	const tree = {
+		type: "root",
+		children: [
+			{
+				type: "code",
+				lang: "plantuml",
+				value: [
+					"@startuml",
+					"!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml",
+					"Person(user, \"User\")",
+					"@enduml",
+				].join("\n"),
+			},
+		],
+	};
+
+	remarkPlantuml({
+		servers: ["https://example.com/diagram/plantuml"],
+	})(tree);
+
+	const [node] = tree.children;
+	assert.equal(node.type, "plantuml");
+	assert.match(node.data.hChildren[0].value, /!include <C4\/C4_Container>/);
+	assert.doesNotMatch(node.data.hChildren[0].value, /raw\.githubusercontent\.com/);
+	assert.doesNotMatch(node.data.hChildren[0].value, /!includeurl/);
+});

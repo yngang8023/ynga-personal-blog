@@ -13,8 +13,8 @@ const THEME_SWITCH_TRANSITION_MS = 220;
 const THEME_VEIL_SETTLE_DELAY_MS = 44;
 const THEME_VEIL_SETTLE_MS = 72;
 const THEME_SWITCH_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
-const THEME_VEIL_MAX_OPACITY = 0.56;
-const THEME_VEIL_SETTLE_OPACITY = 0.34;
+const THEME_VEIL_MAX_OPACITY = 0.18;
+const THEME_VEIL_SETTLE_OPACITY = 0.08;
 const THEME_SWITCH_FALLBACK_ORIGIN = {
 	x: "calc(100vw - 3rem)",
 	y: "3rem",
@@ -112,8 +112,8 @@ function updateThemeTransitionOrigin(
 
 function getThemeVeilSpotlight(nextTheme: LIGHT_DARK_MODE): string {
 	return nextTheme === DARK_MODE
-		? "rgba(15, 23, 42, 0.22)"
-		: "rgba(255, 255, 255, 0.24)";
+		? "rgba(15, 23, 42, 0.14)"
+		: "rgba(255, 255, 255, 0.12)";
 }
 
 function ensureThemeTransitionVeil(): HTMLDivElement {

@@ -36,13 +36,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
       
+      # 如果需要启用内容分离，可在这里为构建步骤补充 env，例如：
+      # ENABLE_CONTENT_SYNC: true
+      # CONTENT_REPO_URL: ${{ secrets.CONTENT_REPO_URL }}
+      # USE_SUBMODULE: true
       - name: Build site
         run: pnpm run build
-        env:
-          # 如果需要启用内容分离,取消以下注释并配置
-          # ENABLE_CONTENT_SYNC: true
-          # CONTENT_REPO_URL: ${{ secrets.CONTENT_REPO_URL }}
-          # USE_SUBMODULE: true
 
       - name: Sync Cloudflare RAG knowledge base
         run: pnpm sync-rag

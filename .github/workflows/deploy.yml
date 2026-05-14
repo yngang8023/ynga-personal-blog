@@ -1,47 +1,42 @@
-name: Deploy to Pages Branch
+name: Sync Cloudflare RAG Knowledge Base
 
 on:
-  # 每次推送到 `main` 分支时触发这个"工作流程"
-  # 如果你使用了别的分支名，请按需将 `main` 替换成你的分支名
+  # 推送到 main 后自动同步博客文章目录到 Cloudflare RAG
   push:
     branches: [ main ]
-  # 允许你在 GitHub 上的 Actions 标签中手动触发此"工作流程"
+    paths:
+      - "src/content/posts/**"
+      - "scripts/blog-rag-sync-utils.mjs"
+      - "scripts/sync-blog-rag.mjs"
+      - "src/config.ts"
+      - ".github/workflows/deploy.yml"
+  # 允许在 GitHub Actions 中手动触发一次全文同步
   workflow_dispatch:
 
-# 需要写入权限来推送到pages分支
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build-and-deploy:
+  sync-rag:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout your repository using git
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: true  # 支持 Git Submodule 模式
-          token: ${{ secrets.GITHUB_TOKEN }}  # 自动访问同账号下的私有仓库
+          submodules: true
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 9.14.4
           run_install: false
           
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
-      
-      # 如果需要启用内容分离，可在这里为构建步骤补充 env，例如：
-      # ENABLE_CONTENT_SYNC: true
-      # CONTENT_REPO_URL: ${{ secrets.CONTENT_REPO_URL }}
-      # USE_SUBMODULE: true
-      - name: Build site
-        run: pnpm run build
 
       - name: Sync Cloudflare RAG knowledge base
         run: pnpm sync-rag
@@ -49,10 +44,16 @@ jobs:
           BLOG_RAG_SYNC_TOKEN: ${{ secrets.BLOG_RAG_SYNC_TOKEN }}
           BLOG_RAG_SYNC_ENDPOINT: ${{ vars.BLOG_RAG_SYNC_ENDPOINT }}
           BLOG_RAG_SITE_URL: ${{ vars.BLOG_RAG_SITE_URL }}
-      
-      - name: Deploy to pages branch
-        uses: JamesIves/github-pages-deploy-action@v4
-        with:
-          branch: pages # 部署到pages分支
-          folder: dist # Astro默认构建输出目录
-          clean: true # 清理目标分支中的旧文件
+
+      # 当前博客正式部署由 EdgeOne Pages 负责，这里默认不执行 GitHub Pages 部署。
+      # 如果其他开发者需要恢复 GitHub Pages 发布，可取消下面这段注释：
+      #
+      # - name: Build site
+      #   run: pnpm run build
+      #
+      # - name: Deploy to pages branch
+      #   uses: JamesIves/github-pages-deploy-action@v4
+      #   with:
+      #     branch: pages
+      #     folder: dist
+      #     clean: true

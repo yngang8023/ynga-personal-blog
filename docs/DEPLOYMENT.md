@@ -8,6 +8,7 @@
 - [GitHub Pages 部署](#-github-pages-部署)
 - [Vercel 部署](#-vercel-部署)
 - [Netlify 部署](#-netlify-部署)
+- [EdgeOne Pages 部署](#-edgeone-pages-部署)
 - [Cloudflare Pages 部署](#-cloudflare-pages-部署)
 - [故障排查](#-故障排查)
 
@@ -125,7 +126,7 @@ export default defineConfig({
 | 工作流 | 触发条件 | 功能 |
 |--------|---------|------|
 | `build.yml` | Push/PR 到 main | CI 测试，检查构建 |
-| `deploy.yml` | Push 到 main | 构建并部署到 pages 分支 |
+| `deploy.yml` | Push 到 main | 同步公开文章目录到 Cloudflare RAG |
 | `format.yml` | Push/PR | 代码格式和质量检查 |
 
 ---
@@ -237,6 +238,41 @@ USE_SUBMODULE=true
 
 ---
 
+## 🟦 EdgeOne Pages 部署
+
+### 当前项目的推荐配置
+
+项目根目录已添加 `edgeone.json`：
+
+```json
+{
+  "installCommand": "pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist",
+  "nodeVersion": "20.18.0"
+}
+```
+
+### 这对 `cloudflare-rag/` 的影响
+
+`outputDirectory` 明确指定为 `dist` 后，EdgeOne Pages 生产部署只会发布构建产物目录 `dist`，不会把仓库里的其他目录一起作为静态站点内容发布。因此：
+
+- `cloudflare-rag/` 不会被部署到博客静态站点
+- `cloudflare-rag/` 目录中的源码、配置、Functions 文件不会进入博客线上产物
+- EdgeOne 构建时虽然会 checkout 整个仓库，但最终发布范围只有 `dist`
+
+### 与博客 RAG 同步的关系
+
+博客文章同步到 Cloudflare RAG 走的是 GitHub Actions 里的 `pnpm sync-rag`，同步脚本只扫描：
+
+```text
+src/content/posts/**
+```
+
+因此 `cloudflare-rag/` 也不会被带进知识库同步负载。
+
+---
+
 ## ☁️ Cloudflare Pages 部署
 
 ### 部署步骤
@@ -313,13 +349,13 @@ BLOG_RAG_SITE_URL=https://ynga.kingcola-icg.cn/
 
 ### GitHub 推送后自动同步
 
-`.github/workflows/deploy.yml` 已在 `pnpm run build` 成功后执行：
+`.github/workflows/deploy.yml` 目前会在匹配到博客内容或同步脚本相关改动时执行：
 
 ```bash
 pnpm sync-rag
 ```
 
-因此每次推送到 `main` 分支时，博客会先构建，再把公开文章目录同步到 Cloudflare RAG，最后部署到 `pages` 分支。
+当前仓库正式站点由 EdgeOne Pages 部署，因此这个 workflow 默认只负责把公开文章目录同步到 Cloudflare RAG，不再执行 GitHub Pages 发布。
 
 需要在 GitHub 仓库中添加 Actions Secret：
 

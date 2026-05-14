@@ -172,106 +172,119 @@ function shouldSkipPostSync(
 }
 
 export const onRequest: PagesFunction<Env> = async (ctx) => {
-  if (ctx.request.method !== "POST") {
-    return jsonResponse({ error: "Expected POST." }, 405);
-  }
-
-  const token = getBearerToken(ctx.request.headers.get("authorization"));
-  if (!ctx.env.RAG_SYNC_TOKEN || token !== ctx.env.RAG_SYNC_TOKEN) {
-    return jsonResponse({ error: "Unauthorized." }, 401);
-  }
-
-  let payload: unknown;
-  let posts;
   try {
-    payload = await ctx.request.json();
-    posts = parseBundleSyncPayload(payload);
-  } catch (error) {
-    return jsonResponse(
-      { error: `Invalid sync payload: ${(error as Error).message}` },
-      400,
-    );
-  }
-
-  if (posts.length === 0) {
-    return jsonResponse({ error: "Sync payload must include at least one post bundle." }, 400);
-  }
-
-  const siteURL =
-    payload &&
-    typeof payload === "object" &&
-    typeof (payload as { siteURL?: unknown }).siteURL === "string"
-      ? (payload as { siteURL: string }).siteURL
-      : undefined;
-
-  const db = drizzle(ctx.env.DB);
-  const existingPosts = await db.select().from(blogPosts);
-  const incomingIds = new Set(posts.map((post) => post.id));
-  const existingById = new Map(existingPosts.map((post) => [post.id, post]));
-  const deletedPosts = existingPosts.filter((post) => !incomingIds.has(post.id));
-
-  for (const post of deletedPosts) {
-    await deletePostData(db, ctx.env, post.id, post.sourcePrefix || undefined);
-  }
-
-  let unchanged = 0;
-  let updated = 0;
-  let created = 0;
-  let chunks = 0;
-  let images = 0;
-  let files = 0;
-
-  for (const post of posts) {
-    const existing = existingById.get(post.id);
-
-    if (shouldSkipPostSync(existing, post)) {
-      unchanged += 1;
-      continue;
+    if (ctx.request.method !== "POST") {
+      return jsonResponse({ error: "Expected POST." }, 405);
     }
 
-    if (existing) {
-      await deletePostData(db, ctx.env, post.id, existing.sourcePrefix || undefined);
-      updated += 1;
-    } else {
-      created += 1;
+    const token = getBearerToken(ctx.request.headers.get("authorization"));
+    if (!ctx.env.RAG_SYNC_TOKEN || token !== ctx.env.RAG_SYNC_TOKEN) {
+      return jsonResponse({ error: "Unauthorized." }, 401);
     }
 
-    const prepared = await preparePostBundle(ctx.env, post, siteURL);
-    const result = await upsertPreparedPost(db, ctx.env, prepared);
-    chunks += result.chunkCount;
-    images += result.imageCount;
-    files += prepared.files.length;
-  }
-
-  const activeIds = posts.map((post) => post.id);
-  if (activeIds.length > 0) {
-    const storedActivePosts = await db
-      .select({ id: blogPosts.id })
-      .from(blogPosts)
-      .where(inArray(blogPosts.id, activeIds));
-
-    if (storedActivePosts.length !== activeIds.length) {
+    let payload: unknown;
+    let posts;
+    try {
+      payload = await ctx.request.json();
+      posts = parseBundleSyncPayload(payload);
+    } catch (error) {
       return jsonResponse(
         {
-          error: "Sync finished but stored post count did not match incoming post count.",
-          incoming: activeIds.length,
-          stored: storedActivePosts.length,
+          error: `Invalid sync payload: ${(error as Error).message}`,
         },
-        500,
+        400,
       );
     }
-  }
 
-  return jsonResponse({
-    ok: true,
-    corpusId: getBlogCorpusId(ctx.env),
-    received: posts.length,
-    created,
-    updated,
-    unchanged,
-    deleted: deletedPosts.length,
-    files,
-    images,
-    chunks,
-  });
+    if (posts.length === 0) {
+      return jsonResponse({ error: "Sync payload must include at least one post bundle." }, 400);
+    }
+
+    const siteURL =
+      payload &&
+      typeof payload === "object" &&
+      typeof (payload as { siteURL?: unknown }).siteURL === "string"
+        ? (payload as { siteURL: string }).siteURL
+        : undefined;
+
+    const db = drizzle(ctx.env.DB);
+    const existingPosts = await db.select().from(blogPosts);
+    const incomingIds = new Set(posts.map((post) => post.id));
+    const existingById = new Map(existingPosts.map((post) => [post.id, post]));
+    const deletedPosts = existingPosts.filter((post) => !incomingIds.has(post.id));
+
+    for (const post of deletedPosts) {
+      await deletePostData(db, ctx.env, post.id, post.sourcePrefix || undefined);
+    }
+
+    let unchanged = 0;
+    let updated = 0;
+    let created = 0;
+    let chunks = 0;
+    let images = 0;
+    let files = 0;
+
+    for (const post of posts) {
+      const existing = existingById.get(post.id);
+
+      if (shouldSkipPostSync(existing, post)) {
+        unchanged += 1;
+        continue;
+      }
+
+      if (existing) {
+        await deletePostData(db, ctx.env, post.id, existing.sourcePrefix || undefined);
+        updated += 1;
+      } else {
+        created += 1;
+      }
+
+      const prepared = await preparePostBundle(ctx.env, post, siteURL);
+      const result = await upsertPreparedPost(db, ctx.env, prepared);
+      chunks += result.chunkCount;
+      images += result.imageCount;
+      files += prepared.files.length;
+    }
+
+    const activeIds = posts.map((post) => post.id);
+    if (activeIds.length > 0) {
+      const storedActivePosts = await db
+        .select({ id: blogPosts.id })
+        .from(blogPosts)
+        .where(inArray(blogPosts.id, activeIds));
+
+      if (storedActivePosts.length !== activeIds.length) {
+        return jsonResponse(
+          {
+            error: "Sync finished but stored post count did not match incoming post count.",
+            incoming: activeIds.length,
+            stored: storedActivePosts.length,
+          },
+          500,
+        );
+      }
+    }
+
+    return jsonResponse({
+      ok: true,
+      corpusId: getBlogCorpusId(ctx.env),
+      received: posts.length,
+      created,
+      updated,
+      unchanged,
+      deleted: deletedPosts.length,
+      files,
+      images,
+      chunks,
+    });
+  } catch (error) {
+    return jsonResponse(
+      {
+        error: "Blog post sync failed.",
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : null,
+      },
+      500,
+    );
+  }
 };

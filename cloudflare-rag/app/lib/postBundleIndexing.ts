@@ -76,6 +76,37 @@ interface MarkdownSection {
 
 const textDecoder = new TextDecoder();
 const imageExtensionPattern = /\.(avif|gif|jpe?g|png|svg|webp)$/i;
+const blogRagChunkSeparators = [
+  "\n## ",
+  "\n### ",
+  "\n#### ",
+  "\n##### ",
+  "\n###### ",
+  "```\n\n",
+  "\n\n***\n\n",
+  "\n\n---\n\n",
+  "\n\n___\n\n",
+  "\n\n",
+  "\n",
+  "。",
+  "！",
+  "？",
+  "；",
+  ";",
+  "，",
+  ",",
+  ".",
+  "!",
+  "?",
+  " ",
+  "",
+];
+const blogRagTextSplitter = new RecursiveCharacterTextSplitter({
+  chunkSize: 900,
+  chunkOverlap: 160,
+  keepSeparator: true,
+  separators: blogRagChunkSeparators,
+});
 
 function parseScalar(value: string): unknown {
   const trimmed = value.trim();
@@ -380,6 +411,17 @@ function getAssetProxyUrl(r2Key: string): string {
   return `/api/assets/${encodePathSegments(r2Key)}`;
 }
 
+async function splitTextIntoChunks(value: string): Promise<string[]> {
+  const text = value.trim();
+  if (!text) {
+    return [];
+  }
+
+  return (await blogRagTextSplitter.splitText(text))
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+}
+
 async function runImageOcr(env: Env, file: StoredBundleFile): Promise<string> {
   const ai = env.AI as unknown as {
     toMarkdown?: (files: unknown, options?: unknown) => Promise<unknown>;
@@ -499,10 +541,6 @@ async function buildChunks(
   sections: MarkdownSection[],
   images: ImageIndexRecord[],
 ): Promise<ChunkIndexRecord[]> {
-  const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 900,
-    chunkOverlap: 160,
-  });
   const chunks: ChunkIndexRecord[] = [];
   const referencedImagePaths = new Set<string>();
 
@@ -533,7 +571,7 @@ async function buildChunks(
       continue;
     }
 
-    const pieces = await splitter.splitText(sectionText);
+    const pieces = await splitTextIntoChunks(sectionText);
     for (const piece of pieces) {
       chunks.push({
         id: await sha256(`${post.id}\n${chunks.length}\n${piece}`),

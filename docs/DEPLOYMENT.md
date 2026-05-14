@@ -333,7 +333,7 @@ USE_SUBMODULE=false  # ⚠️ Cloudflare Pages 默认不支持 submodule
 
 ## 🤖 Cloudflare RAG 知识库同步
 
-博客文章可以同步到独立部署的 Cloudflare RAG 服务，供右下角 AI 助手检索回答。
+博客文章可以同步到独立部署的 Cloudflare RAG 服务，供右下角 AI 助手检索回答。`cloudflare-rag/` 服务仍由本地手动执行 Wrangler 命令部署；GitHub Actions 只负责把公开文章目录同步到已部署的 RAG 服务。
 
 ### 环境变量
 
@@ -349,13 +349,13 @@ BLOG_RAG_SITE_URL=https://ynga.kingcola-icg.cn/
 
 ### GitHub 推送后自动同步
 
-`.github/workflows/deploy.yml` 目前会在匹配到博客内容或同步脚本相关改动时执行：
+`.github/workflows/deploy.yml` 会在匹配到 Cloudflare RAG、博客内容或同步脚本相关改动时执行：
 
 ```bash
 pnpm sync-rag
 ```
 
-当前仓库正式站点由 EdgeOne Pages 部署，因此这个 workflow 默认只负责把公开文章目录同步到 Cloudflare RAG，不再执行 GitHub Pages 发布。
+当前仓库正式博客站点由 EdgeOne Pages 部署，Cloudflare RAG 服务由本地 Wrangler 部署，因此这个 workflow 不负责部署博客静态站点，也不负责部署 `cloudflare-rag/` 服务。
 
 需要在 GitHub 仓库中添加 Actions Secret：
 

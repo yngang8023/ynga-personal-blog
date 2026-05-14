@@ -5,6 +5,7 @@ on:
   push:
     branches: [ main ]
     paths:
+      - "cloudflare-rag/**"
       - "src/content/posts/**"
       - "scripts/blog-rag-sync-utils.mjs"
       - "scripts/sync-blog-rag.mjs"

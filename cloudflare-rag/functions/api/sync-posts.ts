@@ -15,6 +15,9 @@ const jsonHeaders = {
   "Content-Type": "application/json; charset=utf-8",
 };
 
+const blogPostImageInsertBatchSize = 5;
+const blogPostChunkInsertBatchSize = 8;
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -79,35 +82,36 @@ async function upsertPreparedPost(
   });
 
   if (prepared.images.length > 0) {
-    await db.insert(blogPostImages).values(
-      prepared.images.map((image) => ({
-        id: image.id,
-        postId: prepared.post.id,
-        relativePath: image.relativePath,
-        r2Key: image.r2Key,
-        url: image.url,
-        alt: image.alt,
-        title: image.title,
-        heading: image.heading,
-        anchor: image.anchor,
-        surroundingText: image.surroundingText,
-        ocrText: image.ocrText,
-        contentType: image.contentType,
-        contentHash: image.contentHash,
-        createdAt: now,
-        updatedAt: now,
-      })),
-    );
+    for (let i = 0; i < prepared.images.length; i += blogPostImageInsertBatchSize) {
+      await db.insert(blogPostImages).values(
+        prepared.images.slice(i, i + blogPostImageInsertBatchSize).map((image) => ({
+          id: image.id,
+          postId: prepared.post.id,
+          relativePath: image.relativePath,
+          r2Key: image.r2Key,
+          url: image.url,
+          alt: image.alt,
+          title: image.title,
+          heading: image.heading,
+          anchor: image.anchor,
+          surroundingText: image.surroundingText,
+          ocrText: image.ocrText,
+          contentType: image.contentType,
+          contentHash: image.contentHash,
+          createdAt: now,
+          updatedAt: now,
+        })),
+      );
+    }
   }
 
   if (prepared.chunks.length === 0) {
     return { chunkCount: 0, imageCount: prepared.images.length };
   }
 
-  const dbInsertBatchSize = 50;
-  for (let i = 0; i < prepared.chunks.length; i += dbInsertBatchSize) {
+  for (let i = 0; i < prepared.chunks.length; i += blogPostChunkInsertBatchSize) {
     await db.insert(blogPostChunks).values(
-      prepared.chunks.slice(i, i + dbInsertBatchSize).map((chunk) => ({
+      prepared.chunks.slice(i, i + blogPostChunkInsertBatchSize).map((chunk) => ({
         id: chunk.id,
         postId: prepared.post.id,
         chunkIndex: chunk.chunkIndex,

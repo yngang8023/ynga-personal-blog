@@ -15,6 +15,27 @@
 - 单元测试：`pnpm test`
 - 构建：`pnpm build`
 
+## 规则文档入口
+
+- 本文件是仓库级的总说明，优先给出高层约束、常用命令和默认实现原则。
+- 更细的前端开发规范统一放在 `docs/rule/` 目录下；开始修改前，先按改动类型去读对应文档，不要只凭印象实现。
+- 规则总览入口：`docs/rule/README.md`
+
+按场景优先查看：
+
+- 组件分层、命名、职责划分：`docs/rule/01-component-architecture.md`
+- 大组件拆分、避免单文件继续膨胀：`docs/rule/02-component-split-guide.md`
+- 文件放置位置、目录职责、模块组织：`docs/rule/03-file-organization-architecture.md`
+- CSS 写法、选择器优先级、`!important` 约束：`docs/rule/04-css-style-guide.md`
+- 优先复用 atoms / misc 组件、减少重复 UI：`docs/rule/05-atom-component-usage.md`
+- 侧栏组件接入、注册和布局配置：`docs/rule/06-sidebar-widget-dev.md`
+
+执行原则：
+
+- 先看本文件确定仓库级约束，再看 `docs/rule/` 对应专题文档落地实现。
+- 如果只是小改，也至少先看 `docs/rule/README.md`，确认有没有现成规则可复用。
+- 如果改动同时涉及组件、样式、目录结构，不要只看一篇，按主题交叉检查。
+
 ## 测试约定
 
 - 所有测试文件统一放在 `tests/` 目录下。

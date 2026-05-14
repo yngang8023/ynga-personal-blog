@@ -25,6 +25,40 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+function shouldForceRebuild(payload: unknown): boolean {
+  return (
+    payload !== null &&
+    typeof payload === "object" &&
+    (payload as { force?: unknown }).force === true
+  );
+}
+
+async function getPostIdsWithChunks(
+  db: ReturnType<typeof drizzle>,
+  postIds: string[],
+): Promise<Set<string>> {
+  const result = new Set<string>();
+  const batchSize = 50;
+
+  for (let i = 0; i < postIds.length; i += batchSize) {
+    const batch = postIds.slice(i, i + batchSize);
+    if (batch.length === 0) {
+      continue;
+    }
+
+    const rows = await db
+      .select({ postId: blogPostChunks.postId })
+      .from(blogPostChunks)
+      .where(inArray(blogPostChunks.postId, batch));
+
+    for (const row of rows) {
+      result.add(row.postId);
+    }
+  }
+
+  return result;
+}
+
 async function deleteVectorsForChunks(index: VectorizeIndex, chunkIds: string[]) {
   const batchSize = 100;
   for (let i = 0; i < chunkIds.length; i += batchSize) {
@@ -159,7 +193,13 @@ async function upsertPreparedPost(
 function shouldSkipPostSync(
   existing: typeof blogPosts.$inferSelect | undefined,
   post: BlogPostBundleInput,
+  hasStoredChunks: boolean,
+  forceRebuild: boolean,
 ) {
+  if (forceRebuild) {
+    return false;
+  }
+
   if (!existing) {
     return false;
   }
@@ -171,7 +211,8 @@ function shouldSkipPostSync(
     existing.contentHash === post.contentHash &&
     existing.slug === expectedSlug &&
     existing.url === (post.url || existing.url) &&
-    (existing.sourcePrefix || "") === expectedSourcePrefix
+    (existing.sourcePrefix || "") === expectedSourcePrefix &&
+    hasStoredChunks
   );
 }
 
@@ -204,6 +245,8 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
       return jsonResponse({ error: "Sync payload must include at least one post bundle." }, 400);
     }
 
+    const forceRebuild = shouldForceRebuild(payload);
+
     const siteURL =
       payload &&
       typeof payload === "object" &&
@@ -215,6 +258,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     const existingPosts = await db.select().from(blogPosts);
     const incomingIds = new Set(posts.map((post) => post.id));
     const existingById = new Map(existingPosts.map((post) => [post.id, post]));
+    const postIdsWithChunks = await getPostIdsWithChunks(db, posts.map((post) => post.id));
     const deletedPosts = existingPosts.filter((post) => !incomingIds.has(post.id));
 
     for (const post of deletedPosts) {
@@ -231,7 +275,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     for (const post of posts) {
       const existing = existingById.get(post.id);
 
-      if (shouldSkipPostSync(existing, post)) {
+      if (shouldSkipPostSync(existing, post, postIdsWithChunks.has(post.id), forceRebuild)) {
         unchanged += 1;
         continue;
       }
@@ -272,6 +316,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     return jsonResponse({
       ok: true,
       corpusId: getBlogCorpusId(ctx.env),
+      forceRebuild,
       received: posts.length,
       created,
       updated,

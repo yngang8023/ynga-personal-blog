@@ -173,9 +173,41 @@ function toAbsoluteUrl(value: string, requestOrigin: string): string {
   }
 }
 
+function getBlogSiteOrigin(env: Env): string | null {
+  const siteURL = env.BLOG_SITE_URL?.trim();
+  if (!siteURL) {
+    return null;
+  }
+
+  try {
+    return new URL(siteURL).origin;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeBlogPostUrl(value: string, env: Env): string {
+  const blogOrigin = getBlogSiteOrigin(env);
+  if (!blogOrigin || !value) {
+    return value;
+  }
+
+  try {
+    const url = new URL(value);
+    const embedMatch = url.pathname.match(/^\/embed\/(posts\/.+)$/);
+    if (embedMatch) {
+      return `${blogOrigin}/${embedMatch[1]}${url.hash}`;
+    }
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
 async function buildSources(
   chunks: Awaited<ReturnType<typeof getRelevantChunks>>,
   db: DrizzleD1Database<any>,
+  env: Env,
   requestOrigin: string,
 ): Promise<BlogSource[]> {
   const postIds = Array.from(new Set(chunks.map((chunk) => chunk.postId)));
@@ -202,7 +234,7 @@ async function buildSources(
       return {
         postId: chunk.postId,
         title: chunk.title,
-        url: chunk.url,
+        url: normalizeBlogPostUrl(chunk.url, env),
         heading: chunk.heading,
         anchor: chunk.anchor,
         text: chunk.text,
@@ -325,7 +357,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
         ]);
         const mergedIds = reciprocalRankFusion(fullTextResults, vectorResults);
         const chunks = await getRelevantChunks(mergedIds, db);
-        const sources = await buildSources(chunks, db, new URL(ctx.request.url).origin);
+        const sources = await buildSources(chunks, db, ctx.env, new URL(ctx.request.url).origin);
 
         await writeSse(writer, {
           message: "已找到相关博客内容，正在生成回答...",

@@ -39,6 +39,32 @@ function getSourceLabel(source: Source, index: number): string {
   return `[${index + 1}] ${source.title}${source.heading ? ` / ${source.heading}` : ""}`;
 }
 
+function getSourceImages(source: Source | undefined, maxCount = 2) {
+  return (source?.images || []).slice(0, maxCount);
+}
+
+function getInlineImageSources(sources: Source[], maxCount = 3) {
+  const seen = new Set<string>();
+  const result: Array<Source & { sourceIndex: number; inlineImages: SourceImage[] }> = [];
+
+  sources.forEach((source, sourceIndex) => {
+    const inlineImages = (source.images || []).filter((image) => {
+      const key = `${image.path}#${image.url}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+
+    if (inlineImages.length > 0 && result.length < maxCount) {
+      result.push({ ...source, sourceIndex, inlineImages: inlineImages.slice(0, 2) });
+    }
+  });
+
+  return result;
+}
+
 function collectPreviewImages(sources: Source[]) {
   const seen = new Set<string>();
 
@@ -184,26 +210,27 @@ export default function BlogChat() {
   };
 
   return (
-    <div className="flex h-screen min-h-[420px] flex-col bg-white text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
-      <header className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-        <div className="text-sm font-semibold">HiYnga 博客 AI 助手</div>
-        <div className="text-xs text-zinc-500 dark:text-zinc-400">
-          直接引用博客正文、章节片段和相关图片
+    <div className="flex h-screen min-h-[420px] flex-col bg-[#fafafa] text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+      <header className="border-b border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="text-base font-semibold tracking-tight">HiYngaの随✏️记 - AI助手</div>
+        <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          参考博客文章、章节片段和相关图片，帮你快速定位内容
         </div>
       </header>
 
-      <main ref={containerRef} className="flex-1 overflow-y-auto px-4 py-4">
+      <main ref={containerRef} className="flex-1 overflow-y-auto px-4 py-5">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="text-base font-semibold">问我博客里的内容</div>
-            <div className="mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-              例如：EdgeOne Pages 怎么部署？Waline 代理怎么配置？
+            <div className="text-lg font-semibold tracking-tight">从博客里找答案</div>
+            <div className="mt-2 max-w-sm text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+              可以问部署记录、配置细节、文章里的截图说明，或让助手帮你归纳某篇文章的重点。
             </div>
           </div>
         ) : (
           <div className="space-y-4">
             {messages.map((message) => {
               const previewImages = collectPreviewImages(message.sources || []);
+              const inlineImageSources = getInlineImageSources(message.sources || []);
 
               return (
                 <div
@@ -211,42 +238,97 @@ export default function BlogChat() {
                   className={`flex flex-col ${message.role === "user" ? "items-end" : "items-start"}`}
                 >
                 <div
-                  className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 ${
+                  className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                     message.role === "user"
-                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950"
-                      : "bg-zinc-100 text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100"
+                      ? "border border-sky-200 bg-sky-50 text-slate-900 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-50"
+                      : "border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
                   }`}
                 >
                   {message.role === "assistant" ? (
-                    <Markdown
-                      className="prose prose-sm max-w-none dark:prose-invert"
-                      components={{
-                        a: ({ href, children }) => {
-                          if (href?.startsWith("cite:")) {
-                            const sourceIndex = Number.parseInt(href.slice("cite:".length), 10) - 1;
-                            return (
-                              <button
-                                type="button"
-                                onClick={() => openSource(message.sources || [], sourceIndex)}
-                                className="inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-200 dark:bg-amber-400/20 dark:text-amber-200 dark:hover:bg-amber-400/30"
-                              >
-                                {children}
-                              </button>
-                            );
-                          }
+                    <>
+                      <Markdown
+                        className="prose prose-sm max-w-none prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline dark:prose-invert dark:prose-a:text-blue-300"
+                        components={{
+                          a: ({ href, children }) => {
+                            if (href?.startsWith("cite:")) {
+                              const sourceIndex = Number.parseInt(href.slice("cite:".length), 10) - 1;
+                              const source = message.sources?.[sourceIndex];
+                              return (
+                                <a
+                                  href={source?.url || "#"}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(event) => {
+                                    if (!source?.url) {
+                                      event.preventDefault();
+                                      openSource(message.sources || [], sourceIndex);
+                                    }
+                                  }}
+                                  className="inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-200 dark:bg-amber-400/20 dark:text-amber-100 dark:hover:bg-amber-400/30"
+                                  title={source?.heading || source?.title || "查看引用来源"}
+                                >
+                                  {children}
+                                </a>
+                              );
+                            }
 
-                          return (
-                            <a href={href} target="_blank" rel="noreferrer">
-                              {children}
-                            </a>
-                          );
-                        },
-                      }}
-                    >
-                      {normalizeAssistantMarkdown(message.content)}
-                    </Markdown>
+                            return (
+                              <a href={href} target="_blank" rel="noreferrer">
+                                {children}
+                              </a>
+                            );
+                          },
+                        }}
+                      >
+                        {normalizeAssistantMarkdown(message.content)}
+                      </Markdown>
+
+                      {inlineImageSources.length > 0 && (
+                        <div className="mt-4 space-y-3">
+                          {inlineImageSources.map((source) => (
+                            <div
+                              key={`${source.postId}-${source.sourceIndex}`}
+                              className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950/60"
+                            >
+                              <div className="grid gap-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
+                                <div className="grid grid-cols-1 gap-2 p-2">
+                                  {getSourceImages(source, 2).map((image) => (
+                                    <img
+                                      key={image.path}
+                                      src={image.url}
+                                      alt={image.alt || image.path}
+                                      className="max-h-56 w-full rounded-xl object-cover"
+                                      loading="lazy"
+                                    />
+                                  ))}
+                                </div>
+                                <div className="p-3">
+                                  <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
+                                    配图来源 [{source.sourceIndex + 1}]
+                                  </div>
+                                  <div className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                                    {source.heading || source.title}
+                                  </div>
+                                  <div className="mt-2 line-clamp-5 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                                    {source.text}
+                                  </div>
+                                  <a
+                                    href={source.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mt-3 inline-flex text-xs font-medium text-blue-600 hover:underline dark:text-blue-300"
+                                  >
+                                    打开原文
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   ) : (
-                    <Markdown className="prose prose-sm max-w-none dark:prose-invert">
+                    <Markdown className="prose prose-sm max-w-none prose-p:my-0 dark:prose-invert">
                       {message.content}
                     </Markdown>
                   )}
@@ -292,18 +374,30 @@ export default function BlogChat() {
                     </div>
                     <div className="space-y-2">
                       {(message.sources || []).map((source, index) => (
-                        <button
+                        <div
                           key={`${source.postId}-${source.anchor || index}`}
-                          type="button"
-                          onClick={() => openSource(message.sources || [], index)}
                           className="w-full rounded-xl border border-zinc-200 px-3 py-3 text-left transition hover:border-amber-300 hover:bg-amber-50 dark:border-zinc-800 dark:hover:border-amber-400/40 dark:hover:bg-zinc-900"
                         >
-                          <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                            {getSourceLabel(source, index)}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openSource(message.sources || [], index)}
+                            className="block w-full text-left"
+                          >
+                            <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                              {getSourceLabel(source, index)}
+                            </div>
+                          </button>
                           <div className="mt-1 line-clamp-3 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
                             {source.text}
                           </div>
+                          <a
+                            href={source.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-flex break-all text-xs font-medium text-blue-600 hover:underline dark:text-blue-300"
+                          >
+                            {source.url}
+                          </a>
                           {(source.images || []).length > 0 && (
                             <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
                               {(source.images || []).slice(0, 4).map((image) => (
@@ -321,7 +415,7 @@ export default function BlogChat() {
                               ))}
                             </div>
                           )}
-                        </button>
+                        </div>
                       ))}
                     </div>
                   </section>
@@ -342,9 +436,9 @@ export default function BlogChat() {
       <footer className="border-t border-zinc-200 px-3 py-3 dark:border-zinc-800">
         <PlaceholdersAndVanishInput
           placeholders={[
-            "问问博客里的文章...",
-            "EdgeOne Pages 怎么部署？",
-            "Waline 代理怎么配置？",
+            "从博客文章里找线索...",
+            "帮我归纳某篇文章的重点",
+            "想了解部署、评论、主题配置都可以问",
           ]}
           onChange={(event) => setInputMessage(event.target.value)}
           onSubmit={handleSendMessage}

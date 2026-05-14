@@ -391,6 +391,14 @@ pnpm sync-rag
 
 同步脚本会读取 `src/content/posts/**/*.md`，并把每篇文章所在目录作为原始 bundle 上传，包括 `index.md` 和该文章目录下任意层级的本地图片资源，不要求必须放在 `images/` 目录。脚本只负责上传原文和资源，不再负责 Markdown 清洗、图片解析或分片。
 
+如果之前同步中途失败，可能出现文章 `contentHash` 已写入但 chunks / vectors 未完整入库的半成品状态。此时可以强制重建全部文章：
+
+```bash
+pnpm sync-rag:force
+```
+
+也可以在 GitHub Actions 手动运行 `Sync Cloudflare RAG Knowledge Base` 时勾选 `force_rebuild`。强制重建会忽略 `contentHash` 跳过逻辑，删除旧文章相关的 R2、D1、Vectorize 数据后重新写入。
+
 脚本会自动排除：
 
 - `draft: true`
@@ -398,6 +406,8 @@ pnpm sync-rag
 - 配置了 `password` 的文章
 
 Cloudflare 端按 `contentHash` 增量更新：未变化文章跳过，变化文章会重新写入 R2 并重建 D1 chunks/images 与 Vectorize vectors，已删除文章会从 R2、D1 和 Vectorize 中移除。
+
+增量同步在跳过文章前也会检查 D1 中是否已有 chunks；如果只有文章记录但没有分片，会自动重建，避免失败后的半成品数据被误判为正常。
 
 ---
 

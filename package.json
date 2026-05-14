@@ -6,6 +6,7 @@
 		"sync-content": "node scripts/sync-content.js",
 		"sync-rag": "node scripts/sync-blog-rag.mjs",
 		"sync-rag:dry-run": "node scripts/sync-blog-rag.mjs --dry-run",
+		"sync-rag:force": "node scripts/sync-blog-rag.mjs --force",
 		"init-content": "node scripts/init-content-repo.js",
 		"predev": "node scripts/predev.mjs",
 		"prestart": "node scripts/predev.mjs",

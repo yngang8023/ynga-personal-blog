@@ -76,11 +76,15 @@ function readConfig() {
 	const token = process.env.BLOG_RAG_SYNC_TOKEN || process.env.RAG_SYNC_TOKEN || "";
 	const siteURL = process.env.BLOG_RAG_SITE_URL || defaults.siteURL;
 	const dryRun = hasFlag("--dry-run");
+	const forceRebuild =
+		hasFlag("--force") ||
+		process.env.BLOG_RAG_FORCE_REBUILD === "true" ||
+		process.env.BLOG_RAG_FORCE_REBUILD === "1";
 
-	return { endpoint, token, siteURL, dryRun };
+	return { endpoint, token, siteURL, dryRun, forceRebuild };
 }
 
-async function syncPosts({ endpoint, token, siteURL, posts }) {
+async function syncPosts({ endpoint, token, siteURL, posts, forceRebuild }) {
 	if (!token) {
 		throw new Error(
 			"Missing BLOG_RAG_SYNC_TOKEN or RAG_SYNC_TOKEN. Put it in .env or CI secrets.",
@@ -93,7 +97,7 @@ async function syncPosts({ endpoint, token, siteURL, posts }) {
 			"Content-Type": "application/json",
 			Authorization: `Bearer ${token}`,
 		},
-		body: JSON.stringify({ siteURL, posts }),
+		body: JSON.stringify({ siteURL, posts, force: forceRebuild }),
 	});
 
 	const text = await response.text();
@@ -122,6 +126,9 @@ async function main() {
 
 	console.log(`准备同步 ${posts.length} 篇公开博客文章目录到 RAG 知识库。`);
 	console.log(`同步地址：${config.endpoint}`);
+	if (config.forceRebuild) {
+		console.log("强制重建模式：服务端会忽略 contentHash 跳过逻辑，重新写入所有文章。");
+	}
 
 	if (config.dryRun) {
 		console.log("\nDry run 模式，不会发送请求。");
@@ -129,6 +136,7 @@ async function main() {
 			JSON.stringify(
 				{
 					count: posts.length,
+					forceRebuild: config.forceRebuild,
 					posts: posts.map((post) => ({
 						id: post.id,
 						url: post.url,
@@ -152,6 +160,7 @@ async function main() {
 		token: config.token,
 		siteURL: config.siteURL,
 		posts,
+		forceRebuild: config.forceRebuild,
 	});
 
 	console.log("RAG 知识库同步完成：");

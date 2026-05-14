@@ -272,7 +272,7 @@ function normalizeString(value: unknown, fallback = ""): string {
 }
 
 function buildPostUrl(siteURL: string | undefined, post: BlogPostBundleInput, data: Record<string, unknown>): string {
-  if (post.url) {
+  if (post.url && !siteURL) {
     return post.url;
   }
 
@@ -281,6 +281,18 @@ function buildPostUrl(siteURL: string | undefined, post: BlogPostBundleInput, da
   }
 
   const base = siteURL.endsWith("/") ? siteURL : `${siteURL}/`;
+  if (post.url) {
+    try {
+      const incoming = new URL(post.url);
+      const expected = new URL(base);
+      if (incoming.origin === expected.origin && !incoming.pathname.startsWith("/embed/")) {
+        return incoming.toString();
+      }
+    } catch {
+      // Fall through and rebuild from siteURL.
+    }
+  }
+
   if (data.permalink) {
     return new URL(`${String(data.permalink).replace(/^\/+/, "").replace(/\/+$/, "")}/`, base).toString();
   }

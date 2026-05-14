@@ -5,7 +5,6 @@ on:
   push:
     branches: [ main ]
     paths:
-      - "cloudflare-rag/**"
       - "src/content/posts/**"
       - "scripts/blog-rag-sync-utils.mjs"
       - "scripts/sync-blog-rag.mjs"
@@ -13,6 +12,12 @@ on:
       - ".github/workflows/deploy.yml"
   # 允许在 GitHub Actions 中手动触发一次全文同步
   workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: "忽略 contentHash，强制重建全部文章 RAG 数据"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -45,6 +50,7 @@ jobs:
           BLOG_RAG_SYNC_TOKEN: ${{ secrets.BLOG_RAG_SYNC_TOKEN }}
           BLOG_RAG_SYNC_ENDPOINT: ${{ vars.BLOG_RAG_SYNC_ENDPOINT }}
           BLOG_RAG_SITE_URL: ${{ vars.BLOG_RAG_SITE_URL }}
+          BLOG_RAG_FORCE_REBUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.force_rebuild || false }}
 
       # 当前博客正式部署由 EdgeOne Pages 负责，这里默认不执行 GitHub Pages 部署。
       # 如果其他开发者需要恢复 GitHub Pages 发布，可取消下面这段注释：

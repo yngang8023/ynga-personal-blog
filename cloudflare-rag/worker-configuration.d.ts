@@ -7,6 +7,7 @@ interface Env {
 	BLOG_CORPUS_ID: string;
 	EMBEDDING_MODEL: string;
 	CHAT_MODEL: string;
+	BLOG_SITE_URL: string;
 	DB: D1Database;
 	VECTORIZE_INDEX: VectorizeIndex;
 	AI: Ai;

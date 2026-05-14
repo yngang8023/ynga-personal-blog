@@ -43,6 +43,13 @@ jobs:
           # ENABLE_CONTENT_SYNC: true
           # CONTENT_REPO_URL: ${{ secrets.CONTENT_REPO_URL }}
           # USE_SUBMODULE: true
+
+      - name: Sync Cloudflare RAG knowledge base
+        run: pnpm sync-rag
+        env:
+          BLOG_RAG_SYNC_TOKEN: ${{ secrets.BLOG_RAG_SYNC_TOKEN }}
+          BLOG_RAG_SYNC_ENDPOINT: ${{ vars.BLOG_RAG_SYNC_ENDPOINT }}
+          BLOG_RAG_SITE_URL: ${{ vars.BLOG_RAG_SITE_URL }}
       
       - name: Deploy to pages branch
         uses: JamesIves/github-pages-deploy-action@v4

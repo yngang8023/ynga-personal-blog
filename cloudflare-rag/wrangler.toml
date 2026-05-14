@@ -1,0 +1,33 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "cloudflare-rag"
+compatibility_date = "2024-08-21"
+pages_build_output_dir = "./build/client"
+
+[placement]
+mode = "smart"
+
+[ai]
+binding = "AI"
+
+[vars]
+BLOG_CORPUS_ID = "mizuki-blog"
+EMBEDDING_MODEL = "@cf/baai/bge-m3"
+CHAT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "cloudflare-rag-index"
+
+[[d1_databases]]
+binding = "DB"                                       
+database_name = "cloudflare-rag"
+database_id = "95e371b9-de4e-4a7e-a38d-2805d7152122"
+migrations_dir = "drizzle"
+
+[[kv_namespaces]]
+binding = "rate_limiter"
+id = "356e2c01849247b6a80458ab0e8f705f"
+
+[[r2_buckets]]
+binding = "POST_ASSETS"
+bucket_name = "cloudflare-rag-post-assets"

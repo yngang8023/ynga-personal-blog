@@ -3,6 +3,7 @@ import type { MarkdownHeading } from "astro";
 
 import { musicPlayerConfig, siteConfig } from "../../config";
 import FloatingTOC from "../features/toc/FloatingTOC.astro";
+import AiChatWidget from "./AiChatWidget.astro";
 import BackToHome from "./BackToHome.astro";
 import BackToTop from "./BackToTop.astro";
 import MusicFabButton from "./MusicFabButton.svelte";
@@ -31,6 +32,9 @@ const { headings = [] } = Astro.props;
 			</div>
 		)
 	}
+	<div class="floating-control-item" data-control-key="ai">
+		<AiChatWidget />
+	</div>
 	<div class="floating-control-item" data-control-key="home">
 		<BackToHome />
 	</div>
@@ -99,6 +103,7 @@ const { headings = [] } = Astro.props;
 	}
 
 	:global(html.fab-visibility-locked #floating-toc-btn.fab-lock-visible),
+	:global(html.fab-visibility-locked #ai-chat-btn.fab-lock-visible),
 	:global(html.fab-visibility-locked #back-to-home-btn.fab-lock-visible),
 	:global(html.fab-visibility-locked #back-to-top-btn.fab-lock-visible) {
 		min-width: var(--fab-button-size) !important;
@@ -121,6 +126,9 @@ const { headings = [] } = Astro.props;
 		html:not(.dark).fab-visibility-locked #floating-toc-btn.fab-lock-visible
 	),
 	:global(
+		html:not(.dark).fab-visibility-locked #ai-chat-btn.fab-lock-visible
+	),
+	:global(
 		html:not(.dark).fab-visibility-locked #back-to-home-btn.fab-lock-visible
 	),
 	:global(
@@ -130,6 +138,7 @@ const { headings = [] } = Astro.props;
 	}
 
 	:global(html.fab-visibility-locked #floating-toc-btn.fab-lock-visible.hide),
+	:global(html.fab-visibility-locked #ai-chat-btn.fab-lock-visible.hide),
 	:global(html.fab-visibility-locked #back-to-home-btn.fab-lock-visible.hide),
 	:global(html.fab-visibility-locked #back-to-top-btn.fab-lock-visible.hide) {
 		transform: scale(1) !important;
@@ -146,6 +155,7 @@ const { headings = [] } = Astro.props;
 	}
 
 	:global(html.fab-visibility-locked #floating-toc-btn.fab-lock-visible svg),
+	:global(html.fab-visibility-locked #ai-chat-btn.fab-lock-visible svg),
 	:global(html.fab-visibility-locked #back-to-home-btn.fab-lock-visible svg),
 	:global(html.fab-visibility-locked #back-to-top-btn.fab-lock-visible svg) {
 		opacity: 1 !important;
@@ -251,6 +261,7 @@ const { headings = [] } = Astro.props;
 
 		const controlButtonIds = [
 			"floating-toc-btn",
+			"ai-chat-btn",
 			"back-to-home-btn",
 			"back-to-top-btn",
 		];
@@ -285,6 +296,8 @@ const { headings = [] } = Astro.props;
 
 				if (key === "toc") {
 					visible = isButtonVisible("floating-toc-btn");
+				} else if (key === "ai") {
+					visible = isButtonVisible("ai-chat-btn");
 				} else if (key === "home") {
 					visible = isButtonVisible("back-to-home-btn");
 				} else if (key === "top") {
@@ -365,6 +378,7 @@ const { headings = [] } = Astro.props;
 		function initFloatingControlVisibility() {
 			updateFloatingControlVisibility();
 			observeFloatingControlButton("floating-toc-btn");
+			observeFloatingControlButton("ai-chat-btn");
 			observeFloatingControlButton("back-to-home-btn");
 			observeFloatingControlButton("back-to-top-btn");
 		}
@@ -380,11 +394,13 @@ const { headings = [] } = Astro.props;
 				const id =
 					key === "toc"
 						? "floating-toc-btn"
-						: key === "home"
-							? "back-to-home-btn"
-							: key === "top"
-								? "back-to-top-btn"
-								: null;
+						: key === "ai"
+							? "ai-chat-btn"
+							: key === "home"
+								? "back-to-home-btn"
+								: key === "top"
+									? "back-to-top-btn"
+									: null;
 
 				if (!id) {
 					continue;

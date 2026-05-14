@@ -28,6 +28,21 @@ import { LinkPreset } from "./types/config";
 const SITE_LANG = "zh_CN"; // 语言代码，例如：'en', 'zh_CN', 'ja' 等。
 const SITE_TIMEZONE = 8; //设置你的网站时区 from -12 to 12 default in UTC+8
 
+// Cloudflare RAG 同步接口：本地同步脚本和 GitHub Actions 默认会读取这个地址，可用 BLOG_RAG_SYNC_ENDPOINT 临时覆盖。
+export const BLOG_RAG_SYNC_ENDPOINT =
+	"https://rag.ynga.kingcola-icg.cn/api/sync-posts";
+// Cloudflare RAG 悬浮聊天窗口地址：右下角 AI 助手 iframe 会嵌入这个 /embed 页面。
+export const BLOG_RAG_EMBED_URL = "https://rag.ynga.kingcola-icg.cn/embed";
+// 博客正式站点地址：同步文章到 RAG 时用于生成“参考来源”的文章 URL。
+export const BLOG_RAG_SITE_URL = "https://ynga.kingcola-icg.cn/";
+
+// 博客 RAG 集成配置统一入口，后续更换 RAG 服务域名或站点域名时优先改这里。
+export const blogRagConfig = {
+	syncEndpoint: BLOG_RAG_SYNC_ENDPOINT,
+	embedUrl: BLOG_RAG_EMBED_URL,
+	siteUrl: BLOG_RAG_SITE_URL,
+} as const;
+
 export const umamiConfig = {
 	enable: true,
 	trackInDev: false, // 是否在开发环境下启用统计
@@ -45,7 +60,7 @@ export const siteConfig: SiteConfig = {
 	title: "HiYngaの随✏️记",
 	subtitle:
 		"把路过的风景🎐、零碎的心事🌸慢慢收集起来，写成属于自己的小记📖🌷",
-	siteURL: "https://ynga.kingcola-icg.cn/", // 请替换为你的站点URL，以斜杠结尾
+	siteURL: BLOG_RAG_SITE_URL, // 请替换为你的站点URL，以斜杠结尾
 	siteStartDate: "2026-05-07", // 站点开始运行日期，用于站点统计组件计算运行天数
 
 	timeZone: SITE_TIMEZONE,

@@ -1,0 +1,280 @@
+---
+import { Icon } from "astro-icon/components";
+
+import FloatingButton from "@components/common/FloatingButton.astro";
+import { blogRagConfig } from "../../config";
+
+const embedUrl = blogRagConfig.embedUrl;
+---
+
+<div class="ai-chat-widget">
+	<FloatingButton
+		id="ai-chat-btn"
+		icon="material-symbols:smart-toy-outline-rounded"
+		ariaLabel="AI Assistant"
+		onclick="window.toggleAiChat?.()"
+	/>
+
+	<div id="ai-chat-backdrop" class="ai-chat-backdrop" hidden></div>
+	<section
+		id="ai-chat-panel"
+		class="ai-chat-panel"
+		aria-hidden="true"
+		aria-label="AI Assistant"
+	>
+		<header class="ai-chat-panel__header">
+			<div class="ai-chat-panel__title">
+				<Icon name="material-symbols:smart-toy-outline-rounded" />
+				<span>AI 助手</span>
+			</div>
+			<button
+				id="ai-chat-close"
+				type="button"
+				class="ai-chat-panel__close"
+				aria-label="Close AI Assistant"
+			>
+				<Icon name="material-symbols:close-rounded" />
+			</button>
+		</header>
+		<iframe
+			id="ai-chat-iframe"
+			title="Ynga Blog AI Assistant"
+			data-src={embedUrl}
+			loading="lazy"
+			referrerpolicy="no-referrer-when-downgrade"
+			allow="clipboard-write"
+		></iframe>
+	</section>
+</div>
+
+<style>
+	.ai-chat-widget {
+		position: relative;
+		z-index: 1;
+		pointer-events: auto;
+	}
+
+	.ai-chat-widget.is-open {
+		z-index: 100;
+	}
+
+	.ai-chat-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 98;
+		background: rgba(15, 23, 42, 0.22);
+		backdrop-filter: blur(2px);
+	}
+
+	.ai-chat-panel {
+		position: fixed;
+		right: calc(var(--fab-group-right) + var(--fab-button-size) + 0.75rem);
+		bottom: 1.25rem;
+		z-index: 99;
+		display: flex;
+		flex-direction: column;
+		width: min(26rem, calc(100vw - 2rem));
+		height: min(42rem, calc(100dvh - 2.5rem));
+		overflow: hidden;
+		background: var(--card-bg);
+		border: 1px solid var(--line-color);
+		border-radius: 1rem;
+		box-shadow:
+			0 24px 80px rgba(15, 23, 42, 0.22),
+			0 10px 30px rgba(15, 23, 42, 0.16);
+		opacity: 0;
+		visibility: hidden;
+		transform: translateY(0.75rem) scale(0.98);
+		transform-origin: bottom right;
+		transition:
+			opacity 0.2s ease,
+			visibility 0.2s ease,
+			transform 0.2s ease;
+		pointer-events: none;
+	}
+
+	.ai-chat-widget.is-open .ai-chat-panel {
+		opacity: 1;
+		visibility: visible;
+		transform: translateY(0) scale(1);
+		pointer-events: auto;
+	}
+
+	.ai-chat-panel__header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
+		min-height: 3rem;
+		padding: 0.625rem 0.75rem 0.625rem 1rem;
+		background: var(--card-bg);
+		border-bottom: 1px solid var(--line-color);
+		color: var(--primary);
+	}
+
+	.ai-chat-panel__title {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 0;
+		font-size: 0.95rem;
+		font-weight: 700;
+		line-height: 1;
+	}
+
+	.ai-chat-panel__title :global(svg) {
+		width: 1.2rem;
+		height: 1.2rem;
+		flex: 0 0 auto;
+	}
+
+	.ai-chat-panel__close {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 2rem;
+		height: 2rem;
+		flex: 0 0 auto;
+		border: 0;
+		border-radius: 0.625rem;
+		background: transparent;
+		color: var(--content-meta);
+		cursor: pointer;
+		transition:
+			background 0.18s ease,
+			color 0.18s ease,
+			transform 0.18s ease;
+	}
+
+	.ai-chat-panel__close:hover {
+		background: var(--btn-regular-bg);
+		color: var(--primary);
+	}
+
+	.ai-chat-panel__close:active {
+		transform: scale(0.94);
+	}
+
+	.ai-chat-panel__close :global(svg) {
+		width: 1.25rem;
+		height: 1.25rem;
+	}
+
+	.ai-chat-panel iframe {
+		display: block;
+		width: 100%;
+		min-width: 0;
+		height: 100%;
+		flex: 1 1 auto;
+		border: 0;
+		background: var(--card-bg);
+	}
+
+	:global(html.ai-chat-open) .floating-controls-container {
+		z-index: 100;
+	}
+
+	@media (max-width: 768px) {
+		.ai-chat-panel {
+			inset: auto 0.75rem 0.75rem;
+			width: auto;
+			height: min(78dvh, 42rem);
+			border-radius: 1rem;
+			transform-origin: bottom center;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.ai-chat-panel {
+			inset: auto 0.5rem 0.5rem;
+			height: min(80dvh, 40rem);
+			border-radius: 0.875rem;
+		}
+
+		.ai-chat-panel__header {
+			min-height: 2.75rem;
+			padding: 0.5rem 0.625rem 0.5rem 0.875rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.ai-chat-panel,
+		.ai-chat-panel__close {
+			transition: none;
+		}
+	}
+</style>
+
+<script is:inline>
+	(() => {
+		const win = window;
+		const doc = document;
+
+		if (typeof win.__aiChatWidgetCleanup === "function") {
+			win.__aiChatWidgetCleanup();
+		}
+
+		const widget = doc.querySelector(".ai-chat-widget");
+		const button = doc.getElementById("ai-chat-btn");
+		const panel = doc.getElementById("ai-chat-panel");
+		const iframe = doc.getElementById("ai-chat-iframe");
+		const closeButton = doc.getElementById("ai-chat-close");
+		const backdrop = doc.getElementById("ai-chat-backdrop");
+
+		if (!widget || !button || !panel || !iframe || !closeButton || !backdrop) {
+			return;
+		}
+
+		let isOpen = false;
+
+		function loadIframe() {
+			if (!iframe.getAttribute("src")) {
+				const src = iframe.getAttribute("data-src");
+				if (src) {
+					iframe.setAttribute("src", src);
+				}
+			}
+		}
+
+		function setOpen(nextOpen) {
+			isOpen = nextOpen;
+			widget.classList.toggle("is-open", isOpen);
+			button.classList.toggle("active", isOpen);
+			panel.setAttribute("aria-hidden", String(!isOpen));
+			backdrop.hidden = !isOpen;
+			doc.documentElement.classList.toggle("ai-chat-open", isOpen);
+
+			if (isOpen) {
+				loadIframe();
+			}
+		}
+
+		function toggleAiChat(forceOpen) {
+			setOpen(typeof forceOpen === "boolean" ? forceOpen : !isOpen);
+		}
+
+		function handleKeydown(event) {
+			if (event.key === "Escape" && isOpen) {
+				setOpen(false);
+			}
+		}
+
+		function handleClose() {
+			setOpen(false);
+		}
+
+		win.toggleAiChat = toggleAiChat;
+		closeButton.addEventListener("click", handleClose);
+		backdrop.addEventListener("click", handleClose);
+		doc.addEventListener("keydown", handleKeydown);
+
+		win.__aiChatWidgetCleanup = () => {
+			closeButton.removeEventListener("click", handleClose);
+			backdrop.removeEventListener("click", handleClose);
+			doc.removeEventListener("keydown", handleKeydown);
+			if (win.toggleAiChat === toggleAiChat) {
+				delete win.toggleAiChat;
+			}
+		};
+	})();
+</script>

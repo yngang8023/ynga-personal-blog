@@ -295,6 +295,76 @@ USE_SUBMODULE=false  # ⚠️ Cloudflare Pages 默认不支持 submodule
 
 ---
 
+## 🤖 Cloudflare RAG 知识库同步
+
+博客文章可以同步到独立部署的 Cloudflare RAG 服务，供右下角 AI 助手检索回答。
+
+### 环境变量
+
+在本地 `.env` 或 CI/CD Secrets 中配置：
+
+```env
+BLOG_RAG_SYNC_ENDPOINT=https://rag.ynga.kingcola-icg.cn/api/sync-posts
+BLOG_RAG_SYNC_TOKEN=your-rag-sync-token
+BLOG_RAG_SITE_URL=https://ynga.kingcola-icg.cn/
+```
+
+`BLOG_RAG_SYNC_TOKEN` 必须和 Cloudflare Pages 项目 `cloudflare-rag` 中设置的 `RAG_SYNC_TOKEN` 一致。
+
+### GitHub 推送后自动同步
+
+`.github/workflows/deploy.yml` 已在 `pnpm run build` 成功后执行：
+
+```bash
+pnpm sync-rag
+```
+
+因此每次推送到 `main` 分支时，博客会先构建，再把公开文章目录同步到 Cloudflare RAG，最后部署到 `pages` 分支。
+
+需要在 GitHub 仓库中添加 Actions Secret：
+
+- `BLOG_RAG_SYNC_TOKEN`: 填入 Cloudflare Pages 项目中 `RAG_SYNC_TOKEN` 的同一个值
+
+需要在 GitHub 仓库中添加 Actions Variables：
+
+- `BLOG_RAG_SYNC_ENDPOINT`: `https://rag.ynga.kingcola-icg.cn/api/sync-posts`
+- `BLOG_RAG_SITE_URL`: `https://ynga.kingcola-icg.cn/`
+
+workflow 会通过变量注入同步接口和站点 URL，避免把部署地址硬编码在 `.github/workflows/deploy.yml`：
+
+```yaml
+BLOG_RAG_SYNC_ENDPOINT: ${{ vars.BLOG_RAG_SYNC_ENDPOINT }}
+BLOG_RAG_SITE_URL: ${{ vars.BLOG_RAG_SITE_URL }}
+```
+
+本地脚本的默认值集中维护在 `src/config.ts` 的 `blogRagConfig`，如果 GitHub Variables 或本地 `.env` 未提供对应变量，脚本会回退到 `src/config.ts` 中的默认值。
+
+### 本地预览同步内容
+
+```bash
+pnpm sync-rag:dry-run
+```
+
+该命令只生成待同步文章目录列表，不会请求 Cloudflare。输出中的 `fileCount` / `imageCount` 可用于确认 Markdown 和本地图片是否被纳入同步。
+
+### 手动同步到 Cloudflare RAG
+
+```bash
+pnpm sync-rag
+```
+
+同步脚本会读取 `src/content/posts/**/*.md`，并把每篇文章所在目录作为原始 bundle 上传，包括 `index.md` 和该文章目录下任意层级的本地图片资源，不要求必须放在 `images/` 目录。脚本只负责上传原文和资源，不再负责 Markdown 清洗、图片解析或分片。
+
+脚本会自动排除：
+
+- `draft: true`
+- `encrypted: true`
+- 配置了 `password` 的文章
+
+Cloudflare 端按 `contentHash` 增量更新：未变化文章跳过，变化文章会重新写入 R2 并重建 D1 chunks/images 与 Vectorize vectors，已删除文章会从 R2、D1 和 Vectorize 中移除。
+
+---
+
 ## 🔍 故障排查
 
 ### 问题 1: 部署失败 - "未设置 CONTENT_REPO_URL"

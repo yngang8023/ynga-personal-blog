@@ -21,6 +21,12 @@ test("AI chat widget embeds the deployed Cloudflare RAG chat UI lazily", async (
 	assert.match(source, /embed_token/);
 	assert.match(source, /ai-chat-status/);
 	assert.match(source, /window\.toggleAiChat/);
+	assert.match(source, /IFRAME_READY_TIMEOUT_MS = 12000/);
+	assert.match(source, /IFRAME_MAX_LOAD_ATTEMPTS = 2/);
+	assert.match(source, /连接较慢，正在重试 AI 助手/);
+	assert.match(source, /AI 助手连接超时，请稍后再试/);
+	assert.match(source, /data\.type !== "ynga-rag-embed-ready"/);
+	assert.doesNotMatch(source, /iframe\.addEventListener\("load"/);
 });
 
 test("floating controls mount and track the AI chat button", async () => {

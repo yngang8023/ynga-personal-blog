@@ -2,19 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-  font-family: "LXGWWenKai";
-  src: url("https://ynga.kingcola-icg.cn/assets/font/LXGWWenKai-Regular.woff2")
-    format("woff2");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  unicode-range:
-    U+0020-007F,
-    U+4E00-9FFF,
-    U+3000-303F;
-}
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -78,12 +65,16 @@
   }
   body {
     font-family:
-      "LXGWWenKai",
+      ui-serif,
+      Georgia,
+      Cambria,
+      "Times New Roman",
+      Times,
       "Noto Serif SC",
       "Source Han Serif SC",
-      "PingFang SC",
-      "Hiragino Sans GB",
-      "Microsoft YaHei",
+      "Songti SC",
+      "STSong",
+      SimSun,
       serif;
     @apply bg-background text-foreground;
   }

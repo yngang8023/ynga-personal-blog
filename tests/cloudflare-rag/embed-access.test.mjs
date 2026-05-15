@@ -64,7 +64,7 @@ test("valid bootstrap token establishes a session and redirects to a clean embed
 	const location = response.headers.get("location") ?? "";
 	assert.equal(
 		location,
-		`${RAG_ORIGIN}/embed?theme=dark`,
+		"/embed?theme=dark",
 	);
 
 	const setCookie = response.headers.get("set-cookie") ?? "";
@@ -72,6 +72,33 @@ test("valid bootstrap token establishes a session and redirects to a clean embed
 	assert.match(setCookie, /HttpOnly/i);
 	assert.match(setCookie, /Secure/i);
 	assert.match(setCookie, /SameSite=Strict/i);
+});
+
+test("bootstrap redirect stays on the current host even when the origin request host differs", async () => {
+	const token = await issueEmbedBootstrapToken({
+		secret: SHARED_SECRET,
+		origin: BLOG_ORIGIN,
+		now: FIXED_NOW,
+	});
+
+	const response = await authorizeEmbedPageRequest({
+		request: new Request(
+			`https://cloudflare-rag-1mw.pages.dev/embed?theme=dark&${RAG_EMBED_QUERY_PARAM}=${encodeURIComponent(token)}`,
+			{
+				headers: {
+					referer: `${BLOG_ORIGIN}/posts/security-demo/`,
+					"sec-fetch-site": "same-site",
+					"sec-fetch-dest": "iframe",
+				},
+			},
+		),
+		env,
+		now: FIXED_NOW,
+		renderAuthorized: async () => Response.text("ok"),
+	});
+
+	assert.equal(response.status, 302);
+	assert.equal(response.headers.get("location"), "/embed?theme=dark");
 });
 
 test("valid iframe session allows embed rendering and adds frame-ancestors protection", async () => {

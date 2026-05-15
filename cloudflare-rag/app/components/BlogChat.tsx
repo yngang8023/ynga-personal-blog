@@ -484,7 +484,7 @@ export default function BlogChat() {
   return (
     <div className="blog-chat-shell flex h-screen min-h-[420px] flex-col bg-[#fafafa] text-zinc-950 transition-colors dark:bg-zinc-950 dark:text-zinc-50">
       <header className="border-b border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="text-base font-semibold tracking-tight">HiYngaの随✏️记 - AI助手</div>
+        <div className="text-base font-semibold tracking-tight">HiYngaの随✏️记 - 小Y</div>
       </header>
 
       <main
@@ -651,7 +651,7 @@ export default function BlogChat() {
                 <div
                   className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                     message.role === "user"
-                      ? "border border-sky-200 bg-sky-50 text-slate-900 dark:border-sky-400/40 dark:bg-sky-400/14 dark:text-sky-50"
+                      ? "border border-sky-200 bg-sky-50 text-slate-900 dark:border-sky-800/80 dark:bg-sky-950 dark:text-sky-50"
                       : "border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900/95 dark:text-zinc-100"
                   }`}
                 >
@@ -763,7 +763,7 @@ export default function BlogChat() {
                     </>
                   ) : (
                     <Markdown
-                      className="prose prose-sm max-w-none prose-p:my-0 dark:prose-invert dark:prose-p:text-sky-50"
+                      className="prose prose-sm max-w-none prose-p:my-0 prose-a:text-sky-700 prose-a:no-underline hover:prose-a:underline dark:prose-invert dark:prose-p:text-sky-50 dark:prose-li:text-sky-50 dark:prose-strong:text-sky-50 dark:prose-a:text-sky-200"
                       urlTransform={markdownUrlTransform}
                     >
                       {message.content}

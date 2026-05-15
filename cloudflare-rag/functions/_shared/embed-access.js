@@ -5,7 +5,6 @@ import {
 	issueEmbedSessionToken,
 	verifyEmbedBootstrapToken,
 	verifyEmbedSessionToken,
-	stripEmbedTokenFromUrl,
 } from "./rag-embed-auth.js";
 
 if (
@@ -53,6 +52,13 @@ function buildMisconfiguredResponse(message) {
 			"content-type": "text/plain; charset=utf-8",
 		},
 	});
+}
+
+function buildRelativeCleanEmbedLocation(requestUrl) {
+	const url = new URL(requestUrl);
+	url.searchParams.delete(RAG_EMBED_QUERY_PARAM);
+	const search = url.searchParams.toString();
+	return `${url.pathname}${search ? `?${search}` : ""}${url.hash}`;
 }
 
 function getCookieValue(request, cookieName) {
@@ -202,7 +208,7 @@ export async function authorizeEmbedPageRequest({
 	return new Response(null, {
 		status: 302,
 		headers: {
-			location: stripEmbedTokenFromUrl(request.url),
+			location: buildRelativeCleanEmbedLocation(request.url),
 			"set-cookie": buildEmbedSessionCookie(renewedSessionToken),
 			"cache-control": "no-store, no-transform",
 		},

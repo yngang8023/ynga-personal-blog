@@ -5,10 +5,10 @@ import test from "node:test";
 
 const rootPath = path.resolve("cloudflare-rag/app/root.tsx");
 
-test("cloudflare-rag font preload uses the bundled asset import URL", async () => {
+test("cloudflare-rag root does not preload or preconnect a custom WenKai font", async () => {
 	const source = await readFile(rootPath, "utf8");
 
-	assert.match(source, /import lxgwWenkaiRegularWoff2Url from "\.\.\/assets\/LXGWWenKai-Regular\.woff2";/);
-	assert.match(source, /href=\{lxgwWenkaiRegularWoff2Url\}/);
-	assert.doesNotMatch(source, /href="\/assets\/LXGWWenKai-Regular\.woff2"/);
+	assert.doesNotMatch(source, /LXGWWenKai-Regular\.woff2/);
+	assert.doesNotMatch(source, /rel="preload"/);
+	assert.doesNotMatch(source, /rel="preconnect"\s+href="https:\/\/ynga\.kingcola-icg\.cn"/);
 });

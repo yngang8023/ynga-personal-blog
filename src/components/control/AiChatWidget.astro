@@ -318,7 +318,12 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 		let isOpen = false;
 		let themeObserver = null;
 		let iframeBootstrapPromise = null;
+		let iframeReadyTimeoutId = 0;
+		let iframeLoadAttemptCount = 0;
+		let iframeNavigationId = 0;
 		let previousFocus = null;
+		const IFRAME_READY_TIMEOUT_MS = 12000;
+		const IFRAME_MAX_LOAD_ATTEMPTS = 2;
 
 		function getThemeMode() {
 			return doc.documentElement.classList.contains("dark") ? "dark" : "light";
@@ -336,6 +341,47 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 			delete status.dataset.state;
 		}
 
+		function clearIframeReadyTimeout() {
+			if (iframeReadyTimeoutId) {
+				win.clearTimeout(iframeReadyTimeoutId);
+				iframeReadyTimeoutId = 0;
+			}
+		}
+
+		function handleIframeUnavailable() {
+			clearIframeReadyTimeout();
+			iframe.dataset.ready = "false";
+
+			if (!isOpen) {
+				return;
+			}
+
+			if (iframeLoadAttemptCount < IFRAME_MAX_LOAD_ATTEMPTS) {
+				iframe.removeAttribute("src");
+				loadIframe({ retry: true });
+				return;
+			}
+
+			iframe.removeAttribute("src");
+			setStatus("AI 助手连接超时，请稍后再试。", "error");
+		}
+
+		function scheduleIframeReadyTimeout() {
+			clearIframeReadyTimeout();
+			const navigationId = String(iframeNavigationId);
+			iframeReadyTimeoutId = win.setTimeout(() => {
+				if (
+					!isOpen ||
+					iframe.dataset.ready === "true" ||
+					iframe.dataset.navigationId !== navigationId
+				) {
+					return;
+				}
+
+				handleIframeUnavailable();
+			}, IFRAME_READY_TIMEOUT_MS);
+		}
+
 		function postThemeToIframe() {
 			const theme = getThemeMode();
 			if (iframe?.contentWindow) {
@@ -349,8 +395,9 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 			}
 		}
 
-		async function loadIframe() {
+		async function loadIframe({ resetAttempts = false, retry = false } = {}) {
 			if (iframe.getAttribute("src") && iframe.dataset.ready === "true") {
+				clearIframeReadyTimeout();
 				clearStatus();
 				return true;
 			}
@@ -366,7 +413,14 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 				return false;
 			}
 
-			setStatus("正在连接 AI 助手...", "loading");
+			if (resetAttempts) {
+				iframeLoadAttemptCount = 0;
+			}
+
+			setStatus(
+				retry ? "连接较慢，正在重试 AI 助手..." : "正在连接 AI 助手...",
+				"loading",
+			);
 			iframe.dataset.ready = "false";
 			iframeBootstrapPromise = (async () => {
 				try {
@@ -391,10 +445,15 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 					const url = new URL(src, window.location.href);
 					url.searchParams.set("theme", getThemeMode());
 					url.searchParams.set("embed_token", payload.token);
+					iframeLoadAttemptCount += 1;
+					iframeNavigationId += 1;
 					iframe.dataset.ready = "false";
+					iframe.dataset.navigationId = String(iframeNavigationId);
 					iframe.setAttribute("src", url.toString());
+					scheduleIframeReadyTimeout();
 					return true;
 				} catch {
+					clearIframeReadyTimeout();
 					iframe.dataset.ready = "false";
 					iframe.removeAttribute("src");
 					setStatus("AI 助手加载失败，请稍后再试。", "error");
@@ -423,7 +482,7 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 						closeButton.focus({ preventScroll: true });
 					}
 				});
-				loadIframe().then((loaded) => {
+				loadIframe({ resetAttempts: true }).then((loaded) => {
 					if (loaded && isOpen) {
 						postThemeToIframe();
 					}
@@ -438,6 +497,7 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 			}
 			panel.setAttribute("aria-hidden", "true");
 			panel.setAttribute("inert", "");
+			clearIframeReadyTimeout();
 		}
 
 		function toggleAiChat(forceOpen) {
@@ -454,15 +514,8 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 			setOpen(false);
 		}
 
-		function handleIframeLoad() {
-			iframe.dataset.ready = "true";
-			clearStatus();
-		}
-
 		function handleIframeError() {
-			iframe.dataset.ready = "false";
-			iframe.removeAttribute("src");
-			setStatus("AI 助手加载失败，请稍后再试。", "error");
+			handleIframeUnavailable();
 		}
 
 		function handleEmbedMessage(event) {
@@ -475,6 +528,7 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 				return;
 			}
 
+			clearIframeReadyTimeout();
 			iframe.dataset.ready = "true";
 			clearStatus();
 		}
@@ -482,7 +536,6 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 		win.toggleAiChat = toggleAiChat;
 		closeButton.addEventListener("click", handleClose);
 		backdrop.addEventListener("click", handleClose);
-		iframe.addEventListener("load", handleIframeLoad);
 		iframe.addEventListener("error", handleIframeError);
 		win.addEventListener("message", handleEmbedMessage);
 		doc.addEventListener("keydown", handleKeydown);
@@ -499,11 +552,11 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 		win.__aiChatWidgetCleanup = () => {
 			closeButton.removeEventListener("click", handleClose);
 			backdrop.removeEventListener("click", handleClose);
-			iframe.removeEventListener("load", handleIframeLoad);
 			iframe.removeEventListener("error", handleIframeError);
 			win.removeEventListener("message", handleEmbedMessage);
 			doc.removeEventListener("keydown", handleKeydown);
 			themeObserver?.disconnect();
+			clearIframeReadyTimeout();
 			themeObserver = null;
 			if (win.toggleAiChat === toggleAiChat) {
 				delete win.toggleAiChat;

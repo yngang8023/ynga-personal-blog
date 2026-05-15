@@ -5,7 +5,7 @@ interface Props {
 	title?: string;
 }
 
-const { title = "问问小Y AI 对话" } = Astro.props;
+const { title = "问问小Y对话页" } = Astro.props;
 const embedUrl = blogRagConfig.embedUrl;
 const tokenEndpoint = blogRagConfig.tokenEndpoint;
 ---
@@ -143,6 +143,11 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 			}
 
 			let iframeBootstrapPromise = null;
+			let iframeReadyTimeoutId = 0;
+			let iframeLoadAttemptCount = 0;
+			let iframeNavigationId = 0;
+			const IFRAME_READY_TIMEOUT_MS = 12000;
+			const IFRAME_MAX_LOAD_ATTEMPTS = 2;
 
 			function setStatus(message, state = "loading") {
 				status.textContent = message;
@@ -154,6 +159,42 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 				status.hidden = true;
 				status.textContent = "";
 				delete status.dataset.state;
+			}
+
+			function clearIframeReadyTimeout() {
+				if (iframeReadyTimeoutId) {
+					win.clearTimeout(iframeReadyTimeoutId);
+					iframeReadyTimeoutId = 0;
+				}
+			}
+
+			function handleIframeUnavailable() {
+				clearIframeReadyTimeout();
+				iframe.dataset.ready = "false";
+
+				if (iframeLoadAttemptCount < IFRAME_MAX_LOAD_ATTEMPTS) {
+					iframe.removeAttribute("src");
+					void loadIframe({ retry: true });
+					return;
+				}
+
+				iframe.removeAttribute("src");
+				setStatus("问问小Y连接超时，请刷新页面后重试。", "error");
+			}
+
+			function scheduleIframeReadyTimeout() {
+				clearIframeReadyTimeout();
+				const navigationId = String(iframeNavigationId);
+				iframeReadyTimeoutId = win.setTimeout(() => {
+					if (
+						iframe.dataset.ready === "true" ||
+						iframe.dataset.navigationId !== navigationId
+					) {
+						return;
+					}
+
+					handleIframeUnavailable();
+				}, IFRAME_READY_TIMEOUT_MS);
 			}
 
 			function postThemeToIframe() {
@@ -169,8 +210,9 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 				}
 			}
 
-			async function loadIframe() {
+			async function loadIframe({ resetAttempts = false, retry = false } = {}) {
 				if (iframe.getAttribute("src") && iframe.dataset.ready === "true") {
+					clearIframeReadyTimeout();
 					clearStatus();
 					return true;
 				}
@@ -186,7 +228,14 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 					return false;
 				}
 
-				setStatus("正在连接问问小Y...", "loading");
+				if (resetAttempts) {
+					iframeLoadAttemptCount = 0;
+				}
+
+				setStatus(
+					retry ? "连接较慢，正在重新连接问问小Y..." : "正在连接问问小Y...",
+					"loading",
+				);
 				iframe.dataset.ready = "false";
 				iframeBootstrapPromise = (async () => {
 					try {
@@ -211,10 +260,15 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 						const url = new URL(src, window.location.href);
 						url.searchParams.set("theme", getThemeMode());
 						url.searchParams.set("embed_token", payload.token);
+						iframeLoadAttemptCount += 1;
+						iframeNavigationId += 1;
 						iframe.dataset.ready = "false";
+						iframe.dataset.navigationId = String(iframeNavigationId);
 						iframe.setAttribute("src", url.toString());
+						scheduleIframeReadyTimeout();
 						return true;
 					} catch {
+						clearIframeReadyTimeout();
 						iframe.dataset.ready = "false";
 						iframe.removeAttribute("src");
 						setStatus("问问小Y加载失败，请刷新页面后重试。", "error");
@@ -227,15 +281,8 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 				return iframeBootstrapPromise;
 			}
 
-			const handleLoad = () => {
-				iframe.dataset.ready = "true";
-				clearStatus();
-				postThemeToIframe();
-			};
-
 			const handleError = () => {
-				iframe.dataset.ready = "false";
-				setStatus("问问小Y加载失败，请刷新页面后重试。", "error");
+				handleIframeUnavailable();
 			};
 
 			const handleMessage = (event) => {
@@ -248,12 +295,12 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 					return;
 				}
 
+				clearIframeReadyTimeout();
 				iframe.dataset.ready = "true";
 				clearStatus();
 				postThemeToIframe();
 			};
 
-			iframe.addEventListener("load", handleLoad);
 			iframe.addEventListener("error", handleError);
 			win.addEventListener("message", handleMessage);
 
@@ -267,13 +314,13 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 				attributeFilter: ["class"],
 			});
 
-			void loadIframe();
+			void loadIframe({ resetAttempts: true });
 
 			cleanupFns.push(() => {
-				iframe.removeEventListener("load", handleLoad);
 				iframe.removeEventListener("error", handleError);
 				win.removeEventListener("message", handleMessage);
 				themeObserver.disconnect();
+				clearIframeReadyTimeout();
 			});
 		});
 

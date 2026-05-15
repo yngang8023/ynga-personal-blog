@@ -11,11 +11,11 @@ import {
 export const prerender = true;
 ---
 
-<MainGridLayout title={ASK_Y_PAGE_TITLE} description={ASK_Y_PAGE_SUBTITLE}>
-	<script>
-		import("../scripts/right-sidebar-layout.js");
-	</script>
-
+<MainGridLayout
+	title={ASK_Y_PAGE_TITLE}
+	description={ASK_Y_PAGE_SUBTITLE}
+	hideSidebars={true}
+>
 	<div
 		class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32"
 	>
@@ -26,25 +26,6 @@ export const prerender = true;
 			/>
 
 			<section class="ask-y-shell">
-				<div class="ask-y-overview-grid">
-					<article class="ask-y-intro-card">
-						<div class="ask-y-badge">Ask Y</div>
-						<h2 class="ask-y-title">在完整页面里和小Y聊聊</h2>
-						<p class="ask-y-copy">
-							这里和右下角悬浮 AI 助手是一样的智能问答，但给你更宽的对话空间，适合连续提问、阅读回答和整理思路。
-						</p>
-					</article>
-
-					<aside class="ask-y-note-card">
-						<h2 class="ask-y-note-title">可以直接问</h2>
-						<ul class="ask-y-note-list">
-							<li>博客文章、项目和页面内容相关的问题</li>
-							<li>站内已经写过的技术折腾和实现思路</li>
-							<li>想先快速了解再继续深入阅读的主题</li>
-						</ul>
-					</aside>
-				</div>
-
 				<div class="ask-y-embed-card">
 					<ProtectedRagEmbed title="问问小Y对话页" />
 				</div>
@@ -56,159 +37,21 @@ export const prerender = true;
 <style>
 	.ask-y-shell {
 		display: grid;
-		gap: 1rem;
-	}
-
-	.ask-y-overview-grid {
-		display: grid;
-		grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.95fr);
-		gap: 1rem;
-		align-items: stretch;
-	}
-
-	.ask-y-intro-card,
-	.ask-y-note-card {
-		position: relative;
-		overflow: hidden;
-		border-radius: calc(var(--radius-large) - 0.15rem);
-		border: 1px solid color-mix(in oklch, var(--line-divider) 72%, var(--primary) 28%);
-		box-shadow:
-			0 18px 42px color-mix(in oklch, var(--primary) 10%, transparent),
-			inset 0 1px 0 rgb(255 255 255 / 0.68);
-	}
-
-	.ask-y-intro-card {
-		padding: 1.25rem 1.2rem 1.15rem;
-		background:
-			linear-gradient(
-				135deg,
-				color-mix(in oklch, var(--card-bg) 94%, white 6%),
-				color-mix(in oklch, var(--card-bg) 84%, var(--primary) 16%)
-			);
-	}
-
-	.ask-y-note-card {
-		padding: 1.15rem 1.1rem;
-		background:
-			linear-gradient(
-				180deg,
-				color-mix(in oklch, var(--card-bg) 96%, white 4%),
-				color-mix(in oklch, var(--card-bg) 88%, var(--primary) 12%)
-			);
-	}
-
-	.ask-y-badge {
-		display: inline-flex;
-		align-items: center;
-		padding: 0.34rem 0.74rem;
-		border-radius: 999px;
-		border: 1px solid color-mix(in oklch, var(--line-divider) 62%, var(--primary) 38%);
-		background: color-mix(in oklch, var(--card-bg) 80%, var(--primary) 20%);
-		color: color-mix(in oklch, var(--primary) 74%, black 26%);
-		font-size: 0.78rem;
-		font-weight: 800;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-	}
-
-	.ask-y-title,
-	.ask-y-note-title {
-		margin: 0;
-		color: color-mix(in oklch, var(--tw-prose-headings, black) 86%, var(--primary) 14%);
-	}
-
-	.ask-y-title {
-		margin-top: 0.85rem;
-		font-size: clamp(1.35rem, 2vw, 1.78rem);
-		line-height: 1.35;
-		font-weight: 800;
-	}
-
-	.ask-y-note-title {
-		font-size: 1rem;
-		font-weight: 700;
-	}
-
-	.ask-y-copy {
-		margin: 0.95rem 0 0;
-		color: color-mix(in oklch, var(--tw-prose-body, black) 84%, var(--primary) 16%);
-		font-size: 0.96rem;
-		line-height: 1.9;
-	}
-
-	.ask-y-note-list {
-		margin: 0.95rem 0 0;
-		padding: 0;
-		list-style: none;
-		display: grid;
-		gap: 0.72rem;
-	}
-
-	.ask-y-note-list li {
-		position: relative;
-		padding-left: 1rem;
-		color: color-mix(in oklch, var(--tw-prose-body, black) 84%, var(--primary) 16%);
-		font-size: 0.92rem;
-		line-height: 1.8;
-	}
-
-	.ask-y-note-list li::before {
-		content: "";
-		position: absolute;
-		left: 0;
-		top: 0.72rem;
-		width: 0.42rem;
-		height: 0.42rem;
-		border-radius: 999px;
-		background: color-mix(in oklch, var(--primary) 78%, white 22%);
-		box-shadow: 0 0 0 0.18rem color-mix(in oklch, var(--primary) 16%, transparent);
+		gap: 0.85rem;
 	}
 
 	.ask-y-embed-card {
 		padding: 0;
 	}
 
-	:global(.dark) .ask-y-intro-card,
-	:global(.dark) .ask-y-note-card {
-		box-shadow:
-			0 22px 48px rgb(0 0 0 / 0.24),
-			inset 0 1px 0 rgb(255 255 255 / 0.05);
-	}
-
-	:global(.dark) .ask-y-badge {
-		color: color-mix(in oklch, white 72%, var(--primary) 28%);
-	}
-
-	:global(.dark) .ask-y-title,
-	:global(.dark) .ask-y-note-title {
-		color: color-mix(in oklch, white 92%, var(--primary) 8%);
-	}
-
-	:global(.dark) .ask-y-copy,
-	:global(.dark) .ask-y-note-list li {
-		color: color-mix(in oklch, white 80%, var(--primary) 20%);
-	}
-
-	@media (max-width: 900px) {
-		.ask-y-overview-grid {
-			grid-template-columns: 1fr;
-		}
+	.ask-y-embed-card :global(.protected-rag-embed) {
+		min-height: clamp(48rem, calc(100dvh - 12.75rem), 74rem);
+		max-height: none;
 	}
 
 	@media (max-width: 640px) {
-		.ask-y-intro-card,
-		.ask-y-note-card {
-			padding: 1rem 0.95rem;
-		}
-
-		.ask-y-title {
-			font-size: 1.18rem;
-		}
-
-		.ask-y-copy,
-		.ask-y-note-list li {
-			font-size: 0.91rem;
-			line-height: 1.78;
+		.ask-y-shell {
+			gap: 0.75rem;
 		}
 	}
 </style>

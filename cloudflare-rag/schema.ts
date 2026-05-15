@@ -10,10 +10,33 @@ export const blogPosts = sqliteTable("blog_posts", {
   updated: text("updated"),
   tags: text("tags").notNull().default("[]"),
   category: text("category"),
+  topic: text("topic"),
+  series: text("series"),
+  hasImages: integer("has_images", { mode: "boolean" }).notNull().default(false),
+  hasCodeBlocks: integer("has_code_blocks", { mode: "boolean" }).notNull().default(false),
+  sectionCount: integer("section_count").notNull().default(0),
+  imageCount: integer("image_count").notNull().default(0),
   contentHash: text("content_hash").notNull(),
   sourcePrefix: text("source_prefix").notNull().default(""),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+});
+
+export const blogPostSections = sqliteTable("blog_post_sections", {
+  id: text("id").primaryKey(),
+  postId: text("post_id")
+    .notNull()
+    .references(() => blogPosts.id, { onDelete: "cascade" }),
+  sectionIndex: integer("section_index").notNull(),
+  title: text("title").notNull(),
+  url: text("url").notNull(),
+  heading: text("heading"),
+  anchor: text("anchor"),
+  summary: text("summary").notNull().default(""),
+  text: text("text").notNull(),
+  hasImages: integer("has_images", { mode: "boolean" }).notNull().default(false),
+  hasCodeBlocks: integer("has_code_blocks", { mode: "boolean" }).notNull().default(false),
+  imageRefs: text("image_refs").notNull().default("[]"),
 });
 
 export const blogPostChunks = sqliteTable("blog_post_chunks", {
@@ -21,12 +44,25 @@ export const blogPostChunks = sqliteTable("blog_post_chunks", {
   postId: text("post_id")
     .notNull()
     .references(() => blogPosts.id, { onDelete: "cascade" }),
+  sectionId: text("section_id")
+    .notNull()
+    .references(() => blogPostSections.id, { onDelete: "cascade" }),
   chunkIndex: integer("chunk_index").notNull(),
+  sectionIndex: integer("section_index").notNull().default(0),
   title: text("title").notNull(),
   url: text("url").notNull(),
   heading: text("heading"),
   anchor: text("anchor"),
+  category: text("category"),
+  tags: text("tags").notNull().default("[]"),
+  topic: text("topic"),
+  series: text("series"),
+  published: text("published"),
+  updated: text("updated"),
+  hasImages: integer("has_images", { mode: "boolean" }).notNull().default(false),
+  hasCodeBlocks: integer("has_code_blocks", { mode: "boolean" }).notNull().default(false),
   imageRefs: text("image_refs").notNull().default("[]"),
+  parentText: text("parent_text").notNull().default(""),
   text: text("text").notNull(),
 });
 

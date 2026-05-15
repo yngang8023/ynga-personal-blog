@@ -1,19 +1,10 @@
 import { guardProxyReadRequest } from "../_shared/request-guard.js";
-
-const DEFAULT_UMAMI_API_BASE = "https://cloud.umami.is/analytics/us/api";
-const HOP_BY_HOP_REQUEST_HEADERS = ["host", "content-length"];
-const UNSAFE_RESPONSE_HEADERS = [
-	"content-encoding",
-	"content-length",
-	"transfer-encoding",
-];
-
-const CACHE_CONTROL_BY_ROUTE = {
-	share: "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400, no-transform",
-	stats: "public, max-age=5, s-maxage=5, stale-while-revalidate=15, no-transform",
-	metricsExpanded:
-		"public, max-age=5, s-maxage=5, stale-while-revalidate=15, no-transform",
-};
+import {
+	DEFAULT_UMAMI_API_BASE,
+	EDGE_HOP_BY_HOP_REQUEST_HEADERS,
+	EDGE_UNSAFE_RESPONSE_HEADERS,
+	UMAMI_CACHE_CONTROL_BY_ROUTE,
+} from "../config.js";
 
 function getApiBase(env) {
 	const apiBase = env?.UMAMI_API_BASE || DEFAULT_UMAMI_API_BASE;
@@ -23,7 +14,7 @@ function getApiBase(env) {
 function buildUpstreamHeaders(request, incomingUrl) {
 	const headers = new Headers(request.headers);
 
-	for (const header of HOP_BY_HOP_REQUEST_HEADERS) {
+	for (const header of EDGE_HOP_BY_HOP_REQUEST_HEADERS) {
 		headers.delete(header);
 	}
 
@@ -38,7 +29,7 @@ function resolveRoute(incomingUrl, apiBase) {
 	const shareMatch = incomingUrl.pathname.match(/^\/umami\/share\/([^/]+)$/);
 	if (shareMatch) {
 		return {
-			cacheControl: CACHE_CONTROL_BY_ROUTE.share,
+			cacheControl: UMAMI_CACHE_CONTROL_BY_ROUTE.share,
 			targetUrl: `${apiBase}/share/${shareMatch[1]}`,
 		};
 	}
@@ -48,7 +39,7 @@ function resolveRoute(incomingUrl, apiBase) {
 	);
 	if (statsMatch) {
 		return {
-			cacheControl: CACHE_CONTROL_BY_ROUTE.stats,
+			cacheControl: UMAMI_CACHE_CONTROL_BY_ROUTE.stats,
 			targetUrl: `${apiBase}/websites/${statsMatch[1]}/stats${incomingUrl.search}`,
 		};
 	}
@@ -58,7 +49,7 @@ function resolveRoute(incomingUrl, apiBase) {
 	);
 	if (metricsExpandedMatch) {
 		return {
-			cacheControl: CACHE_CONTROL_BY_ROUTE.metricsExpanded,
+			cacheControl: UMAMI_CACHE_CONTROL_BY_ROUTE.metricsExpanded,
 			targetUrl: `${apiBase}/websites/${metricsExpandedMatch[1]}/metrics/expanded${incomingUrl.search}`,
 		};
 	}
@@ -69,7 +60,7 @@ function resolveRoute(incomingUrl, apiBase) {
 function sanitizeUpstreamResponseHeaders(upstreamHeaders, cacheControl, cacheState) {
 	const responseHeaders = new Headers(upstreamHeaders);
 
-	for (const header of UNSAFE_RESPONSE_HEADERS) {
+	for (const header of EDGE_UNSAFE_RESPONSE_HEADERS) {
 		responseHeaders.delete(header);
 	}
 

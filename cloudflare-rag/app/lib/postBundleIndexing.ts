@@ -33,13 +33,38 @@ export interface ImageIndexRecord {
 
 export interface ChunkIndexRecord {
   id: string;
+  sectionId: string;
   chunkIndex: number;
+  sectionIndex: number;
   title: string;
   url: string;
   heading: string | null;
   anchor: string | null;
+  category: string | null;
+  tags: string[];
+  topic: string | null;
+  series: string | null;
+  published: string | null;
+  updated: string | null;
+  hasImages: boolean;
+  hasCodeBlocks: boolean;
   imageRefs: string[];
+  parentText: string;
   text: string;
+}
+
+export interface SectionIndexRecord {
+  id: string;
+  sectionIndex: number;
+  title: string;
+  url: string;
+  heading: string | null;
+  anchor: string | null;
+  summary: string;
+  text: string;
+  hasImages: boolean;
+  hasCodeBlocks: boolean;
+  imageRefs: string[];
 }
 
 export interface PreparedPostBundle {
@@ -53,11 +78,18 @@ export interface PreparedPostBundle {
     updated: string | null;
     tags: string[];
     category: string | null;
+    topic: string | null;
+    series: string | null;
+    hasImages: boolean;
+    hasCodeBlocks: boolean;
+    sectionCount: number;
+    imageCount: number;
     contentHash: string;
     sourcePrefix: string;
   };
   files: StoredBundleFile[];
   images: ImageIndexRecord[];
+  sections: SectionIndexRecord[];
   chunks: ChunkIndexRecord[];
 }
 
@@ -72,6 +104,7 @@ interface MarkdownSection {
   anchor: string | null;
   lines: string[];
   images: SectionImageRef[];
+  codeBlocks: string[];
 }
 
 const textDecoder = new TextDecoder();
@@ -271,6 +304,33 @@ function normalizeString(value: unknown, fallback = ""): string {
   return String(value);
 }
 
+function inferTopic(data: Record<string, unknown>, tags: string[], category: string | null, title: string): string | null {
+  const explicit = normalizeString(data.topic, "");
+  if (explicit) {
+    return explicit;
+  }
+  if (tags.length > 0) {
+    return tags[0];
+  }
+  if (category) {
+    return category;
+  }
+  const cleaned = cleanMarkdownInline(title);
+  return cleaned || null;
+}
+
+function inferSeries(data: Record<string, unknown>): string | null {
+  const explicit = normalizeString(data.series, "");
+  return explicit || null;
+}
+
+function summarizeSectionText(value: string): string {
+  return value
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 280);
+}
+
 function buildPostUrl(siteURL: string | undefined, post: BlogPostBundleInput, data: Record<string, unknown>): string {
   if (post.url && !siteURL) {
     return post.url;
@@ -310,7 +370,9 @@ function buildPostUrl(siteURL: string | undefined, post: BlogPostBundleInput, da
 
 async function sha256(bytes: Uint8Array | string): Promise<string> {
   const input = typeof bytes === "string" ? new TextEncoder().encode(bytes) : bytes;
-  const digest = await crypto.subtle.digest("SHA-256", input);
+  const digestInput = new Uint8Array(input.byteLength);
+  digestInput.set(new Uint8Array(input.buffer, input.byteOffset, input.byteLength));
+  const digest = await crypto.subtle.digest("SHA-256", digestInput.buffer);
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -349,17 +411,27 @@ function getMarkdownImageRefs(line: string): Array<{ alt: string; target: string
 
 function parseMarkdownSections(markdown: string, entryPath: string): MarkdownSection[] {
   const { body } = parseFrontmatter(markdown);
-  const sections: MarkdownSection[] = [{ heading: null, anchor: null, lines: [], images: [] }];
+  const sections: MarkdownSection[] = [{ heading: null, anchor: null, lines: [], images: [], codeBlocks: [] }];
   let current = sections[0];
   let inFence = false;
+  let fenceBuffer: string[] = [];
 
   for (const rawLine of body.split(/\r?\n/)) {
     const line = rawLine.trimEnd();
     if (/^(```|~~~)/.test(line.trim())) {
+      if (inFence && fenceBuffer.length > 0) {
+        const codeText = fenceBuffer.join("\n").trim();
+        if (codeText) {
+          current.codeBlocks.push(codeText);
+          current.lines.push(`[代码块]\n${codeText}`);
+        }
+        fenceBuffer = [];
+      }
       inFence = !inFence;
       continue;
     }
     if (inFence) {
+      fenceBuffer.push(line);
       continue;
     }
 
@@ -371,6 +443,7 @@ function parseMarkdownSections(markdown: string, entryPath: string): MarkdownSec
         anchor: slugifyHeading(heading),
         lines: [],
         images: [],
+        codeBlocks: [],
       };
       sections.push(current);
       continue;
@@ -444,7 +517,9 @@ async function runImageOcr(env: Env, file: StoredBundleFile): Promise<string> {
   }
 
   try {
-    const blob = new Blob([file.bytes], { type: file.contentType });
+    const blobBytes = new Uint8Array(file.bytes.byteLength);
+    blobBytes.set(new Uint8Array(file.bytes.buffer, file.bytes.byteOffset, file.bytes.byteLength));
+    const blob = new Blob([blobBytes.buffer], { type: file.contentType });
     const result = await ai.toMarkdown([{ name: file.path, blob }], {
       descriptionLanguage: "zh",
     });
@@ -548,11 +623,12 @@ async function buildImageRecords(
   return [...imagesByPath.values()];
 }
 
-async function buildChunks(
+async function buildSectionsAndChunks(
   post: PreparedPostBundle["post"],
   sections: MarkdownSection[],
   images: ImageIndexRecord[],
-): Promise<ChunkIndexRecord[]> {
+): Promise<{ sections: SectionIndexRecord[]; chunks: ChunkIndexRecord[] }> {
+  const sectionRecords: SectionIndexRecord[] = [];
   const chunks: ChunkIndexRecord[] = [];
   const referencedImagePaths = new Set<string>();
 
@@ -583,16 +659,43 @@ async function buildChunks(
       continue;
     }
 
+    const sectionIndex = sectionRecords.length;
+    const sectionId = await sha256(`${post.id}\nsection\n${sectionIndex}\n${section.anchor || section.heading || "root"}`);
+    sectionRecords.push({
+      id: sectionId,
+      sectionIndex,
+      title: post.title,
+      url: section.anchor ? `${post.url}#${section.anchor}` : post.url,
+      heading: section.heading,
+      anchor: section.anchor,
+      summary: summarizeSectionText(sectionText),
+      text: sectionText,
+      hasImages: sectionImages.length > 0,
+      hasCodeBlocks: section.codeBlocks.length > 0,
+      imageRefs: sectionImages.map((image) => image.relativePath),
+    });
+
     const pieces = await splitTextIntoChunks(sectionText);
     for (const piece of pieces) {
       chunks.push({
         id: await sha256(`${post.id}\n${chunks.length}\n${piece}`),
+        sectionId,
         chunkIndex: chunks.length,
+        sectionIndex,
         title: post.title,
         url: section.anchor ? `${post.url}#${section.anchor}` : post.url,
         heading: section.heading,
         anchor: section.anchor,
+        category: post.category,
+        tags: post.tags,
+        topic: post.topic,
+        series: post.series,
+        published: post.published,
+        updated: post.updated,
+        hasImages: sectionImages.length > 0,
+        hasCodeBlocks: section.codeBlocks.length > 0,
         imageRefs: sectionImages.map((image) => image.relativePath),
+        parentText: sectionText,
         text: piece,
       });
     }
@@ -616,19 +719,46 @@ async function buildChunks(
       continue;
     }
 
-    chunks.push({
-      id: await sha256(`${post.id}\nimage\n${image.relativePath}\n${imageChunkText}`),
-      chunkIndex: chunks.length,
+    const sectionIndex = sectionRecords.length;
+    const sectionId = await sha256(`${post.id}\nimage-section\n${image.relativePath}`);
+    sectionRecords.push({
+      id: sectionId,
+      sectionIndex,
       title: post.title,
       url: image.anchor ? `${post.url}#${image.anchor}` : post.url,
       heading: image.heading || `图片资源：${image.alt || image.relativePath}`,
       anchor: image.anchor,
+      summary: summarizeSectionText(imageChunkText),
+      text: imageChunkText,
+      hasImages: true,
+      hasCodeBlocks: false,
       imageRefs: [image.relativePath],
+    });
+
+    chunks.push({
+      id: await sha256(`${post.id}\nimage\n${image.relativePath}\n${imageChunkText}`),
+      sectionId,
+      chunkIndex: chunks.length,
+      sectionIndex,
+      title: post.title,
+      url: image.anchor ? `${post.url}#${image.anchor}` : post.url,
+      heading: image.heading || `图片资源：${image.alt || image.relativePath}`,
+      anchor: image.anchor,
+      category: post.category,
+      tags: post.tags,
+      topic: post.topic,
+      series: post.series,
+      published: post.published,
+      updated: post.updated,
+      hasImages: true,
+      hasCodeBlocks: false,
+      imageRefs: [image.relativePath],
+      parentText: imageChunkText,
       text: imageChunkText,
     });
   }
 
-  return chunks;
+  return { sections: sectionRecords, chunks };
 }
 
 export async function preparePostBundle(
@@ -649,6 +779,10 @@ export async function preparePostBundle(
   const postUrl = buildPostUrl(siteURL, bundle, data);
   const title = normalizeString(data.title, bundle.metadata?.title || bundle.slug || bundle.id);
   const sourcePrefix = `posts/${bundle.slug}/`;
+  const tags = normalizeTags(data.tags).length ? normalizeTags(data.tags) : bundle.metadata?.tags || [];
+  const category = normalizeString(data.category, bundle.metadata?.category || "") || null;
+  const topic = inferTopic(data, tags, category, title);
+  const series = inferSeries(data) || bundle.metadata?.series || null;
   const post = {
     id: bundle.id,
     slug: bundle.slug || bundle.id,
@@ -657,8 +791,14 @@ export async function preparePostBundle(
     url: postUrl,
     published: normalizeDate(data.published) || bundle.metadata?.published || null,
     updated: normalizeDate(data.updated) || bundle.metadata?.updated || null,
-    tags: normalizeTags(data.tags).length ? normalizeTags(data.tags) : bundle.metadata?.tags || [],
-    category: normalizeString(data.category, bundle.metadata?.category || "") || null,
+    tags,
+    category,
+    topic,
+    series,
+    hasImages: false,
+    hasCodeBlocks: false,
+    sectionCount: 0,
+    imageCount: 0,
     contentHash: bundle.contentHash || await sha256(files.map((file) => `${file.path}:${file.hash}`).join("\n")),
     sourcePrefix,
   };
@@ -680,12 +820,17 @@ export async function preparePostBundle(
   const sections = parseMarkdownSections(markdown, entryPath);
   const frontmatterImages = collectFrontmatterImages(data, entryPath);
   const images = await buildImageRecords(env, post.url, filesByPath, sections, frontmatterImages);
-  const chunks = await buildChunks(post, sections, images);
+  const { sections: sectionRecords, chunks } = await buildSectionsAndChunks(post, sections, images);
+  post.hasImages = images.length > 0;
+  post.hasCodeBlocks = sections.some((section) => section.codeBlocks.length > 0);
+  post.sectionCount = sectionRecords.length;
+  post.imageCount = images.length;
 
   return {
     post,
     files,
     images,
+    sections: sectionRecords,
     chunks,
   };
 }

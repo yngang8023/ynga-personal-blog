@@ -169,8 +169,8 @@ export function PlaceholdersAndVanishInput({
   return (
     <form
       className={cn(
-        "w-full relative max-w-xl mx-auto h-12 rounded-full overflow-hidden border border-zinc-200 bg-white shadow-[0px_10px_30px_-18px_rgba(15,23,42,0.45),0px_0px_0px_1px_rgba(15,23,42,0.04)] transition duration-200 dark:border-zinc-700 dark:bg-zinc-100",
-        value && "border-sky-200 bg-sky-50 dark:border-sky-300 dark:bg-sky-50"
+        "w-full relative max-w-xl mx-auto h-12 rounded-full overflow-hidden border border-zinc-200 bg-white shadow-[0px_10px_30px_-18px_rgba(15,23,42,0.45),0px_0px_0px_1px_rgba(15,23,42,0.04)] transition duration-200 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-[0px_16px_44px_-24px_rgba(0,0,0,0.75),0px_0px_0px_1px_rgba(255,255,255,0.04)]",
+        value && "border-sky-200 bg-sky-50 dark:border-sky-500/50 dark:bg-sky-500/10"
       )}
       onSubmit={handleSubmit}
     >
@@ -193,7 +193,7 @@ export function PlaceholdersAndVanishInput({
         value={value}
         type="text"
         className={cn(
-          "w-full relative text-sm sm:text-base z-30 border-none bg-transparent text-zinc-950 placeholder:text-zinc-400 h-full rounded-full focus:outline-none focus:ring-0 pl-4 sm:pl-10 pr-20 dark:text-zinc-950",
+          "w-full relative text-sm sm:text-base z-30 border-none bg-transparent text-zinc-950 placeholder:text-zinc-400 h-full rounded-full focus:outline-none focus:ring-0 pl-4 sm:pl-10 pr-20 dark:text-zinc-100 dark:placeholder:text-zinc-500",
           animating && "text-transparent"
         )}
       />
@@ -201,7 +201,7 @@ export function PlaceholdersAndVanishInput({
       <button
         disabled={!value}
         type="submit"
-        className="absolute right-2 top-1/2 z-50 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-950 text-white transition duration-200 hover:bg-sky-700 disabled:bg-zinc-200 disabled:text-zinc-400 dark:bg-zinc-950 dark:text-white dark:disabled:bg-zinc-300 dark:disabled:text-zinc-500"
+        className="absolute right-2 top-1/2 z-50 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-zinc-950 text-white transition duration-200 hover:bg-sky-700 disabled:bg-zinc-200 disabled:text-zinc-400 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-sky-200 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-500"
       >
         <motion.svg
           xmlns="http://www.w3.org/2000/svg"
@@ -256,7 +256,7 @@ export function PlaceholdersAndVanishInput({
                 duration: 0.3,
                 ease: "linear",
               }}
-              className="text-sm sm:text-base font-normal text-zinc-500 pl-4 sm:pl-12 text-left w-[calc(100%-2rem)] truncate dark:text-zinc-600"
+              className="text-sm sm:text-base font-normal text-zinc-500 pl-4 sm:pl-12 text-left w-[calc(100%-2rem)] truncate dark:text-zinc-400"
             >
               {placeholders[currentPlaceholder]}
             </motion.p>

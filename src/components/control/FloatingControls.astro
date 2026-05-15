@@ -32,11 +32,11 @@ const { headings = [] } = Astro.props;
 			</div>
 		)
 	}
-	<div class="floating-control-item" data-control-key="ai">
-		<AiChatWidget />
-	</div>
 	<div class="floating-control-item" data-control-key="home">
 		<BackToHome />
+	</div>
+	<div class="floating-control-item" data-control-key="ai">
+		<AiChatWidget />
 	</div>
 	<div class="floating-control-item" data-control-key="top">
 		<BackToTop />
@@ -73,6 +73,10 @@ const { headings = [] } = Astro.props;
 		z-index: var(--fab-group-z-open);
 	}
 
+	:global(html.ai-chat-open) .floating-controls-container {
+		z-index: calc(var(--fab-group-z-open) + 24);
+	}
+
 	.floating-control-item {
 		display: flex;
 		align-items: center;
@@ -88,6 +92,12 @@ const { headings = [] } = Astro.props;
 			transform 0.28s cubic-bezier(0.4, 0, 0.2, 1),
 			margin-top 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 		overflow: visible;
+	}
+
+	.floating-control-item[data-control-key="ai"] {
+		position: relative;
+		z-index: 4;
+		transform: none;
 	}
 
 	.floating-control-item.is-stacked {

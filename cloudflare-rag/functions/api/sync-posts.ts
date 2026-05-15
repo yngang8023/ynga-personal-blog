@@ -1,6 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { blogPostChunks, blogPostImages, blogPosts } from "schema";
+import { blogPostChunks, blogPostImages, blogPosts, blogPostSections } from "schema";
 import {
   BlogPostBundleInput,
   getBearerToken,
@@ -16,7 +16,9 @@ const jsonHeaders = {
 };
 
 const blogPostImageInsertBatchSize = 5;
-const blogPostChunkInsertBatchSize = 8;
+const blogPostSectionInsertBatchSize = 6;
+// D1 对单条 SQL 的变量数量有限制，chunk 表字段较多，所以批次要保守一点。
+const blogPostChunkInsertBatchSize = 4;
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -83,6 +85,7 @@ async function deletePostData(
 
   await db.delete(blogPostImages).where(eq(blogPostImages.postId, postId));
   await db.delete(blogPostChunks).where(eq(blogPostChunks.postId, postId));
+  await db.delete(blogPostSections).where(eq(blogPostSections.postId, postId));
   await db.delete(blogPosts).where(eq(blogPosts.id, postId));
 
   if (sourcePrefix) {
@@ -109,11 +112,38 @@ async function upsertPreparedPost(
     updated: prepared.post.updated,
     tags: JSON.stringify(prepared.post.tags),
     category: prepared.post.category,
+    topic: prepared.post.topic,
+    series: prepared.post.series,
+    hasImages: prepared.post.hasImages,
+    hasCodeBlocks: prepared.post.hasCodeBlocks,
+    sectionCount: prepared.post.sectionCount,
+    imageCount: prepared.post.imageCount,
     contentHash: prepared.post.contentHash,
     sourcePrefix: prepared.post.sourcePrefix,
     createdAt: now,
     updatedAt: now,
   });
+
+  if (prepared.sections.length > 0) {
+    for (let i = 0; i < prepared.sections.length; i += blogPostSectionInsertBatchSize) {
+      await db.insert(blogPostSections).values(
+        prepared.sections.slice(i, i + blogPostSectionInsertBatchSize).map((section) => ({
+          id: section.id,
+          postId: prepared.post.id,
+          sectionIndex: section.sectionIndex,
+          title: section.title,
+          url: section.url,
+          heading: section.heading,
+          anchor: section.anchor,
+          summary: section.summary,
+          text: section.text,
+          hasImages: section.hasImages,
+          hasCodeBlocks: section.hasCodeBlocks,
+          imageRefs: JSON.stringify(section.imageRefs),
+        })),
+      );
+    }
+  }
 
   if (prepared.images.length > 0) {
     for (let i = 0; i < prepared.images.length; i += blogPostImageInsertBatchSize) {
@@ -145,18 +175,29 @@ async function upsertPreparedPost(
 
   for (let i = 0; i < prepared.chunks.length; i += blogPostChunkInsertBatchSize) {
     await db.insert(blogPostChunks).values(
-      prepared.chunks.slice(i, i + blogPostChunkInsertBatchSize).map((chunk) => ({
-        id: chunk.id,
-        postId: prepared.post.id,
-        chunkIndex: chunk.chunkIndex,
-        title: chunk.title,
-        url: chunk.url,
-        heading: chunk.heading,
-        anchor: chunk.anchor,
-        imageRefs: JSON.stringify(chunk.imageRefs),
-        text: chunk.text,
-      })),
-    );
+        prepared.chunks.slice(i, i + blogPostChunkInsertBatchSize).map((chunk) => ({
+          id: chunk.id,
+          postId: prepared.post.id,
+          sectionId: chunk.sectionId,
+          chunkIndex: chunk.chunkIndex,
+          sectionIndex: chunk.sectionIndex,
+          title: chunk.title,
+          url: chunk.url,
+          heading: chunk.heading,
+          anchor: chunk.anchor,
+          category: chunk.category,
+          tags: JSON.stringify(chunk.tags),
+          topic: chunk.topic,
+          series: chunk.series,
+          published: chunk.published,
+          updated: chunk.updated,
+          hasImages: chunk.hasImages,
+          hasCodeBlocks: chunk.hasCodeBlocks,
+          imageRefs: JSON.stringify(chunk.imageRefs),
+          parentText: chunk.parentText,
+          text: chunk.text,
+        })),
+      );
   }
 
   const embeddingBatchSize = 20;
@@ -179,6 +220,16 @@ async function upsertPreparedPost(
           url: chunk.url,
           heading: chunk.heading || "",
           anchor: chunk.anchor || "",
+          category: chunk.category || "",
+          tags: chunk.tags,
+          topic: chunk.topic || "",
+          series: chunk.series || "",
+          published: chunk.published || "",
+          updated: chunk.updated || "",
+          hasImages: chunk.hasImages,
+          hasCodeBlocks: chunk.hasCodeBlocks,
+          sectionIndex: chunk.sectionIndex,
+          parentText: chunk.parentText,
           chunkIndex: chunk.chunkIndex,
           imageRefs: JSON.stringify(chunk.imageRefs),
           text: chunk.text,

@@ -261,6 +261,24 @@ const showMessageComment =
 			inset 0 1px 0 rgb(255 255 255 / 0.04);
 	}
 
+	:global(.dark) .message-hero-grid {
+		--message-badge-color: color-mix(
+			in oklch,
+			white 72%,
+			var(--primary) 28%
+		);
+		--message-title-color: color-mix(
+			in oklch,
+			white 92%,
+			var(--primary) 8%
+		);
+		--message-body-color: color-mix(
+			in oklch,
+			white 80%,
+			var(--primary) 20%
+		);
+	}
+
 	@media (max-width: 900px) {
 		.message-hero-grid {
 			grid-template-columns: 1fr;

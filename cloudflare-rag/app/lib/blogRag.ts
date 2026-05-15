@@ -3,6 +3,7 @@ import { z } from "zod";
 const DEFAULT_BLOG_CORPUS_ID = "mizuki-blog";
 const DEFAULT_EMBEDDING_MODEL = "@cf/baai/bge-m3";
 const DEFAULT_CHAT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
+const DEFAULT_RERANK_MODEL = "@cf/baai/bge-reranker-base";
 
 export function getBlogCorpusId(env: Pick<Env, "BLOG_CORPUS_ID">): string {
   return env.BLOG_CORPUS_ID?.trim() || DEFAULT_BLOG_CORPUS_ID;
@@ -14,6 +15,10 @@ export function getEmbeddingModel(env: Pick<Env, "EMBEDDING_MODEL">): string {
 
 export function getChatModel(env: Pick<Env, "CHAT_MODEL">): string {
   return env.CHAT_MODEL?.trim() || DEFAULT_CHAT_MODEL;
+}
+
+export function getRerankModel(env: Pick<Env, "RERANK_MODEL">): string {
+  return env.RERANK_MODEL?.trim() || DEFAULT_RERANK_MODEL;
 }
 
 export interface BlogPostInput {
@@ -37,6 +42,12 @@ export interface BlogSource {
   text: string;
   heading?: string | null;
   anchor?: string | null;
+  snippet?: string;
+  category?: string | null;
+  topic?: string | null;
+  series?: string | null;
+  tags?: string[];
+  hasCodeBlocks?: boolean;
   images?: BlogSourceImage[];
   score?: number;
 }
@@ -46,6 +57,16 @@ export interface BlogSourceImage {
   url: string;
   alt?: string;
   text?: string;
+}
+
+export interface RetrievalPreferences {
+  mode: "search" | "chat";
+  preferImages: boolean;
+  preferCode: boolean;
+  preferRecent: boolean;
+  emphasizeProcess: boolean;
+  confidence: number;
+  rationale?: string;
 }
 
 export interface BlogBundleFileInput {
@@ -69,6 +90,8 @@ export interface BlogPostBundleInput {
     updated?: string | null;
     tags?: string[];
     category?: string | null;
+    topic?: string | null;
+    series?: string | null;
   };
   files: BlogBundleFileInput[];
   contentHash?: string;
@@ -123,6 +146,8 @@ const blogPostBundleInputSchema = z.object({
       updated: z.string().nullable().optional(),
       tags: z.array(z.string()).optional(),
       category: z.string().nullable().optional(),
+      topic: z.string().nullable().optional(),
+      series: z.string().nullable().optional(),
     })
     .optional(),
   files: z.array(blogBundleFileInputSchema).min(1),
@@ -174,6 +199,8 @@ export function parseBundleSyncPayload(value: unknown): BlogPostBundleInput[] {
       updated: post.metadata?.updated || null,
       tags: post.metadata?.tags || [],
       category: post.metadata?.category || null,
+      topic: post.metadata?.topic || null,
+      series: post.metadata?.series || null,
     },
   }));
 }
@@ -233,6 +260,40 @@ export function normalizeQueries(raw: string): string[] {
     .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").trim())
     .filter(Boolean)
     .slice(0, 5);
+}
+
+export function parseRetrievalPreferences(raw: string): RetrievalPreferences | null {
+  const text = raw.trim();
+  if (!text) {
+    return null;
+  }
+
+  const candidates = [
+    text,
+    text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim() || "",
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as Partial<RetrievalPreferences>;
+      const confidence = Number(parsed.confidence ?? 0);
+      const mode = parsed.mode === "chat" ? "chat" : "search";
+
+      return {
+        mode,
+        preferImages: Boolean(parsed.preferImages),
+        preferCode: Boolean(parsed.preferCode),
+        preferRecent: Boolean(parsed.preferRecent),
+        emphasizeProcess: Boolean(parsed.emphasizeProcess),
+        confidence: Number.isFinite(confidence) ? Math.min(Math.max(confidence, 0), 1) : 0,
+        rationale: typeof parsed.rationale === "string" ? parsed.rationale.trim() : undefined,
+      };
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
 }
 
 export function dedupeSources(sources: BlogSource[], maxCount = 5): BlogSource[] {

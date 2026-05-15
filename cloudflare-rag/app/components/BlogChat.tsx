@@ -1,6 +1,8 @@
 import { stream } from "fetch-event-stream";
+import { X } from "lucide-react";
 import React, { useRef, useState } from "react";
-import Markdown from "react-markdown";
+import Markdown, { defaultUrlTransform } from "react-markdown";
+import defaultLogo from "../../assets/default-logo.webp";
 import { PlaceholdersAndVanishInput } from "./Input";
 
 interface SourceImage {
@@ -25,6 +27,8 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: Source[];
+  status?: "streaming" | "complete";
+  metaRevealStage?: number;
 }
 
 function parseStreamText(chunk: any): string {
@@ -32,63 +36,216 @@ function parseStreamText(chunk: any): string {
 }
 
 function normalizeAssistantMarkdown(content: string): string {
-  return content.replace(/\[(\d+)\]/g, "[[$1]](cite:$1)");
+  return content.replace(/\[(\d+)\](?!\()/g, "[[$1]](cite:$1)");
+}
+
+function linkifyAssistantUrls(content: string): string {
+  return content.replace(/https?:\/\/[^\s<>)\]]+/g, (value, offset, input) => {
+    const previous = input[offset - 1] || "";
+    const previousTwo = input.slice(Math.max(0, offset - 2), offset);
+    if (previous === "(" || previous === "<" || previousTwo === "](") {
+      return value;
+    }
+
+    const trailing = value.match(/[),.;!?]+$/)?.[0] || "";
+    const normalizedUrl = trailing ? value.slice(0, -trailing.length) : value;
+    return `[${decodeUrlForDisplay(normalizedUrl)}](${normalizedUrl})${trailing}`;
+  });
+}
+
+function formatAssistantMarkdown(content: string): string {
+  return normalizeAssistantMarkdown(linkifyAssistantUrls(content));
+}
+
+function markdownUrlTransform(value: string, key: string) {
+  if (key === "src" && /^image:\d+$/i.test(value.trim())) {
+    return value;
+  }
+  if (key === "href" && /^cite:\d+$/i.test(value.trim())) {
+    return value;
+  }
+
+  return defaultUrlTransform(value);
+}
+
+function childrenToText(children: React.ReactNode): string {
+  if (children === null || children === undefined || typeof children === "boolean") {
+    return "";
+  }
+  if (typeof children === "string" || typeof children === "number") {
+    return String(children);
+  }
+  if (Array.isArray(children)) {
+    return children.map(childrenToText).join("");
+  }
+  if (React.isValidElement(children)) {
+    return childrenToText((children.props as { children?: React.ReactNode }).children);
+  }
+  return "";
 }
 
 function getSourceLabel(source: Source, index: number): string {
   return `[${index + 1}] ${source.title}${source.heading ? ` / ${source.heading}` : ""}`;
 }
 
-function getSourceImages(source: Source | undefined, maxCount = 2) {
-  return (source?.images || []).slice(0, maxCount);
+function splitAssistantSections(content: string) {
+  const match = content.match(/(?:^|\n)(?:#{1,6}\s*)?参考来源[:：]?\s*(?:\n|$)/);
+  if (!match || match.index === undefined) {
+    return {
+      body: content,
+      references: "",
+    };
+  }
+
+  return {
+    body: content.slice(0, match.index).trimEnd(),
+    references: content.slice(match.index).trimStart(),
+  };
 }
 
-function getInlineImageSources(sources: Source[], maxCount = 3) {
-  const seen = new Set<string>();
-  const result: Array<Source & { sourceIndex: number; inlineImages: SourceImage[] }> = [];
+function parseInlineImageSourceIndex(src?: string): number | null {
+  if (!src) {
+    return null;
+  }
 
-  sources.forEach((source, sourceIndex) => {
-    const inlineImages = (source.images || []).filter((image) => {
-      const key = `${image.path}#${image.url}`;
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    });
+  const match = src.trim().match(/^image:(\d+)$/i);
+  if (!match) {
+    return null;
+  }
 
-    if (inlineImages.length > 0 && result.length < maxCount) {
-      result.push({ ...source, sourceIndex, inlineImages: inlineImages.slice(0, 2) });
+  const sourceIndex = Number.parseInt(match[1], 10) - 1;
+  return Number.isFinite(sourceIndex) && sourceIndex >= 0 ? sourceIndex : null;
+}
+
+function collectCitedSourceIndices(children: React.ReactNode): number[] {
+  const indices: number[] = [];
+  const seen = new Set<number>();
+
+  const visit = (node: React.ReactNode) => {
+    if (node === null || node === undefined || typeof node === "boolean") {
+      return;
     }
-  });
+    if (typeof node === "string" || typeof node === "number") {
+      const matches = String(node).matchAll(/\[(\d+)\]/g);
+      for (const match of matches) {
+        const sourceIndex = Number.parseInt(match[1], 10) - 1;
+        if (Number.isFinite(sourceIndex) && sourceIndex >= 0 && !seen.has(sourceIndex)) {
+          seen.add(sourceIndex);
+          indices.push(sourceIndex);
+        }
+      }
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    if (React.isValidElement(node)) {
+      const element = node as React.ReactElement<{ href?: string; children?: React.ReactNode }>;
+      const href = typeof element.props.href === "string" ? element.props.href : "";
+      if (href.startsWith("cite:")) {
+        const sourceIndex = Number.parseInt(href.slice("cite:".length), 10) - 1;
+        if (Number.isFinite(sourceIndex) && sourceIndex >= 0 && !seen.has(sourceIndex)) {
+          seen.add(sourceIndex);
+          indices.push(sourceIndex);
+        }
+      }
+      visit(element.props.children);
+    }
+  };
 
-  return result;
+  visit(children);
+  return indices;
 }
 
-function collectPreviewImages(sources: Source[]) {
-  const seen = new Set<string>();
-
-  return sources
-    .flatMap((source, sourceIndex) =>
-      (source.images || []).map((image) => ({
-        ...image,
-        sourceIndex,
-        label: source.heading || source.title,
-      })),
-    )
-    .filter((image) => {
-      const key = `${image.path}#${image.url}`;
-      if (seen.has(key)) {
-        return false;
-      }
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 6);
+function decodeUrlForDisplay(value: string): string {
+  try {
+    const url = new URL(value);
+    const pathname = url.pathname
+      .split("/")
+      .map((segment) => decodeURIComponent(segment))
+      .join("/");
+    const hash = url.hash ? decodeURIComponent(url.hash) : "";
+    return `${url.origin}${pathname}${hash}`;
+  } catch {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
 }
 
 function buildMessageId(role: Message["role"]): string {
   return `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function buildRenderedImageKey(sourceIndex: number, image: SourceImage): string {
+  return `${sourceIndex}:${image.path}:${image.url}`;
+}
+
+function normalizeImageSearchText(value: string): string {
+  return value.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function extractImageSearchTerms(value: string): string[] {
+  const normalized = normalizeImageSearchText(value);
+  if (!normalized) {
+    return [];
+  }
+
+  const rawTerms = [
+    ...(normalized.match(/[\u4e00-\u9fff]{2,}/gu) ?? []),
+    ...(normalized.match(/[\u3040-\u30ff]{2,}/gu) ?? []),
+    ...(normalized.match(/[a-z0-9][a-z0-9._/-]{1,}/g) ?? []),
+  ];
+
+  const uniqueTerms: string[] = [];
+  const seen = new Set<string>();
+
+  for (const term of rawTerms) {
+    const nextTerm = term.trim();
+    if (nextTerm.length < 2 || seen.has(nextTerm)) {
+      continue;
+    }
+    seen.add(nextTerm);
+    uniqueTerms.push(nextTerm);
+  }
+
+  return uniqueTerms.sort((left, right) => right.length - left.length);
+}
+
+function scoreInlineImageMatch(source: Source, image: SourceImage, contextText: string): number {
+  const normalizedContext = normalizeImageSearchText(contextText);
+  const imageBlob = normalizeImageSearchText(
+    [image.path, image.alt || "", image.text || "", source.heading || "", source.title]
+      .filter(Boolean)
+      .join(" "),
+  );
+
+  if (!normalizedContext || !imageBlob) {
+    return 0;
+  }
+
+  let score = 0;
+  const normalizedPath = normalizeImageSearchText(image.path);
+
+  if (normalizedPath && normalizedContext.includes(normalizedPath)) {
+    score += 24;
+  }
+
+  for (const term of extractImageSearchTerms(contextText)) {
+    if (!imageBlob.includes(term)) {
+      continue;
+    }
+
+    score += Math.min(Math.max(term.length, 2), 10);
+    if (normalizedPath.includes(term)) {
+      score += 4;
+    }
+  }
+
+  return score;
 }
 
 export default function BlogChat() {
@@ -101,32 +258,139 @@ export default function BlogChat() {
     sourceIndex: number;
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
+  const revealTimersRef = useRef<number[]>([]);
+  const activeAssistantIdRef = useRef<string | null>(null);
+  const pendingSourcesRef = useRef<Source[]>([]);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = (force = false) => {
     requestAnimationFrame(() => {
-      if (containerRef.current) {
+      if (containerRef.current && (force || autoScrollRef.current)) {
         containerRef.current.scrollTop = containerRef.current.scrollHeight;
       }
     });
   };
 
-  const upsertLastAssistantMessage = (updater: (message: Message) => Message) => {
+  const clearRevealTimers = () => {
+    revealTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    revealTimersRef.current = [];
+  };
+
+  const scheduleAssistantMetaReveal = (messageId: string) => {
+    clearRevealTimers();
+    [1].forEach((stage, index) => {
+      const timer = window.setTimeout(() => {
+        setMessages((previous) =>
+          previous.map((message) =>
+            message.id === messageId
+              ? {
+                  ...message,
+                  metaRevealStage: stage,
+                }
+              : message,
+          ),
+        );
+        scrollToBottom();
+      }, 180 * (index + 1));
+      revealTimersRef.current.push(timer);
+    });
+  };
+
+  const upsertActiveAssistantMessage = (updater: (message: Message) => Message) => {
+    if (!activeAssistantIdRef.current) {
+      activeAssistantIdRef.current = buildMessageId("assistant");
+    }
+
+    const assistantId = activeAssistantIdRef.current;
     setMessages((previous) => {
-      const lastMessage = previous[previous.length - 1];
-      if (lastMessage?.role === "assistant") {
-        return [...previous.slice(0, -1), updater(lastMessage)];
+      const messageIndex = previous.findIndex((message) => message.id === assistantId);
+      if (messageIndex !== -1) {
+        const current = previous[messageIndex];
+        return [
+          ...previous.slice(0, messageIndex),
+          updater({
+            ...current,
+            sources: current.sources?.length ? current.sources : pendingSourcesRef.current,
+          }),
+          ...previous.slice(messageIndex + 1),
+        ];
       }
 
       return [
         ...previous,
         updater({
-          id: buildMessageId("assistant"),
+          id: assistantId,
           role: "assistant",
           content: "",
-          sources: [],
+          sources: pendingSourcesRef.current,
+          status: "streaming",
+          metaRevealStage: 0,
         }),
       ];
     });
+  };
+
+  const updateActiveAssistantSources = (sources: Source[]) => {
+    pendingSourcesRef.current = sources;
+    const assistantId = activeAssistantIdRef.current;
+    if (!assistantId) {
+      return;
+    }
+
+    setMessages((previous) =>
+      previous.map((message) =>
+        message.id === assistantId
+          ? {
+              ...message,
+              sources,
+            }
+          : message,
+      ),
+    );
+  };
+
+  const completeLastAssistantMessage = () => {
+    const completedId = activeAssistantIdRef.current;
+    const fallbackSources = pendingSourcesRef.current;
+
+    if (!completedId) {
+      return;
+    }
+
+    setMessages((previous) => {
+      return previous.map((message) =>
+        message.id === completedId
+          ? {
+              ...message,
+              sources: message.sources?.length ? message.sources : fallbackSources,
+              status: "complete",
+              metaRevealStage: 0,
+            }
+          : message,
+      );
+    });
+
+    scheduleAssistantMetaReveal(completedId);
+    activeAssistantIdRef.current = null;
+    pendingSourcesRef.current = [];
+  };
+
+  const handleScroll = () => {
+    if (!containerRef.current) {
+      return;
+    }
+
+    const distanceToBottom =
+      containerRef.current.scrollHeight -
+      containerRef.current.scrollTop -
+      containerRef.current.clientHeight;
+    autoScrollRef.current = distanceToBottom < 96;
+  };
+
+  const handleWheel = (event: React.WheelEvent<HTMLElement>) => {
+    if (event.deltaY < 0) {
+      autoScrollRef.current = false;
+    }
   };
 
   const openSource = (sources: Source[], sourceIndex: number) => {
@@ -151,7 +415,11 @@ export default function BlogChat() {
     setInformativeMessage("");
     setSelectedSource(null);
     setIsStreaming(true);
-    scrollToBottom();
+    autoScrollRef.current = true;
+    activeAssistantIdRef.current = null;
+    pendingSourcesRef.current = [];
+    clearRevealTimers();
+    scrollToBottom(true);
 
     try {
       const response = await stream("/api/stream", {
@@ -173,15 +441,12 @@ export default function BlogChat() {
           const newContent = parseStreamText(parsedChunk);
 
           if (parsedChunk.sources) {
-            upsertLastAssistantMessage((message) => ({
-              ...message,
-              sources: parsedChunk.sources,
-            }));
+            updateActiveAssistantSources(parsedChunk.sources);
           }
 
           if (newContent) {
             setInformativeMessage("");
-            upsertLastAssistantMessage((message) => ({
+            upsertActiveAssistantMessage((message) => ({
               ...message,
               content: message.content + newContent,
             }));
@@ -194,7 +459,7 @@ export default function BlogChat() {
         } catch {
           const text = event?.data || "";
           if (text && text !== "[DONE]") {
-            upsertLastAssistantMessage((message) => ({
+            upsertActiveAssistantMessage((message) => ({
               ...message,
               content: message.content + text,
             }));
@@ -205,32 +470,178 @@ export default function BlogChat() {
     } catch (error) {
       setInformativeMessage(`请求失败：${(error as Error).message}`);
     } finally {
+      completeLastAssistantMessage();
       setIsStreaming(false);
     }
   };
 
+  React.useEffect(() => {
+    return () => {
+      clearRevealTimers();
+    };
+  }, []);
+
   return (
-    <div className="flex h-screen min-h-[420px] flex-col bg-[#fafafa] text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+    <div className="blog-chat-shell flex h-screen min-h-[420px] flex-col bg-[#fafafa] text-zinc-950 transition-colors dark:bg-zinc-950 dark:text-zinc-50">
       <header className="border-b border-zinc-200 bg-white px-5 py-4 dark:border-zinc-800 dark:bg-zinc-950">
         <div className="text-base font-semibold tracking-tight">HiYngaの随✏️记 - AI助手</div>
-        <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          参考博客文章、章节片段和相关图片，帮你快速定位内容
-        </div>
       </header>
 
-      <main ref={containerRef} className="flex-1 overflow-y-auto px-4 py-5">
+      <main
+        ref={containerRef}
+        onScroll={handleScroll}
+        onWheel={handleWheel}
+        className="blog-chat-scroll flex-1 overflow-y-auto px-4 py-5"
+      >
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
+            <img
+              src={defaultLogo}
+              alt="HiYnga 博客 Logo"
+              className="mb-6 h-auto w-[15rem] max-w-full object-contain sm:w-[17rem]"
+              loading="eager"
+            />
             <div className="text-lg font-semibold tracking-tight">从博客里找答案</div>
-            <div className="mt-2 max-w-sm text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+            <div className="mt-2 max-w-sm text-sm leading-6 text-zinc-500 dark:text-zinc-300">
               可以问部署记录、配置细节、文章里的截图说明，或让助手帮你归纳某篇文章的重点。
             </div>
           </div>
         ) : (
           <div className="space-y-4">
-            {messages.map((message) => {
-              const previewImages = collectPreviewImages(message.sources || []);
-              const inlineImageSources = getInlineImageSources(message.sources || []);
+            {messages.map((message, messageIndex) => {
+              const isAssistantComplete =
+                message.role === "assistant" && message.status === "complete";
+              const isLatestUserMessage =
+                message.role === "user" &&
+                messages.slice(messageIndex + 1).every((candidate) => candidate.role !== "user");
+              const assistantSections =
+                message.role === "assistant"
+                  ? splitAssistantSections(message.content)
+                  : { body: message.content, references: "" };
+              const renderedInlineImageKeys = new Set<string>();
+              const renderInlineImagesForChildren = (children: React.ReactNode) => {
+                const citedSourceIndices = collectCitedSourceIndices(children);
+                const contextText = childrenToText(children);
+                const imagesToRender: Array<{
+                  image: SourceImage;
+                  source: Source;
+                  sourceIndex: number;
+                }> = [];
+
+                for (const sourceIndex of citedSourceIndices) {
+                  const source = message.sources?.[sourceIndex];
+                  const images = source?.images || [];
+                  if (!source || images.length === 0) {
+                    continue;
+                  }
+
+                  const rankedImages = images
+                    .map((image) => ({
+                      image,
+                      key: buildRenderedImageKey(sourceIndex, image),
+                      score: scoreInlineImageMatch(source, image, contextText),
+                    }))
+                    .sort((left, right) => right.score - left.score);
+
+                  const bestMatch =
+                    rankedImages.find((candidate) => !renderedInlineImageKeys.has(candidate.key) && candidate.score > 0) ??
+                    rankedImages.find((candidate) => !renderedInlineImageKeys.has(candidate.key)) ??
+                    rankedImages[0];
+
+                  if (!bestMatch) {
+                    continue;
+                  }
+
+                  if (renderedInlineImageKeys.has(bestMatch.key)) {
+                    continue;
+                  }
+
+                  renderedInlineImageKeys.add(bestMatch.key);
+                  imagesToRender.push({ image: bestMatch.image, source, sourceIndex });
+                  if (imagesToRender.length >= 1) {
+                    break;
+                  }
+                }
+
+                if (imagesToRender.length === 0) {
+                  return null;
+                }
+
+                return (
+                  <div className="my-4 space-y-3">
+                    {imagesToRender.map(({ image, source, sourceIndex }) => (
+                      <button
+                        key={`${sourceIndex}:${image.path}`}
+                        type="button"
+                        onClick={() => openSource(message.sources || [], sourceIndex)}
+                        className="block w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 text-left transition hover:border-amber-300 hover:bg-amber-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-amber-400/40"
+                      >
+                        <img
+                          src={image.url}
+                          alt={image.alt || image.path}
+                          className="max-h-[420px] w-full object-cover object-top"
+                          loading="lazy"
+                          onLoad={() => scrollToBottom()}
+                        />
+                        <div className="border-t border-zinc-200 px-3 py-2 dark:border-zinc-800">
+                          <div className="line-clamp-2 text-xs font-medium text-zinc-800 dark:text-zinc-100">
+                            {image.alt || source.heading || source.title}
+                          </div>
+                          <div className="mt-1 line-clamp-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                            {source.heading || source.title}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                );
+              };
+              const renderMarkdownLink = ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+                if (href?.startsWith("cite:")) {
+                  const sourceIndex = Number.parseInt(href.slice("cite:".length), 10) - 1;
+                  const source = message.sources?.[sourceIndex];
+                  const label = childrenToText(children).trim() || `[${sourceIndex + 1}]`;
+                  const fallbackTitle = source
+                    ? `${source.heading || source.title}\n${decodeUrlForDisplay(source.url)}`
+                    : "引用来源加载中";
+                  if (!source?.url) {
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => openSource(message.sources || [], sourceIndex)}
+                        className="inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-200 dark:bg-amber-400/20 dark:text-amber-100 dark:hover:bg-amber-400/30"
+                        title={fallbackTitle}
+                      >
+                        {label}
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <a
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-200 dark:bg-amber-400/20 dark:text-amber-100 dark:hover:bg-amber-400/30"
+                      title={fallbackTitle}
+                    >
+                      {label}
+                    </a>
+                  );
+                }
+
+                return (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="break-all"
+                    style={{ overflowWrap: "anywhere" }}
+                  >
+                    {children}
+                  </a>
+                );
+              };
 
               return (
                 <div
@@ -240,143 +651,142 @@ export default function BlogChat() {
                 <div
                   className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                     message.role === "user"
-                      ? "border border-sky-200 bg-sky-50 text-slate-900 dark:border-sky-400/30 dark:bg-sky-400/10 dark:text-sky-50"
-                      : "border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100"
+                      ? "border border-sky-200 bg-sky-50 text-slate-900 dark:border-sky-400/40 dark:bg-sky-400/14 dark:text-sky-50"
+                      : "border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900/95 dark:text-zinc-100"
                   }`}
                 >
                   {message.role === "assistant" ? (
                     <>
-                      <Markdown
-                        className="prose prose-sm max-w-none prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline dark:prose-invert dark:prose-a:text-blue-300"
-                        components={{
-                          a: ({ href, children }) => {
-                            if (href?.startsWith("cite:")) {
-                              const sourceIndex = Number.parseInt(href.slice("cite:".length), 10) - 1;
-                              const source = message.sources?.[sourceIndex];
-                              return (
-                                <a
-                                  href={source?.url || "#"}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  onClick={(event) => {
-                                    if (!source?.url) {
-                                      event.preventDefault();
-                                      openSource(message.sources || [], sourceIndex);
-                                    }
-                                  }}
-                                  className="inline-flex rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-200 dark:bg-amber-400/20 dark:text-amber-100 dark:hover:bg-amber-400/30"
-                                  title={source?.heading || source?.title || "查看引用来源"}
-                                >
-                                  {children}
-                                </a>
-                              );
-                            }
-
-                            return (
-                              <a href={href} target="_blank" rel="noreferrer">
-                                {children}
-                              </a>
-                            );
-                          },
-                        }}
-                      >
-                        {normalizeAssistantMarkdown(message.content)}
-                      </Markdown>
-
-                      {inlineImageSources.length > 0 && (
-                        <div className="mt-4 space-y-3">
-                          {inlineImageSources.map((source) => (
-                            <div
-                              key={`${source.postId}-${source.sourceIndex}`}
-                              className="overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950/60"
-                            >
-                              <div className="grid gap-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)]">
-                                <div className="grid grid-cols-1 gap-2 p-2">
-                                  {getSourceImages(source, 2).map((image) => (
-                                    <img
-                                      key={image.path}
-                                      src={image.url}
-                                      alt={image.alt || image.path}
-                                      className="max-h-56 w-full rounded-xl object-cover"
-                                      loading="lazy"
-                                    />
-                                  ))}
-                                </div>
-                                <div className="p-3">
-                                  <div className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                                    配图来源 [{source.sourceIndex + 1}]
-                                  </div>
-                                  <div className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                                    {source.heading || source.title}
-                                  </div>
-                                  <div className="mt-2 line-clamp-5 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-                                    {source.text}
-                                  </div>
-                                  <a
-                                    href={source.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="mt-3 inline-flex text-xs font-medium text-blue-600 hover:underline dark:text-blue-300"
-                                  >
-                                    打开原文
-                                  </a>
-                                </div>
+                      {assistantSections.body ? (
+                        <Markdown
+                          className="prose prose-sm max-w-none prose-headings:text-zinc-900 prose-strong:text-zinc-950 prose-a:break-all prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline dark:prose-invert dark:prose-headings:text-zinc-50 dark:prose-p:text-zinc-100 dark:prose-li:text-zinc-100 dark:prose-strong:text-zinc-50 dark:prose-a:text-sky-300"
+                          urlTransform={markdownUrlTransform}
+                          components={{
+                            a: renderMarkdownLink,
+                            p: ({ children }) => (
+                              <div className="my-3 first:mt-0 last:mb-0">
+                                <p>{children}</p>
+                                {renderInlineImagesForChildren(children)}
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                            ),
+                            li: ({ children }) => (
+                              <li className="my-1">
+                                <div>{children}</div>
+                                {renderInlineImagesForChildren(children)}
+                              </li>
+                            ),
+                            img: ({ src, alt }) => {
+                              const sourceIndex = parseInlineImageSourceIndex(src);
+                              if (sourceIndex === null) {
+                                return (
+                                  <img
+                                    src={src}
+                                    alt={alt || ""}
+                                    className="my-3 max-h-[420px] w-full rounded-2xl object-cover object-top"
+                                    loading="lazy"
+                                    onLoad={() => scrollToBottom()}
+                                  />
+                                );
+                              }
+
+                              const source = message.sources?.[sourceIndex];
+                              const images = source?.images || [];
+                              if (!source || images.length === 0) {
+                                return null;
+                              }
+
+                              const altContext = `${alt || ""} ${source.heading || ""} ${source.text || ""}`.trim();
+                              const rankedImages = images
+                                .map((image) => ({
+                                  image,
+                                  key: buildRenderedImageKey(sourceIndex, image),
+                                  score: scoreInlineImageMatch(source, image, altContext),
+                                }))
+                                .sort((left, right) => right.score - left.score);
+
+                              const bestMatch =
+                                rankedImages.find((candidate) => !renderedInlineImageKeys.has(candidate.key) && candidate.score > 0) ??
+                                rankedImages.find((candidate) => !renderedInlineImageKeys.has(candidate.key)) ??
+                                rankedImages[0];
+
+                              if (!bestMatch) {
+                                return null;
+                              }
+
+                              renderedInlineImageKeys.add(bestMatch.key);
+
+                              return (
+                                <div className="my-4 space-y-3">
+                                  <button
+                                    key={`${sourceIndex}:${bestMatch.image.path}`}
+                                    type="button"
+                                    onClick={() => openSource(message.sources || [], sourceIndex)}
+                                    className="block w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50 text-left transition hover:border-amber-300 hover:bg-amber-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-amber-400/40"
+                                  >
+                                    <img
+                                      src={bestMatch.image.url}
+                                      alt={bestMatch.image.alt || alt || bestMatch.image.path}
+                                      className="max-h-[420px] w-full object-cover object-top"
+                                      loading="lazy"
+                                      onLoad={() => scrollToBottom()}
+                                    />
+                                    <div className="border-t border-zinc-200 px-3 py-2 dark:border-zinc-800">
+                                      <div className="line-clamp-2 text-xs font-medium text-zinc-800 dark:text-zinc-100">
+                                        {bestMatch.image.alt || alt || source.heading || source.title}
+                                      </div>
+                                      <div className="mt-1 line-clamp-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                                        {source.heading || source.title}
+                                      </div>
+                                    </div>
+                                  </button>
+                                </div>
+                              );
+                            },
+                          }}
+                        >
+                          {formatAssistantMarkdown(assistantSections.body)}
+                        </Markdown>
+                      ) : null}
+
+                      {assistantSections.references ? (
+                        <Markdown
+                          className="prose prose-sm mt-4 max-w-none prose-a:break-all prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline dark:prose-invert dark:prose-p:text-zinc-200 dark:prose-li:text-zinc-200 dark:prose-strong:text-zinc-50 dark:prose-a:text-sky-300"
+                          urlTransform={markdownUrlTransform}
+                          components={{
+                            a: renderMarkdownLink,
+                            img: () => null,
+                          }}
+                        >
+                          {formatAssistantMarkdown(assistantSections.references)}
+                        </Markdown>
+                      ) : null}
                     </>
                   ) : (
-                    <Markdown className="prose prose-sm max-w-none prose-p:my-0 dark:prose-invert">
+                    <Markdown
+                      className="prose prose-sm max-w-none prose-p:my-0 dark:prose-invert dark:prose-p:text-sky-50"
+                      urlTransform={markdownUrlTransform}
+                    >
                       {message.content}
                     </Markdown>
                   )}
                 </div>
 
-                {message.role === "assistant" && previewImages.length > 0 && (
-                  <section className="mt-3 w-full max-w-[88%] rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/70">
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                      相关图片
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                      {previewImages.map((image) => (
-                        <button
-                          key={`${image.path}-${image.sourceIndex}`}
-                          type="button"
-                          onClick={() => openSource(message.sources || [], image.sourceIndex)}
-                          className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-50 text-left transition hover:border-amber-300 hover:bg-amber-50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-amber-400/40"
-                        >
-                          <img
-                            src={image.url}
-                            alt={image.alt || image.path}
-                            className="aspect-[4/3] w-full object-cover"
-                            loading="lazy"
-                          />
-                          <div className="px-3 py-2">
-                            <div className="line-clamp-1 text-xs font-medium text-zinc-800 dark:text-zinc-100">
-                              {image.alt || image.path}
-                            </div>
-                            <div className="mt-1 line-clamp-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-                              {image.label}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
+                {isLatestUserMessage && informativeMessage && isStreaming && (
+                  <div className="mt-3 w-full max-w-[90%] self-start rounded-xl bg-zinc-100 px-4 py-2 text-sm text-zinc-600 shadow-sm dark:bg-zinc-900/90 dark:text-zinc-300">
+                    {informativeMessage}
+                  </div>
                 )}
 
-                {message.role === "assistant" && (message.sources || []).length > 0 && (
-                  <section className="mt-3 w-full max-w-[88%] rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/70">
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                {isAssistantComplete && (message.metaRevealStage || 0) >= 1 && (message.sources || []).length > 0 && (
+                  <section className="mt-3 w-full max-w-[90%] rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/75">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-300">
                       引用来源
                     </div>
                     <div className="space-y-2">
                       {(message.sources || []).map((source, index) => (
                         <div
                           key={`${source.postId}-${source.anchor || index}`}
-                          className="w-full rounded-xl border border-zinc-200 px-3 py-3 text-left transition hover:border-amber-300 hover:bg-amber-50 dark:border-zinc-800 dark:hover:border-amber-400/40 dark:hover:bg-zinc-900"
+                          className="w-full rounded-xl border border-zinc-200 px-3 py-3 text-left transition hover:border-amber-300 hover:bg-amber-50 dark:border-zinc-700 dark:bg-zinc-950/35 dark:hover:border-amber-400/40 dark:hover:bg-zinc-800/80"
                         >
                           <button
                             type="button"
@@ -387,34 +797,18 @@ export default function BlogChat() {
                               {getSourceLabel(source, index)}
                             </div>
                           </button>
-                          <div className="mt-1 line-clamp-3 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                          <div className="mt-1 line-clamp-3 text-xs leading-5 text-zinc-500 dark:text-zinc-300">
                             {source.text}
                           </div>
                           <a
                             href={source.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="mt-2 inline-flex break-all text-xs font-medium text-blue-600 hover:underline dark:text-blue-300"
+                            className="mt-2 inline-flex max-w-full break-all text-xs font-medium text-blue-600 hover:underline dark:text-blue-300"
+                            style={{ overflowWrap: "anywhere" }}
                           >
-                            {source.url}
+                            {decodeUrlForDisplay(source.url)}
                           </a>
-                          {(source.images || []).length > 0 && (
-                            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                              {(source.images || []).slice(0, 4).map((image) => (
-                                <div
-                                  key={image.path}
-                                  className="h-16 w-16 flex-none overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900"
-                                >
-                                  <img
-                                    src={image.url}
-                                    alt={image.alt || image.path}
-                                    className="h-full w-full object-cover"
-                                    loading="lazy"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -426,8 +820,8 @@ export default function BlogChat() {
           </div>
         )}
 
-        {informativeMessage && (
-          <div className="mt-4 rounded-xl bg-zinc-100 px-4 py-2 text-sm text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
+        {informativeMessage && !isStreaming && (
+          <div className="mt-4 rounded-xl bg-zinc-100 px-4 py-2 text-sm text-zinc-600 dark:bg-zinc-900/90 dark:text-zinc-300">
             {informativeMessage}
           </div>
         )}
@@ -465,13 +859,14 @@ export default function BlogChat() {
               <button
                 type="button"
                 onClick={() => setSelectedSource(null)}
-                className="rounded-full border border-zinc-200 px-3 py-1 text-sm text-zinc-500 transition hover:bg-zinc-100 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 dark:border-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
+                aria-label="关闭引用来源弹窗"
               >
-                关闭
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="overflow-y-auto px-5 py-4">
+            <div className="blog-chat-scroll overflow-y-auto px-5 py-4">
               <div className="rounded-2xl bg-amber-50 p-4 text-sm leading-7 text-zinc-900 dark:bg-amber-400/10 dark:text-zinc-100">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">
                   文章命中内容
@@ -524,13 +919,50 @@ export default function BlogChat() {
                   rel="noreferrer"
                   className="mt-1 inline-block break-all text-xs text-blue-600 hover:underline dark:text-blue-400"
                 >
-                  {selectedSource.source.url}
+                  {decodeUrlForDisplay(selectedSource.source.url)}
                 </a>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        .blog-chat-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(161, 161, 170, 0.72) transparent;
+        }
+
+        .blog-chat-scroll::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+
+        .blog-chat-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .blog-chat-scroll::-webkit-scrollbar-thumb {
+          border-radius: 999px;
+          background: rgba(161, 161, 170, 0.72);
+        }
+
+        .blog-chat-scroll::-webkit-scrollbar-thumb:hover {
+          background: rgba(113, 113, 122, 0.82);
+        }
+
+        .dark .blog-chat-scroll {
+          scrollbar-color: rgba(113, 113, 122, 0.78) transparent;
+        }
+
+        .dark .blog-chat-scroll::-webkit-scrollbar-thumb {
+          background: rgba(113, 113, 122, 0.78);
+        }
+
+        .dark .blog-chat-scroll::-webkit-scrollbar-thumb:hover {
+          background: rgba(161, 161, 170, 0.82);
+        }
+      `}</style>
     </div>
   );
 }

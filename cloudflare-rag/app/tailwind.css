@@ -2,6 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "LXGWWenKai";
+  src: url("../assets/LXGWWenKai-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  unicode-range:
+    U+0020-007F,
+    U+4E00-9FFF,
+    U+3000-303F;
+}
+
 :root {
   --radius: 12px;
+}
+
+@layer base {
+  html,
+  body {
+    font-family:
+      "LXGWWenKai",
+      "Noto Serif SC",
+      "Source Han Serif SC",
+      "PingFang SC",
+      "Hiragino Sans GB",
+      "Microsoft YaHei",
+      serif;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+  }
 }

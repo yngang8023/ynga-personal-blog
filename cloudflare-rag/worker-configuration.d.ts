@@ -4,9 +4,11 @@
 interface Env {
 	rate_limiter: KVNamespace;
 	RAG_SYNC_TOKEN: string;
+	RAG_EMBED_SHARED_SECRET: string;
 	BLOG_CORPUS_ID: string;
 	EMBEDDING_MODEL: string;
 	CHAT_MODEL: string;
+	RERANK_MODEL: string;
 	BLOG_SITE_URL: string;
 	DB: D1Database;
 	VECTORIZE_INDEX: VectorizeIndex;

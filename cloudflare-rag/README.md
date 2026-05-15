@@ -10,6 +10,7 @@ The Astro blog stays on EdgeOne Pages. This project is deployed independently to
 - `/api/assets/posts/...` public asset proxy for raw article images stored in R2.
 - R2 raw post bundle archive for `content/posts/**` markdown and images.
 - Cloudflare-side Markdown parsing, image OCR/description, D1 full-text search, and Vectorize semantic search.
+- Tutorial-oriented retrieval enhancements: semantic routing, conversational query rewriting, rerank confidence gating, metadata-aware retrieval, and parent-child chunking.
 - KV based per-IP rate limiting for `/api/stream`.
 - Workers AI chat and multilingual embeddings.
 
@@ -77,13 +78,16 @@ Runtime model and corpus settings are configured in `wrangler.toml`:
 BLOG_CORPUS_ID = "mizuki-blog"
 EMBEDDING_MODEL = "@cf/baai/bge-m3"
 CHAT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+RERANK_MODEL = "@cf/baai/bge-reranker-base"
 ```
 
 Notes:
 
 - `@cf/baai/bge-m3` stays aligned with the current `1024`-dimension Vectorize index.
+- `@cf/baai/bge-reranker-base` is used after hybrid recall to re-order candidate blog chunks before generation.
 - `CHAT_MODEL` can be swapped without rebuilding the vector index.
 - If you change `EMBEDDING_MODEL` to another `1024`-dimension embedding model, re-run post sync so all vectors are regenerated.
+- After the blog intelligence upgrade, run a forced full sync once so new metadata, section records, parent text, and code/image flags are rebuilt.
 
 ## Environment
 
@@ -91,12 +95,14 @@ Create `.dev.vars` for local development:
 
 ```sh
 RAG_SYNC_TOKEN=replace-with-a-long-random-secret
+RAG_EMBED_SHARED_SECRET=replace-with-a-long-random-secret
 ```
 
 Set production secrets:
 
 ```sh
 pnpm exec wrangler pages secret put RAG_SYNC_TOKEN --project-name cloudflare-rag
+pnpm exec wrangler pages secret put RAG_EMBED_SHARED_SECRET --project-name cloudflare-rag
 ```
 
 Generate a long random token in PowerShell before you set it:

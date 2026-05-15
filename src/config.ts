@@ -20,6 +20,10 @@ import {
 	MESSAGE_PAGE_PATH,
 	MESSAGE_PAGE_TITLE,
 } from "./constants/message-page";
+import {
+	ASK_Y_PAGE_PATH,
+	ASK_Y_PAGE_TITLE,
+} from "./constants/ask-y-page";
 import { LinkPreset } from "./types/config";
 
 // 移除i18n导入以避免循环依赖
@@ -29,17 +33,24 @@ const SITE_LANG = "zh_CN"; // 语言代码，例如：'en', 'zh_CN', 'ja' 等。
 const SITE_TIMEZONE = 8; //设置你的网站时区 from -12 to 12 default in UTC+8
 
 // Cloudflare RAG 同步接口：本地同步脚本和 GitHub Actions 默认会读取这个地址，可用 BLOG_RAG_SYNC_ENDPOINT 临时覆盖。
+export const BLOG_RAG_SERVICE_ORIGIN = "https://rag.ynga.kingcola-icg.cn";
+export const BLOG_RAG_SITE_ORIGIN = "https://ynga.kingcola-icg.cn";
 export const BLOG_RAG_SYNC_ENDPOINT =
-	"https://rag.ynga.kingcola-icg.cn/api/sync-posts";
+	`${BLOG_RAG_SERVICE_ORIGIN}/api/sync-posts`;
 // Cloudflare RAG 悬浮聊天窗口地址：右下角 AI 助手 iframe 会嵌入这个 /embed 页面。
-export const BLOG_RAG_EMBED_URL = "https://rag.ynga.kingcola-icg.cn/embed";
+export const BLOG_RAG_EMBED_URL = `${BLOG_RAG_SERVICE_ORIGIN}/embed`;
+// 博客同源临时 token 下发接口：AI 助手首次打开时先请求这里，再用 token 启动受保护的 RAG iframe。
+export const BLOG_RAG_TOKEN_ENDPOINT = "/rag-embed-token";
 // 博客正式站点地址：同步文章到 RAG 时用于生成“参考来源”的文章 URL。
-export const BLOG_RAG_SITE_URL = "https://ynga.kingcola-icg.cn/";
+export const BLOG_RAG_SITE_URL = `${BLOG_RAG_SITE_ORIGIN}/`;
 
 // 博客 RAG 集成配置统一入口，后续更换 RAG 服务域名或站点域名时优先改这里。
 export const blogRagConfig = {
+	serviceOrigin: BLOG_RAG_SERVICE_ORIGIN,
 	syncEndpoint: BLOG_RAG_SYNC_ENDPOINT,
 	embedUrl: BLOG_RAG_EMBED_URL,
+	siteOrigin: BLOG_RAG_SITE_ORIGIN,
+	tokenEndpoint: BLOG_RAG_TOKEN_ENDPOINT,
 	siteUrl: BLOG_RAG_SITE_URL,
 } as const;
 
@@ -258,7 +269,7 @@ export const siteConfig: SiteConfig = {
 			//fontFamily: "ZenMaruGothic-Medium",
 			fontFamily: "LXGWWenKai-Regular",
 			fontWeight: "400",
-			localFonts: ["LXGWWenKai-Regular.ttf"],
+			localFonts: ["LXGWWenKai-Regular.woff2"],
 			enableCompress: false, // 关闭子集优化，避免正文偶发缺字/回退
 		},
 		cjkFont: {
@@ -266,7 +277,7 @@ export const siteConfig: SiteConfig = {
 			//fontFamily: "萝莉体 第二版",
 			fontFamily: "LXGWWenKai-Regular",
 			fontWeight: "500",
-			localFonts: ["LXGWWenKai-Regular.ttf"],
+			localFonts: ["LXGWWenKai-Regular.woff2"],
 			enableCompress: false, // 关闭子集优化，保证正文字体稳定一致
 		},
 	},
@@ -359,6 +370,11 @@ export const navBarConfig: NavBarConfig = {
 					name: "Gallery",
 					url: "/albums/",
 					icon: "material-symbols:photo-library",
+				},
+				{
+					name: ASK_Y_PAGE_TITLE,
+					url: ASK_Y_PAGE_PATH,
+					icon: "material-symbols:smart-toy-outline-rounded",
 				},
 				// {
 				// 	name: "Devices",
@@ -637,16 +653,16 @@ export const announcementConfig: AnnouncementConfig = {
 	},
 };
 
-// const MUSIC_PLAYER_MODE: MusicPlayerConfig["mode"] =
-// 	process.env.NODE_ENV === "production" ? "meting" : "local";
+const MUSIC_PLAYER_MODE: MusicPlayerConfig["mode"] =
+	process.env.NODE_ENV === "production" ? "meting" : "local";
 
 export const musicPlayerConfig: MusicPlayerConfig = {
 	enable: true, // 启用音乐播放器功能
 	showFloatingPlayer: true, // 显示悬浮播放器 UI
 	floatingEntryMode: "fab", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
 	// floatingEntryMode: "default", // 悬浮入口模式："default" 为独立悬浮播放器，"fab" 为集成到通用 FAB 组
-	// mode: MUSIC_PLAYER_MODE, // 开发环境默认 local，生产环境默认 meting
-	mode: "meting", // 开发环境默认 local，生产环境默认 meting
+	mode: MUSIC_PLAYER_MODE, // 开发环境默认 local，生产环境默认 meting
+	// mode: "meting", // 开发环境默认 local，生产环境默认 meting
 	meting_api: [
 		"https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r",
 		"https://api.moeyao.cn/meting/?server=:server&type=:type&id=:id",

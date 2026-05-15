@@ -49,10 +49,14 @@
 /* 导入新字体 */
 @font-face {
   font-family: "LXGWWenKai-Regular";
-  src: url("/assets/font/LXGWWenKai-Regular.ttf") format("truetype");
-  font-weight: 400 700;
+  src: url("/assets/font/LXGWWenKai-Regular.woff2") format("woff2");
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
+  unicode-range:
+    U+0020-007F,
+    U+4E00-9FFF,
+    U+3000-303F;
 }
 
 html,

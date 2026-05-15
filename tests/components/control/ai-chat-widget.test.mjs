@@ -11,10 +11,15 @@ test("AI chat widget embeds the deployed Cloudflare RAG chat UI lazily", async (
 
 	assert.match(source, /import \{ blogRagConfig \} from "..\/..\/config";/);
 	assert.match(source, /const embedUrl = blogRagConfig\.embedUrl;/);
+	assert.match(source, /const tokenEndpoint = blogRagConfig\.tokenEndpoint;/);
 	assert.doesNotMatch(source, /https:\/\/cloudflare-rag-1mw\.pages\.dev\/embed/);
 	assert.match(source, /id="ai-chat-btn"/);
 	assert.match(source, /data-src=\{embedUrl\}/);
+	assert.match(source, /data-token-endpoint=\{tokenEndpoint\}/);
 	assert.match(source, /<iframe/);
+	assert.match(source, /fetch\(tokenEndpointUrl/);
+	assert.match(source, /embed_token/);
+	assert.match(source, /ai-chat-status/);
 	assert.match(source, /window\.toggleAiChat/);
 });
 

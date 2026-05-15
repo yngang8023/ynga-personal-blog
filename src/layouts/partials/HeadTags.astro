@@ -121,6 +121,7 @@ const getFontMimeType = (fileName: string): string => {
 			href={url(`/assets/font/${fontFile}`)}
 			as="font"
 			type={getFontMimeType(fontFile)}
+			crossorigin="anonymous"
 		/>
 	))
 }

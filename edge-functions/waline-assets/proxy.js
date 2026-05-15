@@ -1,15 +1,10 @@
 import { guardProxyReadRequest } from "../_shared/request-guard.js";
-
-const DEFAULT_WALINE_ASSETS_ORIGIN = "https://unpkg.com";
-const WALINE_ASSET_CACHE_CONTROL =
-	"public, max-age=31536000, s-maxage=31536000, immutable, no-transform";
-
-const HOP_BY_HOP_REQUEST_HEADERS = ["host", "content-length"];
-const UNSAFE_RESPONSE_HEADERS = [
-	"content-encoding",
-	"content-length",
-	"transfer-encoding",
-];
+import {
+	DEFAULT_WALINE_ASSETS_ORIGIN,
+	EDGE_HOP_BY_HOP_REQUEST_HEADERS,
+	EDGE_UNSAFE_RESPONSE_HEADERS,
+	WALINE_ASSET_CACHE_CONTROL,
+} from "../config.js";
 
 function getOrigin(env) {
 	const origin = env?.WALINE_ASSETS_ORIGIN || DEFAULT_WALINE_ASSETS_ORIGIN;
@@ -32,7 +27,7 @@ function buildUpstreamUrl(incomingUrl, env) {
 function buildUpstreamHeaders(request, incomingUrl) {
 	const headers = new Headers(request.headers);
 
-	for (const header of HOP_BY_HOP_REQUEST_HEADERS) {
+	for (const header of EDGE_HOP_BY_HOP_REQUEST_HEADERS) {
 		headers.delete(header);
 	}
 
@@ -46,7 +41,7 @@ function buildUpstreamHeaders(request, incomingUrl) {
 function sanitizeUpstreamResponseHeaders(upstreamHeaders) {
 	const responseHeaders = new Headers(upstreamHeaders);
 
-	for (const header of UNSAFE_RESPONSE_HEADERS) {
+	for (const header of EDGE_UNSAFE_RESPONSE_HEADERS) {
 		responseHeaders.delete(header);
 	}
 

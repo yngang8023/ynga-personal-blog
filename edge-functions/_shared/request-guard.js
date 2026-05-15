@@ -1,10 +1,7 @@
-const DEFAULT_ALLOWED_SITE_ORIGINS = ["https://ynga.kingcola-icg.cn"];
-
-const BLOCKED_RESPONSE_HEADERS = {
-	"cache-control": "no-store, no-transform",
-	"content-type": "text/plain; charset=utf-8",
-	"x-edge-guard": "blocked",
-};
+import {
+	DEFAULT_ALLOWED_SITE_ORIGINS,
+	EDGE_BLOCKED_RESPONSE_HEADERS,
+} from "../config.js";
 
 function trimTrailingSlash(value) {
 	return value.replace(/\/+$/, "");
@@ -43,7 +40,7 @@ export function getAllowedSiteOrigins(env) {
 function buildBlockedResponse(reason = "Forbidden") {
 	return new Response(reason, {
 		status: 403,
-		headers: BLOCKED_RESPONSE_HEADERS,
+		headers: EDGE_BLOCKED_RESPONSE_HEADERS,
 	});
 }
 
@@ -134,4 +131,3 @@ export function handleProxyPreflight(request, env, allowMethods) {
 		headers: buildCorsHeaders(origin, requestedHeaders, allowMethods),
 	});
 }
-

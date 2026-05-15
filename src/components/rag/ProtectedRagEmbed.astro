@@ -1,0 +1,267 @@
+---
+import { blogRagConfig } from "../../config";
+
+interface Props {
+	title?: string;
+}
+
+const { title = "问问小Y AI 对话" } = Astro.props;
+const embedUrl = blogRagConfig.embedUrl;
+const tokenEndpoint = blogRagConfig.tokenEndpoint;
+---
+
+<div class="protected-rag-embed" data-protected-rag-embed>
+	<div
+		class="protected-rag-embed__status"
+		data-rag-embed-status
+		role="status"
+		aria-live="polite"
+	>
+		正在连接问问小Y...
+	</div>
+	<iframe
+		data-rag-embed-iframe
+		title={title}
+		data-src={embedUrl}
+		data-token-endpoint={tokenEndpoint}
+		loading="lazy"
+		referrerpolicy="no-referrer-when-downgrade"
+		allow="clipboard-write"
+	></iframe>
+</div>
+
+<style>
+	.protected-rag-embed {
+		position: relative;
+		width: 100%;
+		min-width: 0;
+		min-height: clamp(40rem, 78vh, 62rem);
+		max-height: min(82vh, 62rem);
+		overflow: hidden;
+		border-radius: calc(var(--radius-large) - 0.15rem);
+		border: 1px solid color-mix(in oklch, var(--line-divider) 72%, var(--primary) 28%);
+		background:
+			linear-gradient(
+				180deg,
+				color-mix(in oklch, var(--card-bg) 96%, white 4%),
+				color-mix(in oklch, var(--card-bg) 88%, var(--primary) 12%)
+			);
+		box-shadow:
+			0 22px 56px color-mix(in oklch, var(--primary) 12%, transparent),
+			inset 0 1px 0 rgb(255 255 255 / 0.72);
+	}
+
+	.protected-rag-embed__status {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		display: grid;
+		place-items: center;
+		padding: 1.25rem;
+		background:
+			linear-gradient(180deg, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.78));
+		color: var(--content-meta);
+		font-size: 0.98rem;
+		font-weight: 600;
+		line-height: 1.7;
+		text-align: center;
+	}
+
+	.protected-rag-embed__status[data-state="error"] {
+		color: var(--primary);
+	}
+
+	.protected-rag-embed__status[hidden] {
+		display: none;
+	}
+
+	.protected-rag-embed iframe {
+		display: block;
+		width: 100%;
+		height: 100%;
+		min-width: 0;
+		min-height: inherit;
+		border: 0;
+		background: transparent;
+	}
+
+	:global(.dark) .protected-rag-embed {
+		box-shadow:
+			0 24px 60px rgb(0 0 0 / 0.26),
+			inset 0 1px 0 rgb(255 255 255 / 0.05);
+	}
+
+	:global(.dark) .protected-rag-embed__status {
+		background:
+			linear-gradient(180deg, rgb(15 23 42 / 0.9), rgb(15 23 42 / 0.72));
+	}
+
+	@media (max-width: 900px) {
+		.protected-rag-embed {
+			min-height: clamp(36rem, 72vh, 54rem);
+			max-height: none;
+		}
+	}
+
+	@media (max-width: 640px) {
+		.protected-rag-embed {
+			min-height: calc(100dvh - 12.5rem);
+			border-radius: 1.05rem;
+		}
+
+		.protected-rag-embed__status {
+			padding: 1rem;
+			font-size: 0.92rem;
+		}
+	}
+</style>
+
+<script is:inline>
+	(() => {
+		const win = window;
+		const doc = document;
+
+		if (typeof win.__protectedRagEmbedCleanup === "function") {
+			win.__protectedRagEmbedCleanup();
+		}
+
+		const cleanupFns = [];
+		const roots = Array.from(
+			doc.querySelectorAll("[data-protected-rag-embed]"),
+		);
+
+		function getThemeMode() {
+			return doc.documentElement.classList.contains("dark") ? "dark" : "light";
+		}
+
+		roots.forEach((root) => {
+			const iframe = root.querySelector("[data-rag-embed-iframe]");
+			const status = root.querySelector("[data-rag-embed-status]");
+
+			if (!iframe || !status) {
+				return;
+			}
+
+			let iframeBootstrapPromise = null;
+
+			function setStatus(message, state = "loading") {
+				status.textContent = message;
+				status.dataset.state = state;
+				status.hidden = false;
+			}
+
+			function clearStatus() {
+				status.hidden = true;
+				status.textContent = "";
+				delete status.dataset.state;
+			}
+
+			function postThemeToIframe() {
+				const theme = getThemeMode();
+				if (iframe.contentWindow) {
+					iframe.contentWindow.postMessage(
+						{
+							type: "ynga-theme-change",
+							theme,
+						},
+						"*",
+					);
+				}
+			}
+
+			async function loadIframe() {
+				if (iframe.getAttribute("src") && iframe.dataset.ready === "true") {
+					clearStatus();
+					return true;
+				}
+
+				if (iframeBootstrapPromise) {
+					return iframeBootstrapPromise;
+				}
+
+				const src = iframe.getAttribute("data-src");
+				const tokenEndpointUrl = iframe.getAttribute("data-token-endpoint");
+				if (!src || !tokenEndpointUrl) {
+					setStatus("AI 对话加载配置缺失，请稍后重试。", "error");
+					return false;
+				}
+
+				setStatus("正在连接问问小Y...", "loading");
+				iframe.dataset.ready = "false";
+				iframeBootstrapPromise = (async () => {
+					try {
+						const response = await fetch(tokenEndpointUrl, {
+							method: "GET",
+							cache: "no-store",
+							credentials: "same-origin",
+							headers: {
+								accept: "application/json",
+							},
+						});
+
+						if (!response.ok) {
+							throw new Error(`bootstrap token request failed: ${response.status}`);
+						}
+
+						const payload = await response.json();
+						if (typeof payload?.token !== "string" || payload.token.length === 0) {
+							throw new Error("bootstrap token response is missing token");
+						}
+
+						const url = new URL(src, window.location.href);
+						url.searchParams.set("theme", getThemeMode());
+						url.searchParams.set("embed_token", payload.token);
+						iframe.dataset.ready = "false";
+						iframe.setAttribute("src", url.toString());
+						return true;
+					} catch {
+						iframe.dataset.ready = "false";
+						iframe.removeAttribute("src");
+						setStatus("问问小Y加载失败，请刷新页面后重试。", "error");
+						return false;
+					} finally {
+						iframeBootstrapPromise = null;
+					}
+				})();
+
+				return iframeBootstrapPromise;
+			}
+
+			const handleLoad = () => {
+				iframe.dataset.ready = "true";
+				clearStatus();
+				postThemeToIframe();
+			};
+
+			const handleError = () => {
+				iframe.dataset.ready = "false";
+				setStatus("问问小Y加载失败，请刷新页面后重试。", "error");
+			};
+
+			iframe.addEventListener("load", handleLoad);
+			iframe.addEventListener("error", handleError);
+
+			const themeObserver = new MutationObserver(() => {
+				if (iframe.getAttribute("src")) {
+					postThemeToIframe();
+				}
+			});
+			themeObserver.observe(doc.documentElement, {
+				attributes: true,
+				attributeFilter: ["class"],
+			});
+
+			void loadIframe();
+
+			cleanupFns.push(() => {
+				iframe.removeEventListener("load", handleLoad);
+				iframe.removeEventListener("error", handleError);
+				themeObserver.disconnect();
+			});
+		});
+
+		win.__protectedRagEmbedCleanup = () => {
+			cleanupFns.forEach((cleanup) => cleanup());
+		};
+	})();
+</script>

@@ -3,21 +3,16 @@ import {
 	guardProxyWriteRequest,
 	handleProxyPreflight,
 } from "../_shared/request-guard.js";
+import {
+	DEFAULT_WALINE_ORIGIN,
+	EDGE_HOP_BY_HOP_REQUEST_HEADERS,
+	EDGE_UNSAFE_RESPONSE_HEADERS,
+	WALINE_READ_METHODS,
+	WALINE_WRITE_METHODS,
+} from "../config.js";
 
-const DEFAULT_WALINE_ORIGIN = "https://waline.kingcola-icg.cn";
-const READ_METHODS = new Set(["GET", "HEAD"]);
-const WRITE_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
-
-const HOP_BY_HOP_REQUEST_HEADERS = [
-	"host",
-	"content-length",
-];
-
-const UNSAFE_RESPONSE_HEADERS = [
-	"content-encoding",
-	"content-length",
-	"transfer-encoding",
-];
+const READ_METHODS = new Set(WALINE_READ_METHODS);
+const WRITE_METHODS = [...WALINE_WRITE_METHODS];
 
 function getOrigin(env) {
 	const origin = env?.WALINE_ORIGIN || DEFAULT_WALINE_ORIGIN;
@@ -27,7 +22,7 @@ function getOrigin(env) {
 function buildUpstreamHeaders(request, incomingUrl) {
 	const headers = new Headers(request.headers);
 
-	for (const header of HOP_BY_HOP_REQUEST_HEADERS) {
+	for (const header of EDGE_HOP_BY_HOP_REQUEST_HEADERS) {
 		headers.delete(header);
 	}
 
@@ -42,7 +37,7 @@ function buildUpstreamHeaders(request, incomingUrl) {
 function sanitizeUpstreamResponseHeaders(upstreamHeaders) {
 	const responseHeaders = new Headers(upstreamHeaders);
 
-	for (const header of UNSAFE_RESPONSE_HEADERS) {
+	for (const header of EDGE_UNSAFE_RESPONSE_HEADERS) {
 		responseHeaders.delete(header);
 	}
 

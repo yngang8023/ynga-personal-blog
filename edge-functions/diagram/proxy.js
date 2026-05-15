@@ -1,29 +1,18 @@
 import { guardProxyReadRequest } from "../_shared/request-guard.js";
-
-const MERMAID_ROUTE = "/diagram/mermaid.js";
-const MERMAID_UPSTREAM =
-	"https://unpkg.com/mermaid@11.12.0/dist/mermaid.min.js";
-const PLANTUML_ROUTE_PREFIX = "/diagram/plantuml";
-const PLANTUML_UPSTREAM = "https://www.plantuml.com/plantuml/";
-
-const HOP_BY_HOP_REQUEST_HEADERS = ["host", "content-length"];
-const UNSAFE_RESPONSE_HEADERS = [
-	"content-encoding",
-	"content-length",
-	"transfer-encoding",
-];
-
-const CACHE_CONTROL_BY_ROUTE = {
-	mermaid:
-		"public, max-age=3600, s-maxage=2592000, stale-while-revalidate=604800, no-transform",
-	plantuml:
-		"public, max-age=86400, s-maxage=2592000, stale-while-revalidate=604800, no-transform",
-};
+import {
+	DIAGRAM_CACHE_CONTROL_BY_ROUTE,
+	EDGE_HOP_BY_HOP_REQUEST_HEADERS,
+	EDGE_UNSAFE_RESPONSE_HEADERS,
+	MERMAID_ROUTE,
+	MERMAID_UPSTREAM,
+	PLANTUML_ROUTE_PREFIX,
+	PLANTUML_UPSTREAM,
+} from "../config.js";
 
 function buildUpstreamHeaders(request, incomingUrl) {
 	const headers = new Headers(request.headers);
 
-	for (const header of HOP_BY_HOP_REQUEST_HEADERS) {
+	for (const header of EDGE_HOP_BY_HOP_REQUEST_HEADERS) {
 		headers.delete(header);
 	}
 
@@ -37,7 +26,7 @@ function buildUpstreamHeaders(request, incomingUrl) {
 function resolveRoute(incomingUrl) {
 	if (incomingUrl.pathname === MERMAID_ROUTE) {
 		return {
-			cacheControl: CACHE_CONTROL_BY_ROUTE.mermaid,
+			cacheControl: DIAGRAM_CACHE_CONTROL_BY_ROUTE.mermaid,
 			targetUrl: MERMAID_UPSTREAM,
 		};
 	}
@@ -54,7 +43,7 @@ function resolveRoute(incomingUrl) {
 		const normalizedUpstreamPath = upstreamPath.replace(/^\/+/, "");
 
 		return {
-			cacheControl: CACHE_CONTROL_BY_ROUTE.plantuml,
+			cacheControl: DIAGRAM_CACHE_CONTROL_BY_ROUTE.plantuml,
 			targetUrl: new URL(
 				`${normalizedUpstreamPath}${incomingUrl.search}`,
 				PLANTUML_UPSTREAM,
@@ -68,7 +57,7 @@ function resolveRoute(incomingUrl) {
 function sanitizeUpstreamResponseHeaders(upstreamHeaders, cacheControl, cacheState) {
 	const responseHeaders = new Headers(upstreamHeaders);
 
-	for (const header of UNSAFE_RESPONSE_HEADERS) {
+	for (const header of EDGE_UNSAFE_RESPONSE_HEADERS) {
 		responseHeaders.delete(header);
 	}
 
@@ -105,11 +94,12 @@ async function readCachedResponse(cacheStore, cacheKey) {
 	return new Response(await cached.arrayBuffer(), {
 		status: cached.status,
 		statusText: cached.statusText,
-		headers: sanitizeUpstreamResponseHeaders(
-			cached.headers,
-			cached.headers.get("cache-control") || CACHE_CONTROL_BY_ROUTE.plantuml,
-			"hit",
-		),
+			headers: sanitizeUpstreamResponseHeaders(
+				cached.headers,
+				cached.headers.get("cache-control") ||
+					DIAGRAM_CACHE_CONTROL_BY_ROUTE.plantuml,
+				"hit",
+			),
 	});
 }
 

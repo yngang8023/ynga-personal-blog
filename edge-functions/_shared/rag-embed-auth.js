@@ -9,6 +9,13 @@ const RAG_EMBED_SESSION_TTL_SECONDS = 30 * 60;
 
 export const RAG_EMBED_QUERY_PARAM = "embed_token";
 export const RAG_EMBED_SESSION_COOKIE_NAME = "rag_embed_session";
+const BASE64_ALPHABET =
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+const BASE64_LOOKUP = Object.freeze(
+	Object.fromEntries(
+		Array.from(BASE64_ALPHABET).map((character, index) => [character, index]),
+	),
+);
 
 function getCrypto() {
 	if (!globalThis.crypto?.subtle) {
@@ -35,22 +42,65 @@ function toUnixSeconds(now = Date.now()) {
 }
 
 function bytesToBase64(bytes) {
-	let binary = "";
-	for (const byte of bytes) {
-		binary += String.fromCharCode(byte);
+	let output = "";
+
+	for (let index = 0; index < bytes.length; index += 3) {
+		const first = bytes[index];
+		const second = index + 1 < bytes.length ? bytes[index + 1] : 0;
+		const third = index + 2 < bytes.length ? bytes[index + 2] : 0;
+
+		const firstChunk = first >> 2;
+		const secondChunk = ((first & 0b11) << 4) | (second >> 4);
+		const thirdChunk = ((second & 0b1111) << 2) | (third >> 6);
+		const fourthChunk = third & 0b111111;
+
+		output += BASE64_ALPHABET[firstChunk];
+		output += BASE64_ALPHABET[secondChunk];
+		output += index + 1 < bytes.length ? BASE64_ALPHABET[thirdChunk] : "=";
+		output += index + 2 < bytes.length ? BASE64_ALPHABET[fourthChunk] : "=";
 	}
 
-	return btoa(binary);
+	return output;
 }
 
 function base64ToBytes(value) {
-	const binary = atob(value);
-	const bytes = new Uint8Array(binary.length);
-	for (let index = 0; index < binary.length; index += 1) {
-		bytes[index] = binary.charCodeAt(index);
+	const normalized = value.replace(/\s+/g, "");
+	if (normalized.length % 4 !== 0) {
+		throw new Error("Invalid base64 input.");
 	}
 
-	return bytes;
+	const output = [];
+
+	for (let index = 0; index < normalized.length; index += 4) {
+		const first = normalized[index];
+		const second = normalized[index + 1];
+		const third = normalized[index + 2];
+		const fourth = normalized[index + 3];
+
+		const firstValue = BASE64_LOOKUP[first];
+		const secondValue = BASE64_LOOKUP[second];
+		const thirdValue = third === "=" ? 0 : BASE64_LOOKUP[third];
+		const fourthValue = fourth === "=" ? 0 : BASE64_LOOKUP[fourth];
+
+		if (
+			firstValue === undefined ||
+			secondValue === undefined ||
+			(third !== "=" && thirdValue === undefined) ||
+			(fourth !== "=" && fourthValue === undefined)
+		) {
+			throw new Error("Invalid base64 input.");
+		}
+
+		output.push((firstValue << 2) | (secondValue >> 4));
+		if (third !== "=") {
+			output.push(((secondValue & 0b1111) << 4) | (thirdValue >> 2));
+		}
+		if (fourth !== "=") {
+			output.push(((thirdValue & 0b11) << 6) | fourthValue);
+		}
+	}
+
+	return new Uint8Array(output);
 }
 
 function toBase64Url(bytes) {

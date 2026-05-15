@@ -62,3 +62,21 @@ test("rag embed token endpoint rejects cross-site requests", async () => {
 	assert.equal(response.headers.get("x-edge-guard"), "blocked");
 	assert.match(await response.text(), /forbidden/i);
 });
+
+test("rag embed token endpoint accepts requests when sec-fetch-site is omitted but referer stays same-origin", async () => {
+	const response = await onRequest({
+		request: new Request("https://ynga.kingcola-icg.cn/rag-embed-token", {
+			headers: {
+				referer: ALLOWED_REFERER,
+				accept: "application/json",
+			},
+		}),
+		env: {
+			RAG_EMBED_SHARED_SECRET: SHARED_SECRET,
+		},
+	});
+
+	assert.equal(response.status, 200);
+	const payload = await response.json();
+	assert.equal(typeof payload.token, "string");
+});

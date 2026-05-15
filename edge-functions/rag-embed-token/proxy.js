@@ -6,6 +6,20 @@ import {
 	EDGE_BLOCKED_RESPONSE_HEADERS,
 } from "../config.js";
 
+if (typeof Response !== "undefined" && typeof Response.json !== "function") {
+	Response.json = function json(body = null, init = undefined) {
+		const headers = new Headers(init?.headers);
+		if (!headers.has("content-type")) {
+			headers.set("content-type", "application/json; charset=utf-8");
+		}
+
+		return new Response(JSON.stringify(body), {
+			...init,
+			headers,
+		});
+	};
+}
+
 function normalizeOrigin(value) {
 	if (typeof value !== "string" || value.trim().length === 0) {
 		return null;
@@ -48,7 +62,11 @@ function isAllowedSameOriginRequest(request, requestOrigin) {
 		return false;
 	}
 
-	if (secFetchSite !== "same-origin") {
+	if (
+		secFetchSite &&
+		secFetchSite !== "same-origin" &&
+		secFetchSite !== "none"
+	) {
 		return false;
 	}
 

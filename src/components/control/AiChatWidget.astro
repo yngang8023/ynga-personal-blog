@@ -465,11 +465,26 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 			setStatus("AI 助手加载失败，请稍后再试。", "error");
 		}
 
+		function handleEmbedMessage(event) {
+			if (event.source !== iframe.contentWindow) {
+				return;
+			}
+
+			const data = event.data;
+			if (!data || data.type !== "ynga-rag-embed-ready") {
+				return;
+			}
+
+			iframe.dataset.ready = "true";
+			clearStatus();
+		}
+
 		win.toggleAiChat = toggleAiChat;
 		closeButton.addEventListener("click", handleClose);
 		backdrop.addEventListener("click", handleClose);
 		iframe.addEventListener("load", handleIframeLoad);
 		iframe.addEventListener("error", handleIframeError);
+		win.addEventListener("message", handleEmbedMessage);
 		doc.addEventListener("keydown", handleKeydown);
 		themeObserver = new MutationObserver(() => {
 			if (isOpen) {
@@ -486,6 +501,7 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 			backdrop.removeEventListener("click", handleClose);
 			iframe.removeEventListener("load", handleIframeLoad);
 			iframe.removeEventListener("error", handleIframeError);
+			win.removeEventListener("message", handleEmbedMessage);
 			doc.removeEventListener("keydown", handleKeydown);
 			themeObserver?.disconnect();
 			themeObserver = null;

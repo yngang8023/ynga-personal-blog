@@ -238,8 +238,24 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 				setStatus("问问小Y加载失败，请刷新页面后重试。", "error");
 			};
 
+			const handleMessage = (event) => {
+				if (event.source !== iframe.contentWindow) {
+					return;
+				}
+
+				const data = event.data;
+				if (!data || data.type !== "ynga-rag-embed-ready") {
+					return;
+				}
+
+				iframe.dataset.ready = "true";
+				clearStatus();
+				postThemeToIframe();
+			};
+
 			iframe.addEventListener("load", handleLoad);
 			iframe.addEventListener("error", handleError);
+			win.addEventListener("message", handleMessage);
 
 			const themeObserver = new MutationObserver(() => {
 				if (iframe.getAttribute("src")) {
@@ -256,6 +272,7 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 			cleanupFns.push(() => {
 				iframe.removeEventListener("load", handleLoad);
 				iframe.removeEventListener("error", handleError);
+				win.removeEventListener("message", handleMessage);
 				themeObserver.disconnect();
 			});
 		});

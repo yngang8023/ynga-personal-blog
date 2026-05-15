@@ -1,5 +1,6 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "@remix-run/react";
 import "./tailwind.css";
+import lxgwWenkaiRegularWoff2Url from "../assets/LXGWWenKai-Regular.woff2";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,7 +10,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link
           rel="preload"
-          href="/assets/LXGWWenKai-Regular.woff2"
+          href={lxgwWenkaiRegularWoff2Url}
           as="font"
           type="font/woff2"
           crossOrigin="anonymous"
@@ -50,6 +51,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   var data = event && event.data;
                   if (!data || data.type !== "ynga-theme-change") return;
                   applyTheme(data.theme);
+                });
+
+                window.addEventListener("load", function() {
+                  try {
+                    window.parent?.postMessage(
+                      {
+                        type: "ynga-rag-embed-ready",
+                        theme: window.__YNGA_EMBED_THEME__ || "light"
+                      },
+                      "*"
+                    );
+                  } catch (error) {
+                    console.error(error);
+                  }
                 });
               })();
             `,

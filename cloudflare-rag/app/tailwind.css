@@ -4,7 +4,8 @@
 
 @font-face {
   font-family: "LXGWWenKai";
-  src: url("../assets/LXGWWenKai-Regular.woff2") format("woff2");
+  src: url("https://ynga.kingcola-icg.cn/assets/font/LXGWWenKai-Regular.woff2")
+    format("woff2");
   font-style: normal;
   font-weight: 400;
   font-display: swap;

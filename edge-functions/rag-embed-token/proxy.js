@@ -1,6 +1,6 @@
 import {
 	issueEmbedBootstrapToken,
-} from "../../scripts/rag-embed-auth.mjs";
+} from "../_shared/rag-embed-auth.js";
 import {
 	ALLOWED_BLOG_ORIGIN,
 	EDGE_BLOCKED_RESPONSE_HEADERS,

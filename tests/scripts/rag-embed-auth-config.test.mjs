@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
-const blogHelperPath = path.resolve("scripts/rag-embed-auth.mjs");
+const blogHelperPath = path.resolve("edge-functions/_shared/rag-embed-auth.js");
 const ragHelperPath = path.resolve("cloudflare-rag/functions/_shared/rag-embed-auth.js");
 
 test("rag embed auth helpers do not hardcode the blog origin internally", async () => {

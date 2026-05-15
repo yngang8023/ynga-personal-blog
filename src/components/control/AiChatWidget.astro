@@ -318,6 +318,7 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 		let isOpen = false;
 		let themeObserver = null;
 		let iframeBootstrapPromise = null;
+		let previousFocus = null;
 
 		function getThemeMode() {
 			return doc.documentElement.classList.contains("dark") ? "dark" : "light";
@@ -410,17 +411,33 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 			isOpen = nextOpen;
 			widget.classList.toggle("is-open", isOpen);
 			button.classList.toggle("active", isOpen);
-			panel.setAttribute("aria-hidden", String(!isOpen));
 			backdrop.hidden = !isOpen;
 			doc.documentElement.classList.toggle("ai-chat-open", isOpen);
 
 			if (isOpen) {
+				previousFocus = doc.activeElement instanceof HTMLElement ? doc.activeElement : null;
+				panel.removeAttribute("inert");
+				panel.setAttribute("aria-hidden", "false");
+				queueMicrotask(() => {
+					if (closeButton instanceof HTMLElement) {
+						closeButton.focus({ preventScroll: true });
+					}
+				});
 				loadIframe().then((loaded) => {
 					if (loaded && isOpen) {
 						postThemeToIframe();
 					}
 				});
+				return;
 			}
+
+			if (doc.activeElement instanceof HTMLElement && panel.contains(doc.activeElement)) {
+				button.focus({ preventScroll: true });
+			} else if (previousFocus instanceof HTMLElement && doc.contains(previousFocus)) {
+				previousFocus.focus({ preventScroll: true });
+			}
+			panel.setAttribute("aria-hidden", "true");
+			panel.setAttribute("inert", "");
 		}
 
 		function toggleAiChat(forceOpen) {

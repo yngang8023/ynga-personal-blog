@@ -179,9 +179,7 @@ async function verifySignedToken({
 		return null;
 	}
 
-	const normalizedExpectedOrigin = normalizeOrigin(
-		expectedOrigin,
-	);
+	const normalizedExpectedOrigin = normalizeOrigin(expectedOrigin);
 	const currentTime = toUnixSeconds(now);
 
 	if (

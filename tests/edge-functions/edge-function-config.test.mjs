@@ -53,6 +53,14 @@ test("edge function proxies import shared defaults from edge-functions/config.js
 	assert.match(requestGuardSource, /from "\.\.\/config\.js";/);
 	assert.match(diagramProxySource, /from "\.\.\/config\.js";/);
 	assert.match(ragEmbedTokenProxySource, /from "\.\.\/config\.js";/);
+	assert.match(
+		ragEmbedTokenProxySource,
+		/from "\.\.\/_shared\/rag-embed-auth\.js";/,
+	);
+	assert.doesNotMatch(
+		ragEmbedTokenProxySource,
+		/\.\.\/\.\.\/scripts\/rag-embed-auth\.mjs/,
+	);
 	assert.match(umamiProxySource, /from "\.\.\/config\.js";/);
 	assert.match(walineProxySource, /from "\.\.\/config\.js";/);
 	assert.match(walineAssetsProxySource, /from "\.\.\/config\.js";/);

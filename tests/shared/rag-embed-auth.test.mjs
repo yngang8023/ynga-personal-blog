@@ -9,7 +9,7 @@ import {
 	stripEmbedTokenFromUrl,
 	verifyEmbedBootstrapToken,
 	verifyEmbedSessionToken,
-} from "../../scripts/rag-embed-auth.mjs";
+} from "../../edge-functions/_shared/rag-embed-auth.js";
 
 const SHARED_SECRET = "shared-secret-for-tests";
 const BLOG_ORIGIN = "https://ynga.kingcola-icg.cn";

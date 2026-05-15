@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { verifyEmbedBootstrapToken } from "../../scripts/rag-embed-auth.mjs";
+import { verifyEmbedBootstrapToken } from "../../edge-functions/_shared/rag-embed-auth.js";
 import { onRequest } from "../../edge-functions/rag-embed-token/proxy.js";
 
 const SHARED_SECRET = "shared-secret-for-tests";

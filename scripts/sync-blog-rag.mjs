@@ -16,6 +16,73 @@ const configPath = path.resolve(rootDir, "src/config.ts");
 loadEnv();
 
 function readExportedStringConstant(sourceFile, constantName) {
+	const declarations = new Map();
+
+	for (const statement of sourceFile.statements) {
+		if (!ts.isVariableStatement(statement)) {
+			continue;
+		}
+
+		for (const declaration of statement.declarationList.declarations) {
+			if (ts.isIdentifier(declaration.name) && declaration.initializer) {
+				declarations.set(declaration.name.text, declaration.initializer);
+			}
+		}
+	}
+
+	function resolveStringExpression(expression, seen = new Set()) {
+		if (
+			ts.isStringLiteral(expression) ||
+			ts.isNoSubstitutionTemplateLiteral(expression)
+		) {
+			return expression.text;
+		}
+
+		if (ts.isTemplateExpression(expression)) {
+			return expression.head.text + expression.templateSpans.map((span) => {
+				const value = resolveStringExpression(span.expression, seen);
+				return value + span.literal.text;
+			}).join("");
+		}
+
+		if (ts.isParenthesizedExpression(expression)) {
+			return resolveStringExpression(expression.expression, seen);
+		}
+
+		if (
+			ts.isBinaryExpression(expression) &&
+			expression.operatorToken.kind === ts.SyntaxKind.PlusToken
+		) {
+			return (
+				resolveStringExpression(expression.left, seen) +
+				resolveStringExpression(expression.right, seen)
+			);
+		}
+
+		if (ts.isIdentifier(expression)) {
+			if (seen.has(expression.text)) {
+				throw new Error(
+					`Circular string constant reference ${expression.text} in src/config.ts`,
+				);
+			}
+
+			const referencedInitializer = declarations.get(expression.text);
+			if (!referencedInitializer) {
+				throw new Error(
+					`Missing referenced string constant ${expression.text} in src/config.ts`,
+				);
+			}
+
+			const nextSeen = new Set(seen);
+			nextSeen.add(expression.text);
+			return resolveStringExpression(referencedInitializer, nextSeen);
+		}
+
+		throw new Error(
+			`Unsupported string expression for ${constantName} in src/config.ts`,
+		);
+	}
+
 	for (const statement of sourceFile.statements) {
 		if (!ts.isVariableStatement(statement)) {
 			continue;
@@ -36,13 +103,8 @@ function readExportedStringConstant(sourceFile, constantName) {
 				continue;
 			}
 
-			const initializer = declaration.initializer;
-			if (
-				initializer &&
-				(ts.isStringLiteral(initializer) ||
-				 ts.isNoSubstitutionTemplateLiteral(initializer))
-			) {
-				return initializer.text;
+			if (declaration.initializer) {
+				return resolveStringExpression(declaration.initializer);
 			}
 		}
 	}

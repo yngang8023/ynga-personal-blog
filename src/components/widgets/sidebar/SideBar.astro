@@ -1,15 +1,17 @@
 ---
 import type { MarkdownHeading } from "astro";
 
+import type { CardTocNavigationItem } from "@/components/widgets/card-toc";
 import SidebarColumn from "@/components/layout/SidebarColumn.astro";
 import { widgetManager } from "@/utils/widget-manager";
 
 interface Props {
 	class?: string;
 	headings?: MarkdownHeading[];
+	cardTocItems?: CardTocNavigationItem[];
 }
 
-const { class: className, headings } = Astro.props;
+const { class: className, headings, cardTocItems = [] } = Astro.props;
 
 const mobileTopComponents = widgetManager.getComponentsByPosition(
 	"top",
@@ -39,6 +41,7 @@ const tabletStickyComponents = widgetManager.getComponentsByPosition(
 	stickyId="sidebar-sticky"
 	rootClass={`${className ?? ""} w-full sidebar-root`}
 	headings={headings}
+	cardTocItems={cardTocItems}
 	showMobile={true}
 	showTablet={true}
 	showDesktop={true}

@@ -85,16 +85,15 @@ test("markdown pipeline enables Firefly-style [grid] image gallery syntax", asyn
 	assert.match(source, /"image-grid":\s*ImageGridComponent/);
 });
 
-test("markdown pipeline routes Mermaid and PlantUML through same-origin diagram endpoints", async () => {
+test("markdown pipeline keeps diagram runtime sources centralized instead of hardcoding same-origin endpoints", async () => {
 	const astroSource = await readFile(astroConfigPath, "utf8");
 	const mermaidSource = await readFile(mermaidScriptPath, "utf8");
 
 	assert.match(
 		astroSource,
-		/new URL\("\/diagram\/plantuml", siteConfig\.siteURL\)/,
+		/servers:\s*\[\s*blogDiagramConfig\.plantumlServerUrl\s*\]/,
 	);
 	assert.match(mermaidSource, /const MERMAID_SCRIPT_SOURCES = \[/);
-	assert.match(mermaidSource, /"\/diagram\/mermaid\.js"/);
-	assert.doesNotMatch(mermaidSource, /cdn\.jsdelivr\.net/);
-	assert.doesNotMatch(mermaidSource, /unpkg\.com\/mermaid@11\.12\.0\/dist\/mermaid\.min\.js/);
+	assert.match(mermaidSource, /window\.__BLOG_DIAGRAM_CONFIG__/);
+	assert.match(mermaidSource, /mermaidScriptUrl/);
 });

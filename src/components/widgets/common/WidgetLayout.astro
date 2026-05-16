@@ -8,14 +8,13 @@ interface Props {
 	id: string;
 	name?: string;
 	isCollapsed?: boolean;
-	collapsedHeight?: string;
 	collapsedRows?: number;
 	class?: string;
 	style?: string;
 }
-const { id, name, isCollapsed, collapsedHeight, collapsedRows, style } = Astro.props;
+const { id, name, isCollapsed, collapsedRows, style } = Astro.props;
 const className = Astro.props.class;
-const collapsible = Boolean(isCollapsed && collapsedHeight);
+const collapsible = Boolean(isCollapsed);
 const showMoreLabel = i18n(I18nKey.showMore);
 const showLessLabel = i18n(I18nKey.showLess);
 const collapseRows = Number.isFinite(Number(collapsedRows))
@@ -25,7 +24,6 @@ const collapseRows = Number.isFinite(Number(collapsedRows))
 
 <widget-layout
 	data-collapsible={String(collapsible)}
-	data-collapsed-height={collapsedHeight ?? ""}
 	data-collapsed-rows={String(collapseRows)}
 	class={"pb-4 card-base " + className}
 	style={style}
@@ -77,7 +75,7 @@ const collapseRows = Number.isFinite(Number(collapsedRows))
 	}
 </widget-layout>
 
-<style define:vars={{ collapsedHeight }}>
+<style>
 	widget-layout {
 		display: block;
 		width: 100%;
@@ -89,7 +87,7 @@ const collapseRows = Number.isFinite(Number(collapsedRows))
 	}
 
 	.collapse-wrapper.collapsed {
-		max-height: var(--collapsedHeight);
+		max-height: 0;
 	}
 
 	.widget-toggle-icon {
@@ -118,15 +116,16 @@ const collapseRows = Number.isFinite(Number(collapsedRows))
 		wrapper: HTMLElement | null = null;
 		button: HTMLButtonElement | null = null;
 		label: HTMLElement | null = null;
-		collapsedHeight = "7.5rem";
 		collapsedRows = 3;
+		collapsedHeightPx = 0;
 		isExpanded = false;
 		shouldCollapse = false;
 		handleToggle: (() => void) | null = null;
 		handleTransitionEnd: ((event: TransitionEvent) => void) | null = null;
 		handleResize: (() => void) | null = null;
-	resizeObserver: ResizeObserver | null = null;
-	toggleContainer: HTMLElement | null = null;
+		resizeObserver: ResizeObserver | null = null;
+		toggleContainer: HTMLElement | null = null;
+		fontsReadyCleanup: (() => void) | null = null;
 
 		connectedCallback() {
 			if (this.dataset.initialized === "true") {
@@ -142,10 +141,6 @@ const collapseRows = Number.isFinite(Number(collapsedRows))
 			this.button = this.querySelector(".widget-toggle-btn");
 			this.label = this.querySelector(".widget-toggle-label");
 			this.toggleContainer = this.querySelector(".expand-btn");
-			this.collapsedHeight =
-				this.dataset.collapsedHeight && this.dataset.collapsedHeight !== ""
-					? this.dataset.collapsedHeight
-					: "7.5rem";
 			this.collapsedRows = Number.parseInt(this.dataset.collapsedRows || "3", 10) || 3;
 			this.isExpanded = false;
 
@@ -167,8 +162,10 @@ const collapseRows = Number.isFinite(Number(collapsedRows))
 				this.handleTransitionEnd,
 			);
 			this.resizeObserver = new ResizeObserver(this.handleResize);
+			this.resizeObserver.observe(this);
 			this.resizeObserver.observe(this.wrapper);
 			window.addEventListener("resize", this.handleResize);
+			this.bindFontReadyRefresh();
 			this.refreshCollapseState();
 		}
 
@@ -186,7 +183,54 @@ const collapseRows = Number.isFinite(Number(collapsedRows))
 				window.removeEventListener("resize", this.handleResize);
 			}
 			this.resizeObserver?.disconnect();
+			this.fontsReadyCleanup?.();
+			this.fontsReadyCleanup = null;
 			this.dataset.initialized = "false";
+		}
+
+		bindFontReadyRefresh() {
+			const fonts = document.fonts;
+			if (!fonts?.ready) {
+				return;
+			}
+
+			let active = true;
+			fonts.ready.finally(() => {
+				if (!active) {
+					return;
+				}
+				this.refreshCollapseState();
+			});
+
+			this.fontsReadyCleanup = () => {
+				active = false;
+			};
+		}
+
+		isVisibleForCollapseMeasurement() {
+			if (!this.wrapper) {
+				return false;
+			}
+
+			const hostRect = this.getBoundingClientRect();
+			const wrapperRect = this.wrapper.getBoundingClientRect();
+			if (
+				hostRect.width <= 0 ||
+				hostRect.height <= 0 ||
+				wrapperRect.width <= 0
+			) {
+				return false;
+			}
+
+			const hostStyle = getComputedStyle(this);
+			if (
+				hostStyle.display === "none" ||
+				hostStyle.visibility === "hidden"
+			) {
+				return false;
+			}
+
+			return true;
 		}
 
 		getCollapseItems() {
@@ -270,30 +314,12 @@ const collapseRows = Number.isFinite(Number(collapsedRows))
 			};
 		}
 
-		getCollapsedHeightPx() {
-			if (!this.wrapper) {
-				return 0;
-			}
-
-			const computedStyle = getComputedStyle(this.wrapper);
-			const rootFontSize = parseFloat(
-				getComputedStyle(document.documentElement).fontSize,
-			);
-			const value = this.collapsedHeight.trim();
-
-			if (value.endsWith("rem")) {
-				return parseFloat(value) * rootFontSize;
-			}
-			if (value.endsWith("px")) {
-				return parseFloat(value);
-			}
-
-			const resolvedMaxHeight = parseFloat(computedStyle.maxHeight);
-			return Number.isFinite(resolvedMaxHeight) ? resolvedMaxHeight : 0;
-		}
-
 		refreshCollapseState() {
 			if (!this.wrapper || !this.button || !this.label) {
+				return;
+			}
+
+			if (!this.isVisibleForCollapseMeasurement()) {
 				return;
 			}
 
@@ -302,25 +328,19 @@ const collapseRows = Number.isFinite(Number(collapsedRows))
 
 			const contentHeight = this.wrapper.scrollHeight;
 			const { rowCount, collapsedHeightPx } = this.measureCollapseRows();
-			this.shouldCollapse = rowCount > this.collapsedRows;
+			this.shouldCollapse = true;
 			if (this.toggleContainer) {
 				this.toggleContainer.hidden = !this.shouldCollapse;
-			}
-
-			if (!this.shouldCollapse) {
-				this.isExpanded = false;
-				this.wrapper.classList.remove("collapsed", "collapsible");
-				this.wrapper.style.maxHeight = "none";
-				this.syncState();
-				return;
 			}
 
 			this.wrapper.classList.add("collapsible");
 			if (!this.isExpanded) {
 				this.wrapper.classList.add("collapsed");
 			}
-			const fallbackHeight = this.getCollapsedHeightPx() || contentHeight;
-			const targetCollapsedHeight = collapsedHeightPx || fallbackHeight;
+			const targetCollapsedHeight = rowCount > 0
+				? collapsedHeightPx || contentHeight
+				: contentHeight;
+			this.collapsedHeightPx = targetCollapsedHeight;
 			this.wrapper.style.maxHeight = this.isExpanded
 				? previousMaxHeight === "none" || previousMaxHeight === ""
 					? `${contentHeight}px`
@@ -364,13 +384,13 @@ const collapseRows = Number.isFinite(Number(collapsedRows))
 				requestAnimationFrame(() => {
 					this.isExpanded = false;
 					this.syncState();
-					wrapper.style.maxHeight = this.collapsedHeight;
+					wrapper.style.maxHeight = `${this.collapsedHeightPx}px`;
 				});
 				return;
 			}
 
 			if (wrapper.style.maxHeight === "none") {
-				wrapper.style.maxHeight = this.collapsedHeight;
+				wrapper.style.maxHeight = `${this.collapsedHeightPx}px`;
 			}
 
 			requestAnimationFrame(() => {

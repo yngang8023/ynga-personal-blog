@@ -13,14 +13,21 @@ import I18nKey from "../../../i18n/i18nKey";
 import { i18n } from "../../../i18n/translation";
 import WidgetEmptyState from "../common/WidgetEmptyState.astro";
 import WidgetLayout from "../common/WidgetLayout.astro";
+import type { CardTocNavigationItem } from "./types";
 
 interface Props {
 	class?: string;
 	style?: string;
 	headings?: MarkdownHeading[];
+	postNavigationItems?: CardTocNavigationItem[];
 }
 
-const { class: className, style } = Astro.props;
+const {
+	class: className,
+	style,
+	postNavigationItems = [],
+} = Astro.props;
+const hasPostNavigation = postNavigationItems.length > 0;
 ---
 
 <WidgetLayout
@@ -29,7 +36,10 @@ const { class: className, style } = Astro.props;
 	class={"group " + (className || "")}
 	style={style}
 >
-	<div data-card-toc-root>
+	<div
+		data-card-toc-root
+		data-card-toc-mode={hasPostNavigation ? "posts" : "headings"}
+	>
 		<template data-card-toc-empty-template>
 			<WidgetEmptyState
 				icon="material-symbols:format-list-bulleted-rounded"
@@ -38,12 +48,77 @@ const { class: className, style } = Astro.props;
 			/>
 		</template>
 		<div class="toc-scroll-container">
-			<div class="toc-content" data-card-toc-content></div>
+			<div class="toc-content" data-card-toc-content>
+				{
+					hasPostNavigation && (
+						<div class="card-toc-post-list">
+							{postNavigationItems.map((item, index) => (
+								<a
+									href={item.href}
+									class="toc-item toc-level-1 card-toc-post-link"
+									data-card-toc-post-link
+								>
+									<div class="toc-badge toc-badge-index">
+										{index + 1}
+									</div>
+									<div class="card-toc-post-copy">
+										<div class="toc-label toc-label-primary">
+											{item.label}
+										</div>
+										{
+											item.meta && (
+												<div class="card-toc-post-meta">
+													{item.meta}
+												</div>
+											)
+										}
+									</div>
+								</a>
+							))}
+						</div>
+					)
+				}
+			</div>
 		</div>
 	</div>
 </WidgetLayout>
 
 <style>
+	:global(.card-toc-post-list) {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	:global(.card-toc-post-link) {
+		align-items: flex-start;
+		text-decoration: none;
+	}
+
+	:global(.card-toc-post-copy) {
+		min-width: 0;
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+
+	:global(.card-toc-post-copy .toc-label) {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		max-width: 100%;
+		white-space: normal;
+		line-height: 1.45;
+	}
+
+	:global(.card-toc-post-meta) {
+		font-size: 0.75rem;
+		line-height: 1.15rem;
+		color: color-mix(in oklab, var(--primary) 70%, var(--content-meta));
+	}
+
 	.toc-scroll-container {
 		max-height: 50vh;
 		overflow-y: auto;
@@ -64,6 +139,84 @@ const { class: className, style } = Astro.props;
 
 	const cardTocManagers = new WeakMap();
 
+	function escapeHtml(value: string) {
+		return value
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;")
+			.replace(/'/g, "&#39;");
+	}
+
+	function getCurrentPostNavigationItems() {
+		return Array.from(
+			document.querySelectorAll("a[data-card-toc-post-source]"),
+		)
+			.filter((link): link is HTMLAnchorElement => {
+				return link instanceof HTMLAnchorElement;
+			})
+			.map((link) => {
+				const href = link.getAttribute("href") || link.href;
+				const label =
+					link.dataset.cardTocPostTitle?.trim() ||
+					link.textContent?.trim() ||
+					"";
+				const meta = link.dataset.cardTocPostMeta?.trim() || "";
+
+				return { href, label, meta };
+			})
+			.filter((item) => item.href && item.label);
+	}
+
+	function buildPostNavigationHTML(
+		items: Array<{ href: string; label: string; meta?: string }>,
+	) {
+		return `<div class="card-toc-post-list" data-card-toc-post-list>${items
+			.map((item, index) => {
+				const metaHTML = item.meta
+					? `<div class="card-toc-post-meta">${escapeHtml(item.meta)}</div>`
+					: "";
+
+				return `
+					<a
+						href="${escapeHtml(item.href)}"
+						class="toc-item toc-level-1 card-toc-post-link"
+						data-card-toc-post-link
+					>
+						<div class="toc-badge toc-badge-index">${index + 1}</div>
+						<div class="card-toc-post-copy">
+							<div class="toc-label toc-label-primary">${escapeHtml(item.label)}</div>
+							${metaHTML}
+						</div>
+					</a>
+				`;
+			})
+			.join("")}</div>`;
+	}
+
+	function syncCardTocModeFromMainContent(
+		root: HTMLElement,
+		tocContent: HTMLElement,
+	) {
+		const postNavigationItems = getCurrentPostNavigationItems();
+
+		if (postNavigationItems.length > 0) {
+			root.dataset.cardTocMode = "posts";
+			tocContent.innerHTML = buildPostNavigationHTML(postNavigationItems);
+			return "posts";
+		}
+
+		if (
+			root.dataset.cardTocMode === "posts" ||
+			tocContent.querySelector("[data-card-toc-post-list]")
+		) {
+			root.dataset.cardTocMode = "headings";
+			tocContent.innerHTML = "";
+		}
+
+		return "headings";
+	}
+
 	/**
 	 * 为单个 card-toc 实例初始化目录。
 	 * 目录绑定当前组件自己的内容容器，避免左侧多断点并存时命中隐藏实例。
@@ -78,6 +231,29 @@ const { class: className, style } = Astro.props;
 			return;
 		}
 
+		const mode = syncCardTocModeFromMainContent(root, tocContent);
+
+		const existingManager = cardTocManagers.get(root);
+		if (
+			existingManager &&
+			typeof existingManager.cleanup === "function"
+		) {
+			existingManager.cleanup();
+			cardTocManagers.delete(root);
+		}
+
+		if (mode === "posts") {
+			tocContent
+				.querySelectorAll("a[data-card-toc-post-link]")
+				.forEach((link) => {
+					if (!(link instanceof HTMLAnchorElement)) {
+						return;
+					}
+					link.removeAttribute("aria-current");
+				});
+			return;
+		}
+
 		const emptyStateTemplate = root.querySelector(
 			"[data-card-toc-empty-template]",
 		);
@@ -87,14 +263,6 @@ const { class: className, style } = Astro.props;
 				: "";
 
 		try {
-			const existingManager = cardTocManagers.get(root);
-			if (
-				existingManager &&
-				typeof existingManager.cleanup === "function"
-			) {
-				existingManager.cleanup();
-			}
-
 			const manager = new TOCManager({
 				contentElement: tocContent,
 				maxLevel: 3,

@@ -44,6 +44,42 @@ export const BLOG_RAG_TOKEN_ENDPOINT = "/rag-embed-token";
 // 博客正式站点地址：同步文章到 RAG 时用于生成“参考来源”的文章 URL。
 export const BLOG_RAG_SITE_URL = `${BLOG_RAG_SITE_ORIGIN}/`;
 
+// Markdown 图表运行时配置：
+// - local：开发环境直连在线 Mermaid / PlantUML 服务，便于本地立即预览并发现语法问题
+// - online：部署环境走站内 /diagram/* 同源代理，由 EdgeOne Functions 统一转发与缓存
+export const DIAGRAM_LOCAL_MODE = "local";
+export const DIAGRAM_ONLINE_MODE = "online";
+export const BLOG_DIAGRAM_MODE =
+	process.env.NODE_ENV === "production"
+		? DIAGRAM_ONLINE_MODE
+		: DIAGRAM_LOCAL_MODE;
+export const MERMAID_PROXY_PATH = "/diagram/mermaid.js";
+export const MERMAID_ONLINE_SCRIPT_URL =
+	"https://unpkg.com/mermaid@11.12.0/dist/mermaid.min.js";
+export const PLANTUML_PROXY_PATH = "/diagram/plantuml";
+export const PLANTUML_ONLINE_SERVER_URL =
+	"https://www.plantuml.com/plantuml";
+
+const resolveDiagramRuntimeValue = (
+	mode: typeof DIAGRAM_LOCAL_MODE | typeof DIAGRAM_ONLINE_MODE,
+	localValue: string,
+	onlineValue: string,
+) => (mode === DIAGRAM_LOCAL_MODE ? localValue : onlineValue);
+
+export const blogDiagramConfig = {
+	mode: BLOG_DIAGRAM_MODE,
+	mermaidScriptUrl: resolveDiagramRuntimeValue(
+		BLOG_DIAGRAM_MODE,
+		MERMAID_ONLINE_SCRIPT_URL,
+		MERMAID_PROXY_PATH,
+	),
+	plantumlServerUrl: resolveDiagramRuntimeValue(
+		BLOG_DIAGRAM_MODE,
+		PLANTUML_ONLINE_SERVER_URL,
+		PLANTUML_PROXY_PATH,
+	),
+} as const;
+
 // 博客 RAG 集成配置统一入口，后续更换 RAG 服务域名或站点域名时优先改这里。
 export const blogRagConfig = {
 	serviceOrigin: BLOG_RAG_SERVICE_ORIGIN,
@@ -718,19 +754,13 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 			animationDelay: 50,
 			// 响应式配置
 			responsive: {
-				// 折叠阈值：当分类数量超过4个时自动折叠
-				collapseThreshold: 4,
+				// 分类数量超过 2 个后进入折叠模式
+				collapseThreshold: 2,
 			},
-			// itemCount > collapseThreshold 且 actualRowCount > collapsedRows
-			// 先满足 itemCount > collapseThreshold，组件才进入可折叠状态；
-			// 再满足 actualRowCount > collapsedRows，才会真的折叠并显示“查看更多”
-			// 两者同时满足，才会折叠。
 			// 组件专属属性
 			customProps: {
-				// 折叠后默认最多显示四行
-				collapsedRows: 4,
-				// 折叠状态兜底高度
-				collapsedHeight: "7.5rem",
+				// 进入折叠模式后默认显示 2 行
+				collapsedRows: 2,
 			},
 		},
 		{
@@ -761,19 +791,13 @@ export const sidebarLayoutConfig: SidebarLayoutConfig = {
 			animationDelay: 250,
 			// 响应式配置
 			responsive: {
-				// 折叠阈值：当标签数量超过10个时自动折叠
+				// 标签数量超过 10 个后进入折叠模式
 				collapseThreshold: 10,
 			},
-			// itemCount > collapseThreshold 且 actualRowCount > collapsedRows
-			// 先满足 itemCount > collapseThreshold，组件才进入可折叠状态；
-			// 再满足 actualRowCount > collapsedRows，才会真的折叠并显示“查看更多”
-			// 两者同时满足，才会折叠。
 			// 组件专属属性
 			customProps: {
-				// 折叠后默认最多显示四行
-				collapsedRows: 4,
-				// 折叠状态兜底高度
-				collapsedHeight: "7.5rem",
+				// 进入折叠模式后默认显示 4 行
+				collapsedRows: 3,
 			},
 		},
 		{

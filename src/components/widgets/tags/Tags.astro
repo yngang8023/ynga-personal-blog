@@ -14,11 +14,6 @@ import WidgetLayout from "../common/WidgetLayout.astro";
 const tags = await getTagList();
 const tagsWidgetConfig = getComponentConfig("tags");
 const isCollapsed = widgetManager.isCollapsed(tagsWidgetConfig, tags.length);
-const collapsedHeight = widgetManager.getCustomProp(
-	tagsWidgetConfig,
-	"collapsedHeight",
-	"7.5rem",
-);
 const collapsedRows = widgetManager.getCustomProp(
 	tagsWidgetConfig,
 	"collapsedRows",
@@ -37,7 +32,6 @@ const style = Astro.props.style;
 	name={i18n(I18nKey.tags)}
 	id="tags"
 	isCollapsed={isCollapsed}
-	collapsedHeight={collapsedHeight}
 	collapsedRows={collapsedRows}
 	class={className}
 	style={style}

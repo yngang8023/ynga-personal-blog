@@ -8,11 +8,25 @@
 
 	window.mermaidInitialized = true;
 
+	const DEFAULT_DIAGRAM_CONFIG = {
+		mermaidScriptUrl: "/diagram/mermaid.js",
+	};
+	const diagramRuntimeConfig =
+		typeof window.__BLOG_DIAGRAM_CONFIG__ === "object" &&
+		window.__BLOG_DIAGRAM_CONFIG__ !== null
+			? window.__BLOG_DIAGRAM_CONFIG__
+			: DEFAULT_DIAGRAM_CONFIG;
+
 	const MIN_ZOOM = 0.65;
 	const MAX_ZOOM = 6;
 	const ZOOM_STEP = 1.2;
 	const OBSERVER_MARGIN = "280px 0px 280px 0px";
-	const MERMAID_SCRIPT_SOURCES = ["/diagram/mermaid.js"];
+	const MERMAID_SCRIPT_SOURCES = [
+		diagramRuntimeConfig.mermaidScriptUrl ||
+			DEFAULT_DIAGRAM_CONFIG.mermaidScriptUrl,
+		"/diagram/mermaid.js",
+		"https://unpkg.com/mermaid@11.12.0/dist/mermaid.min.js",
+	].filter(Boolean);
 	const ADAPTIVE_THEME = "adaptive";
 	const IDLE_PREFETCH_LIMIT = 0;
 	const renderCache = new Map();

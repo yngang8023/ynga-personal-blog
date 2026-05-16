@@ -11,10 +11,12 @@ test("mermaid render script lazy-renders visible diagrams and caches themed SVG 
 	const script = await readScript();
 
 	assert.match(script, /const MERMAID_SCRIPT_SOURCES = \[/);
+	assert.match(script, /window\.__BLOG_DIAGRAM_CONFIG__/);
+	assert.match(script, /diagramRuntimeConfig\.mermaidScriptUrl/);
 	assert.match(script, /"\/diagram\/mermaid\.js"/);
+	assert.match(script, /"https:\/\/unpkg\.com\/mermaid@11\.12\.0\/dist\/mermaid\.min\.js"/);
 	assert.doesNotMatch(script, /cdn\.staticfile\.net/);
 	assert.doesNotMatch(script, /cdn\.jsdelivr\.net/);
-	assert.doesNotMatch(script, /unpkg\.com\/mermaid@11\.12\.0\/dist\/mermaid\.min\.js/);
 	assert.match(script, /const renderCache = new Map\(\)/);
 	assert.match(script, /new IntersectionObserver\(/);
 	assert.match(script, /const IDLE_PREFETCH_LIMIT = 0/);

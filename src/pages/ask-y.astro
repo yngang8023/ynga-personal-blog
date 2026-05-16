@@ -14,6 +14,19 @@ export const prerender = true;
 	pageShell="minimal"
 	disableMusicPlayer={true}
 >
+	<Fragment slot="head">
+		<meta
+			name="theme-color"
+			content="#f5f4ee"
+			media="(prefers-color-scheme: light)"
+		/>
+		<meta
+			name="theme-color"
+			content="#1f1c1a"
+			media="(prefers-color-scheme: dark)"
+		/>
+	</Fragment>
+
 	<section class="ask-y-stage">
 		<div class="ask-y-backdrop" aria-hidden="true"></div>
 		<div class="ask-y-shell">
@@ -41,6 +54,14 @@ export const prerender = true;
 	</section>
 
 	<style>
+		:global(html, body) {
+			background: var(--page-bg, oklch(0.95 0.01 var(--hue, 60)));
+		}
+
+		:global(html.dark, .dark body) {
+			background: oklch(0.16 0.014 var(--hue, 60));
+		}
+
 		.ask-y-stage {
 			--primary: oklch(0.7 0.14 var(--hue, 60));
 			--page-bg: oklch(0.95 0.01 var(--hue, 60));

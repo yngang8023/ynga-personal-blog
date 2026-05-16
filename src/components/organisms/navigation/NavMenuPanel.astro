@@ -90,6 +90,9 @@ const processedLinks: ProcessedNavBarLink[] = (
 									data-ask-y-full-page={
 										child.fullPage ? "true" : null
 									}
+									data-no-swup={
+										child.fullPage ? "" : null
+									}
 									class="group flex justify-between items-center py-2 pl-6 pr-1 rounded-lg gap-4
                                    hover:bg-[var(--btn-plain-bg-hover)] active:bg-[var(--btn-plain-bg-active)] transition"
 									target={child.external ? "_blank" : null}
@@ -117,6 +120,7 @@ const processedLinks: ProcessedNavBarLink[] = (
 					<a
 						href={link.external ? link.url : url(link.url)}
 						data-ask-y-full-page={link.fullPage ? "true" : null}
+						data-no-swup={link.fullPage ? "" : null}
 						class="group flex justify-between items-center py-2 pl-3 pr-1 rounded-lg gap-4
                     hover:bg-[var(--btn-plain-bg-hover)] active:bg-[var(--btn-plain-bg-active)] transition
                 "

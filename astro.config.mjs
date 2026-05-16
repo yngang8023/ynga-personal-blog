@@ -20,7 +20,7 @@ import remarkDirective from "remark-directive";
 import remarkMath from "remark-math";
 import remarkSectionize from "remark-sectionize";
 
-import { siteConfig } from "./src/config.ts";
+import { blogDiagramConfig, siteConfig } from "./src/config.ts";
 import { createMarkdownContentHmrPlugin } from "./src/dev/markdown-content-hmr.mjs";
 import { pluginCustomCopyButton } from "./src/plugins/expressive-code/custom-copy-button.js";
 import { pluginLanguageBadge } from "./src/plugins/expressive-code/language-badge.ts";
@@ -84,11 +84,7 @@ const markdownPipelineDigest = createPluginSourceDigest([
 
 const plantumlConfig = {
 	enable: true,
-	servers: [
-		new URL("/diagram/plantuml", siteConfig.siteURL)
-			.toString()
-			.replace(/\/+$/, ""),
-	],
+	servers: [blogDiagramConfig.plantumlServerUrl],
 	lightTheme: "",
 	darkTheme: "cyborg",
 };
@@ -110,6 +106,7 @@ export default defineConfig({
 			cache: true,
 			preload: false, // 禁用预加载以提升性能
 			accessibility: true,
+			ignore: ["/ask-y"],
 			updateHead: process.env.NODE_ENV === "production",
 			updateBodyClass: false,
 			globalInstance: true,

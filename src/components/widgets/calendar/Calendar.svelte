@@ -328,17 +328,34 @@
 </div>
 
 <style>
-	.custom-scrollbar::-webkit-scrollbar {
-		width: 4px;
+	.custom-scrollbar {
+		scrollbar-width: thin;
+		scrollbar-color: color-mix(in oklch, var(--primary) 18%, transparent)
+			transparent;
 	}
+
+	.custom-scrollbar::-webkit-scrollbar {
+		width: 1px;
+	}
+
 	.custom-scrollbar::-webkit-scrollbar-track {
 		background: transparent;
 	}
+
 	.custom-scrollbar::-webkit-scrollbar-thumb {
-		background-color: rgba(156, 163, 175, 0.5);
-		border-radius: 2px;
+		background-color: color-mix(
+			in oklch,
+			var(--primary) 18%,
+			transparent
+		);
+		border-radius: 999px;
 	}
+
 	.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-		background-color: rgba(156, 163, 175, 0.8);
+		background-color: color-mix(
+			in oklch,
+			var(--primary) 34%,
+			transparent
+		);
 	}
 </style>

@@ -21,6 +21,11 @@ test("ask-y page renders an independent fullscreen chat shell with close-back be
 	assert.match(source, /class="ask-y-topbar"/);
 	assert.match(source, /class="ask-y-chat-shell"/);
 	assert.match(source, /data-ask-y-close/);
+	assert.match(
+		source,
+		/<Fragment slot="head">[\s\S]*?name="theme-color"/,
+	);
+	assert.match(source, /:global\(html,\s*body\)\s*\{[\s\S]*?background:\s*var\(--page-bg/);
 	assert.match(source, /ask-y-minimal-page/);
 	assert.match(source, /window\.history\.back\(\)/);
 	assert.match(source, /window\.location\.href = fallbackPath/);

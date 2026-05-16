@@ -16,11 +16,6 @@ const isCollapsed = widgetManager.isCollapsed(
 	categoriesWidgetConfig,
 	categories.length,
 );
-const collapsedHeight = widgetManager.getCustomProp(
-	categoriesWidgetConfig,
-	"collapsedHeight",
-	"7.5rem",
-);
 const collapsedRows = widgetManager.getCustomProp(
 	categoriesWidgetConfig,
 	"collapsedRows",
@@ -39,7 +34,6 @@ const style = Astro.props.style;
 	name={i18n(I18nKey.categories)}
 	id="categories"
 	isCollapsed={isCollapsed}
-	collapsedHeight={collapsedHeight}
 	collapsedRows={collapsedRows}
 	class={className}
 	style={style}

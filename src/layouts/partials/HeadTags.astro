@@ -6,7 +6,7 @@
  * 提取自 Layout.astro 以实现更好的代码组织
  */
 
-import { profileConfig, siteConfig } from "@/config";
+import { blogDiagramConfig, profileConfig, siteConfig } from "@/config";
 
 import {
 	DARK_MODE,
@@ -215,6 +215,15 @@ const getFontMimeType = (fileName: string): string => {
 			window.addEventListener("orientationchange", adjustPageScale);
 		}
 	})();
+</script>
+
+<script
+	is:inline
+	define:vars={{
+		BLOG_DIAGRAM_CONFIG: JSON.stringify(blogDiagramConfig),
+	}}
+>
+	window.__BLOG_DIAGRAM_CONFIG = JSON.parse(BLOG_DIAGRAM_CONFIG);
 </script>
 
 <!-- Dev mode script - avoid swup replacing head styles -->

@@ -9,6 +9,8 @@ import { siteConfig } from "../config";
 import { PAGE_SIZE } from "../constants/constants";
 import { getSortedPosts } from "../utils/content-utils";
 import { initPostIdMap } from "../utils/permalink-utils";
+import { formatDateToYYYYMMDD } from "../utils/date-utils";
+import { getPostUrl } from "../utils/url-utils";
 
 const showCategoryBar = siteConfig.postListLayout.categoryBar?.enable ?? false;
 
@@ -49,9 +51,14 @@ const { page } = Astro.props;
 
 const len = page.data.length;
 const shouldShowPagination = page.total > 0 && page.lastPage > 1;
+const postNavigationItems = page.data.map((entry) => ({
+	href: getPostUrl(entry),
+	label: entry.data.title,
+	meta: entry.data.category || formatDateToYYYYMMDD(entry.data.published),
+}));
 ---
 
-<MainGridLayout>
+<MainGridLayout cardTocItems={postNavigationItems}>
 	{showCategoryBar && <CategoryBar />}
 	<PostPage page={page} />
 	{

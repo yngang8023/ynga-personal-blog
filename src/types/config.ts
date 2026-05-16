@@ -436,7 +436,6 @@ export interface WidgetComponentConfig {
 	};
 	customProps?: {
 		collapsedRows?: number; // 折叠状态下最多显示的行数
-		collapsedHeight?: string; // 折叠状态下的兜底高度
 		[key: string]: unknown;
 	}; // 自定义属性，用于扩展组件功能
 }

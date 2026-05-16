@@ -2,6 +2,7 @@
 import { render } from "astro:content";
 import { Icon } from "astro-icon/components";
 
+import { formatDateToYYYYMMDD } from "@/utils/date-utils";
 import { getFileDirFromPath, getPostUrl, getTagUrl } from "@/utils/url-utils";
 
 import { siteConfig } from "../../../config";
@@ -30,6 +31,7 @@ const {
 const url = getPostUrl(entry);
 const hasCover = image !== undefined && image !== null && image !== "";
 const coverWidth = "28%";
+const tocMeta = category || formatDateToYYYYMMDD(published);
 
 const { remarkPluginFrontmatter } = await render(entry);
 ---
@@ -53,6 +55,9 @@ const { remarkPluginFrontmatter } = await render(entry);
 	>
 		<a
 			href={url}
+			data-card-toc-post-source
+			data-card-toc-post-title={title}
+			data-card-toc-post-meta={tocMeta}
 			class="transition group w-full block font-bold mb-3 text-3xl text-90
         hover:text-[var(--primary)] dark:hover:text-[var(--primary)]
         active:text-[var(--title-active)] dark:active:text-[var(--title-active)]

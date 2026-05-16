@@ -24,10 +24,28 @@ test("widget layout auto-hides the expand control when content does not overflow
 	);
 	assert.match(
 		source,
-		/this\.shouldCollapse\s*=\s*rowCount\s*>\s*this\.collapsedRows;/,
+		/const collapsible = Boolean\(isCollapsed\);/,
 	);
+	assert.match(source, /this\.shouldCollapse\s*=\s*true;/);
 	assert.match(source, /measureCollapseRows\(\)/);
 	assert.match(source, /ResizeObserver/);
+	assert.match(source, /isVisibleForCollapseMeasurement\(\)/);
+	assert.match(source, /if\s*\(!this\.isVisibleForCollapseMeasurement\(\)\)\s*\{/);
+	assert.match(source, /this\.resizeObserver\.observe\(this\);/);
+	assert.match(source, /this\.resizeObserver\.observe\(this\.wrapper\);/);
+	assert.match(source, /const fonts = document\.fonts;/);
+	assert.match(source, /if\s*\(!fonts\?\.ready\)\s*\{\s*return;/);
+	assert.match(
+		source,
+		/const targetCollapsedHeight = rowCount > 0[\s\S]*?collapsedHeightPx \|\| contentHeight[\s\S]*?: contentHeight;/,
+	);
+	assert.match(source, /this\.collapsedHeightPx = targetCollapsedHeight;/);
+	assert.match(
+		source,
+		/wrapper\.style\.maxHeight = `\$\{this\.collapsedHeightPx\}px`;/,
+	);
+	assert.doesNotMatch(source, /data-collapsed-height=/);
+	assert.doesNotMatch(source, /getCollapsedHeightPx\(/);
 });
 
 test("categories and tags read collapse behavior from config instead of local constants", async () => {
@@ -39,34 +57,20 @@ test("categories and tags read collapse behavior from config instead of local co
 		readUtf8(widgetManagerPath),
 	]);
 
-	assert.match(configSource, /type:\s*"categories"[\s\S]*?collapseThreshold:\s*3/);
-	assert.match(configSource, /type:\s*"tags"[\s\S]*?collapseThreshold:\s*20/);
-	assert.match(configSource, /type:\s*"categories"[\s\S]*?collapsedRows:\s*3/);
-	assert.match(configSource, /type:\s*"tags"[\s\S]*?collapsedRows:\s*3/);
-	assert.match(
-		configSource,
-		/type:\s*"categories"[\s\S]*?collapsedHeight:\s*"7\.5rem"/,
-	);
-	assert.match(
-		configSource,
-		/type:\s*"tags"[\s\S]*?collapsedHeight:\s*"7\.5rem"/,
-	);
+	assert.match(configSource, /type:\s*"categories"[\s\S]*?collapseThreshold:\s*2/);
+	assert.match(configSource, /type:\s*"tags"[\s\S]*?collapseThreshold:\s*10/);
+	assert.match(configSource, /type:\s*"categories"[\s\S]*?collapsedRows:\s*2/);
+	assert.match(configSource, /type:\s*"tags"[\s\S]*?collapsedRows:\s*4/);
 	assert.match(categoriesSource, /widgetManager\.isCollapsed\(/);
 	assert.match(tagsSource, /widgetManager\.isCollapsed\(/);
 	assert.match(categoriesSource, /widgetManager\.getCustomProp\([\s\S]*?"collapsedRows"/);
 	assert.match(tagsSource, /widgetManager\.getCustomProp\([\s\S]*?"collapsedRows"/);
-	assert.match(
-		categoriesSource,
-		/widgetManager\.getCustomProp\([\s\S]*?"collapsedHeight"/,
-	);
-	assert.match(tagsSource, /widgetManager\.getCustomProp\([\s\S]*?"collapsedHeight"/);
 	assert.match(categoriesSource, /collapsedRows=\{collapsedRows\}/);
 	assert.match(tagsSource, /collapsedRows=\{collapsedRows\}/);
-	assert.match(categoriesSource, /collapsedHeight=\{collapsedHeight\}/);
-	assert.match(tagsSource, /collapsedHeight=\{collapsedHeight\}/);
+	assert.doesNotMatch(categoriesSource, /collapsedHeight=/);
+	assert.doesNotMatch(tagsSource, /collapsedHeight=/);
 	assert.doesNotMatch(categoriesSource, /isCollapsed=\{categories\.length > 0\}/);
 	assert.doesNotMatch(tagsSource, /isCollapsed=\{tags\.length > 0\}/);
-	assert.doesNotMatch(categoriesSource, /const COLLAPSED_HEIGHT/);
-	assert.doesNotMatch(tagsSource, /const COLLAPSED_HEIGHT/);
+	assert.doesNotMatch(configSource, /collapsedHeight:/);
 	assert.match(widgetManagerSource, /return itemCount > threshold;/);
 });

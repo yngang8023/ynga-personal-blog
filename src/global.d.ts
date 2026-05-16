@@ -118,6 +118,7 @@ declare global {
 			highlightElement: (block: HTMLElement) => void;
 		};
 		renderMermaidDiagrams?: () => void;
+		__askYPageCleanup?: () => void;
 
 		// Sidebar manager window properties
 		__mizukiSidebarResizeHandler?: () => void;

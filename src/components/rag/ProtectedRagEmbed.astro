@@ -38,16 +38,31 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 		min-height: clamp(40rem, 78vh, 62rem);
 		max-height: min(82vh, 62rem);
 		overflow: hidden;
-		border-radius: calc(var(--radius-large) - 0.15rem);
-		border: 1px solid color-mix(in oklch, var(--line-divider) 72%, var(--primary) 28%);
+		border-radius: calc(var(--radius-large, 1rem) - 0.15rem);
+		border: 1px solid
+			color-mix(
+				in oklch,
+				var(--line-divider, rgb(15 23 42 / 0.08)) 72%,
+				var(--primary, oklch(0.7 0.14 var(--hue, 60))) 28%
+			);
+		background-color: var(--card-bg, white);
 		background:
 			linear-gradient(
 				180deg,
-				color-mix(in oklch, var(--card-bg) 96%, white 4%),
-				color-mix(in oklch, var(--card-bg) 88%, var(--primary) 12%)
+				color-mix(in oklch, var(--card-bg, white) 96%, white 4%),
+				color-mix(
+					in oklch,
+					var(--card-bg, white) 88%,
+					var(--primary, oklch(0.7 0.14 var(--hue, 60))) 12%
+				)
 			);
 		box-shadow:
-			0 22px 56px color-mix(in oklch, var(--primary) 12%, transparent),
+			0 22px 56px
+				color-mix(
+					in oklch,
+					var(--primary, oklch(0.7 0.14 var(--hue, 60))) 12%,
+					transparent
+				),
 			inset 0 1px 0 rgb(255 255 255 / 0.72);
 	}
 
@@ -60,7 +75,7 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 		padding: 1.25rem;
 		background:
 			linear-gradient(180deg, rgb(255 255 255 / 0.92), rgb(255 255 255 / 0.78));
-		color: var(--content-meta);
+		color: var(--content-meta, rgb(15 23 42 / 0.7));
 		font-size: 0.98rem;
 		font-weight: 600;
 		line-height: 1.7;
@@ -68,7 +83,7 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 	}
 
 	.protected-rag-embed__status[data-state="error"] {
-		color: var(--primary);
+		color: var(--primary, oklch(0.7 0.14 var(--hue, 60)));
 	}
 
 	.protected-rag-embed__status[hidden] {
@@ -94,6 +109,11 @@ const tokenEndpoint = blogRagConfig.tokenEndpoint;
 	:global(.dark) .protected-rag-embed__status {
 		background:
 			linear-gradient(180deg, rgb(15 23 42 / 0.9), rgb(15 23 42 / 0.72));
+		color: rgb(241 245 249 / 0.94);
+	}
+
+	:global(.dark) .protected-rag-embed__status[data-state="error"] {
+		color: rgb(255 250 245 / 0.98);
 	}
 
 	@media (max-width: 900px) {

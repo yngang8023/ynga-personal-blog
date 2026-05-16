@@ -8,8 +8,8 @@ on:
       - "src/content/posts/**"
       - "scripts/blog-rag-sync-utils.mjs"
       - "scripts/sync-blog-rag.mjs"
-      - "src/config.ts"
-      - ".github/workflows/deploy.yml"
+      # - "src/config.ts"
+      # - ".github/workflows/deploy.yml"
   # 允许在 GitHub Actions 中手动触发一次全文同步
   workflow_dispatch:
     inputs:

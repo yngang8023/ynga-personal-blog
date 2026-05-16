@@ -17,3 +17,9 @@ test("layout mounts the reusable confirm dialog globally", async () => {
 	);
 	assert.match(layout, /<ConfirmDialog\s+client:load/);
 });
+
+test("layout does not load the deprecated page shell layout helper", async () => {
+	const layout = await readLayout();
+
+	assert.doesNotMatch(layout, /page-shell-layout/);
+});

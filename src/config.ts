@@ -374,6 +374,7 @@ export const navBarConfig: NavBarConfig = {
 				{
 					name: ASK_Y_PAGE_TITLE,
 					url: ASK_Y_PAGE_PATH,
+					fullPage: true,
 					icon: "material-symbols:smart-toy-outline-rounded",
 				},
 				// {

@@ -32,7 +32,6 @@ interface Props {
 	setOGTypeArticle?: boolean;
 	postSlug?: string;
 	headings?: MarkdownHeading[];
-	hideSidebars?: boolean;
 }
 
 // 获取 banner 图片
@@ -46,7 +45,6 @@ const {
 	setOGTypeArticle,
 	postSlug,
 	headings = [],
-	hideSidebars = false,
 } = Astro.props;
 const hasBannerCredit = siteConfig.banner.credit.enable;
 const hasBannerLink = !!siteConfig.banner.credit.url;
@@ -79,15 +77,10 @@ const {
 
 const { hasRightSidebarComponents, hasMobileDrawerComponents } =
 	sidebarPresence;
-const effectiveGridCols = hideSidebars ? "grid-cols-1 md:grid-cols-1 lg:grid-cols-1" : gridCols;
-const effectiveMainContentClass = hideSidebars
-	? "transition-swup-fade overflow-hidden w-full col-span-1 row-start-1 row-end-2 md:col-start-1 md:col-end-2 lg:col-span-1"
-	: mainContentClass;
-const effectiveMobileShowSidebar = hideSidebars ? false : mobileShowSidebar;
-const effectiveHasRightSidebarComponents = hideSidebars
-	? false
-	: hasRightSidebarComponents;
-const currentPageShellLayout = hideSidebars ? "no-sidebars" : "default";
+const effectiveGridCols = gridCols;
+const effectiveMainContentClass = mainContentClass;
+const effectiveMobileShowSidebar = mobileShowSidebar;
+const effectiveHasRightSidebarComponents = hasRightSidebarComponents;
 
 // 半透明效果
 const shouldEnable = shouldEnableTransparency(
@@ -156,7 +149,6 @@ const defaultPostListLayout = siteConfig.postListLayout?.defaultMode || "list";
 				id="main-grid"
 				class={`transition duration-700 w-full left-0 right-0 grid ${effectiveGridCols} grid-rows-none md:grid-rows-[auto] mx-auto gap-4 px-2 md:px-4 ${!effectiveMobileShowSidebar || !hasMobileDrawerComponents ? "mobile-no-sidebar" : ""} ${effectiveHasRightSidebarComponents ? "mobile-both-sidebar" : ""}`}
 				data-layout-mode={defaultPostListLayout}
-				data-page-shell-layout={hideSidebars ? "no-sidebars" : "default"}
 			>
 				<!-- Banner image credit -->
 				{
@@ -200,7 +192,6 @@ const defaultPostListLayout = siteConfig.postListLayout?.defaultMode || "list";
 				{/* 侧边栏和主内容区域容器 */}
 				<div class="contents">
 					{
-						!hideSidebars &&
 						(mobileShowSidebar ||
 							tabletShowSidebar ||
 							desktopShowSidebar) && (
@@ -212,7 +203,7 @@ const defaultPostListLayout = siteConfig.postListLayout?.defaultMode || "list";
 					}
 
 					{
-						!hideSidebars && hasRightSidebarComponents && (
+						hasRightSidebarComponents && (
 							<div
 								class={`right-sidebar-container ${rightSidebarClass} ${transparentClass}`}
 							>
@@ -229,8 +220,6 @@ const defaultPostListLayout = siteConfig.postListLayout?.defaultMode || "list";
 					<div
 						id="content-wrapper"
 						class="onload-animation transition-leaving"
-						data-page-shell-layout-source
-						data-page-shell-layout={currentPageShellLayout}
 					>
 						<!-- the overflow-hidden here prevent long text break the layout-->
 						<!-- make id different from windows.swup global property -->
@@ -275,21 +264,6 @@ const defaultPostListLayout = siteConfig.postListLayout?.defaultMode || "list";
 			scroll-margin-top: var(--sidebar-sticky-top);
 		}
 
-		#main-grid[data-page-shell-layout="no-sidebars"] {
-			grid-template-columns: minmax(0, 1fr) !important;
-		}
-
-		#main-grid[data-page-shell-layout="no-sidebars"] #sidebar,
-		#main-grid[data-page-shell-layout="no-sidebars"] .right-sidebar-container {
-			display: none !important;
-		}
-
-		#main-grid[data-page-shell-layout="no-sidebars"] #swup-container {
-			grid-column: 1 / -1 !important;
-			width: 100%;
-			max-width: 100%;
-		}
-
 		.right-sidebar-container {
 			align-self: start;
 			display: contents;
@@ -310,9 +284,6 @@ const defaultPostListLayout = siteConfig.postListLayout?.defaultMode || "list";
 			height: 0;
 		}
 
-		#toc-wrapper[data-page-shell-layout="no-sidebars"] {
-			display: none !important;
-		}
 	</style>
 
 	<!-- 侧边栏TOC模式 -->
@@ -331,7 +302,6 @@ const defaultPostListLayout = siteConfig.postListLayout?.defaultMode || "list";
 									"banner",
 							},
 						]}
-						data-page-shell-layout={currentPageShellLayout}
 					>
 						<div
 							id="toc-inner-wrapper"

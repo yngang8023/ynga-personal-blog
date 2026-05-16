@@ -32,11 +32,6 @@ const {
 		pageScaling,
 	}}
 >
-	const syncPageShellLayoutState = (doc = document) =>
-		// @ts-ignore
-		window.__mizukiPageShellLayout?.syncPageShellLayout?.(doc) ||
-		"default";
-
 	// 立即执行，在页面渲染前应用壁纸模式和布局模式，避免闪烁
 	(function () {
 		const wallpaperMode =
@@ -81,7 +76,6 @@ const {
 			// 立即应用布局模式，避免闪烁
 			const mainGrid = document.getElementById("main-grid");
 			if (mainGrid) {
-				syncPageShellLayoutState(document);
 				const savedLayout = localStorage.getItem("postListLayout");
 				const currentLayout = savedLayout || defaultPostListLayout;
 				mainGrid.setAttribute("data-layout-mode", currentLayout);
@@ -299,7 +293,6 @@ const {
 			// 在内容替换后立即应用布局，不等待其他脚本
 			// @ts-ignore
 			window.swup.hooks.on("content:replace", function () {
-				syncPageShellLayoutState(document);
 				const mainGrid = document.getElementById("main-grid");
 				if (mainGrid) {
 					// @ts-ignore
@@ -387,7 +380,6 @@ const {
 
 		// 在Swup页面切换时也要重新应用布局模式
 		requestAnimationFrame(function () {
-			syncPageShellLayoutState(document);
 			const mainGrid = document.getElementById("main-grid");
 			if (mainGrid) {
 				const savedLayout = localStorage.getItem("postListLayout");
@@ -416,7 +408,6 @@ const {
 	// 在页面完全加载后，再次确认布局模式是否正确
 	if (document.readyState === "loading") {
 		document.addEventListener("DOMContentLoaded", function () {
-			syncPageShellLayoutState(document);
 			const mainGrid = document.getElementById("main-grid");
 			if (mainGrid) {
 				const savedLayout = localStorage.getItem("postListLayout");
@@ -433,8 +424,6 @@ const {
 				}
 			}
 		});
-	} else {
-		syncPageShellLayoutState(document);
 	}
 
 </script>

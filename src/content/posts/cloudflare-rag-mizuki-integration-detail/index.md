@@ -1,8 +1,9 @@
 ---
 title: 把 Cloudflare-RAG 真正接进 Mizuki 博客
 published: 2026-05-14
-description: 这一篇专门记录实现细节。包括我怎么把 Mizuki + Astro 的文章目录打成 bundle，同步到 Cloudflare-RAG，再通过 Edge Functions 和 Cloudflare Functions 做受保护的 embed token 分发与 session 鉴权，让 AI 对话只能被指定博客域名安全内嵌使用。
-tags: [Cloudflare, RAG, GitHub Actions, Mizuki]
+updated: 2026-05-17T20:58:00+08:00
+description: 这一篇专门记录实现细节。包括我怎么把 Mizuki + Astro 的文章目录升级成 session 化 bundle，同步到 Cloudflare-RAG 的 Queue / Workflow / revision 链路，再通过 Edge Functions 和 Cloudflare Functions 做受保护的 embed token 分发与 session 鉴权，让 AI 对话只能被指定博客域名安全内嵌使用。
+tags: [Cloudflare, RAG, Mizuki, Workers AI]
 category: AI
 draft: false
 image: "./cover.png"
@@ -34,35 +35,40 @@ author: HiYnga
 
 ## 先说一下我现在这套最终结构
 
-我现在不是把 AI 直接写在博客前端里。
+我现在不是把 AI 直接写在博客前端里，而是把它拆成了两条链路：
 
-更准确一点的说法是：
+- 一条是博客文章怎么稳定同步到 Cloudflare
+- 一条是 RAG 聊天页怎么安全内嵌回博客
 
-- 博客前端还是 `Mizuki + Astro`
-- 内容源还是 `src/content/posts/**`
-- RAG 服务单独放在 `cloudflare-rag/`
-- 博客通过 iframe 把受保护的 `/embed` 页面挂回来
+这次真正升级的重点，其实是前者。  
+以前我用的是直连 `/api/sync-posts` 的整包上传，现在已经迁到 `session + queue + workflow + revision` 这套异步链路了。
 
-整体链路大概是这样：
+整体链路现在是这样：
 
 ```mermaid
 flowchart TD
     A[src/content/posts/**] --> B[blog-rag-sync-utils.mjs<br/>整理文章目录 bundle]
     B --> C[sync-blog-rag.mjs]
     C --> D[GitHub Actions / pnpm sync-rag]
-    D --> E["/api/sync-posts"]
-    E --> F[R2 保存文章目录资源]
-    E --> G[D1 保存 post / section / chunk / image]
-    E --> H[Vectorize 保存 chunk embedding]
-    I[博客前端 /ask-y 或悬浮窗] --> J["/rag-embed-token"]
-    J --> K[签发 60s bootstrap token]
-    K --> L["/embed?embed_token=..."]
-    L --> M[验证 token -> 写 session cookie]
-    M --> N["/embed"]
-    N --> O["/api/stream"]
-    O --> G
-    O --> H
+    D --> E["POST /api/sync-sessions"]
+    E --> F["POST /api/sync-sessions/:sessionId/posts/:postId"]
+    F --> G[BLOG_SYNC_STAGING<br/>临时 bundle JSON]
+    E --> H["POST /api/sync-sessions/:sessionId/finalize"]
+    H --> I[cloudflare-rag-ingestion<br/>/start-session]
+    I --> J[Workflow: blog-sync-workflow]
+    J --> K[Queue: cloudflare-rag-sync-queue]
+    K --> L[单篇文章 ingestion]
+    L --> M[D1 / R2 / OCR / Vectorize]
+    N[博客前端 /ask-y 或悬浮窗] --> O["/rag-embed-token"]
+    O --> P[签发 60s bootstrap token]
+    P --> Q["/embed?embed_token=..."]
+    Q --> R[写 session cookie]
+    R --> S["/api/stream"]
 ```
+
+如果只看 Cloudflare 控制台里这次拆出来的独立 ingestion worker，以及它和 Queue、R2、Workflow、D1、Vectorize 的绑定关系，可以看看下面这张图。
+
+![cloudflare-rag-ingestion 关联图](./1.png)
 
 如果把职责拆开，其实就很清楚了。
 
@@ -75,6 +81,26 @@ RAG 这边主要也负责两件事：
 
 - 把文章目录变成真正可检索的知识库
 - 只允许持有合法 session 的 iframe 页面继续对话
+
+## 这次迁移前，旧同步链路的问题
+
+以前那套 `/api/sync-posts` 直连方案能跑，但结构上有几个很明显的缺点：
+
+- 一次 HTTP 请求里把 R2、OCR、D1、embedding、Vectorize 全做完，太重
+- 文章一长、图片一多，就容易碰到 `524` 或者中途超时
+- 失败后很容易留下“半成品写了一半，但旧索引已经被影响”的状态
+- 没有明确的 session 边界，GitHub Actions 只能看到一条长请求的成败
+- 重建和增量没有真正分层，文章局部修改时很难做到只重算该重算的部分
+- 日志和统计比较散，慢在 OCR、慢在 embedding、还是慢在 Vectorize，不好一眼看出来
+
+所以这次我不是给旧请求继续加补丁，而是直接换成了：
+
+- `session` 管一次同步会话
+- `Queue` 管单篇文章异步入库
+- `Workflow` 管整次同步收敛和清理
+- `revision` 管文章更新和原子切换
+
+这样一来，失败点、重试点、终态点都变清楚了。
 
 ## 我的博客侧，为什么不是只同步 Markdown 正文
 
@@ -100,7 +126,14 @@ scripts/blog-rag-sync-utils.mjs
 scripts/sync-blog-rag.mjs
 ```
 
+这两个脚本都在我的静态博客仓库里，不在 `cloudflare-rag/` 里面。
+
 前者负责收集，后者负责发送。
+
+说得更具体一点就是：
+
+- `blog-rag-sync-utils.mjs` 负责把 `src/content/posts/**` 打成可上传的 bundle
+- `sync-blog-rag.mjs` 负责把这些 bundle 通过 `session` 协议发到 Cloudflare
 
 ## `blog-rag-sync-utils.mjs` 现在到底在打什么包
 
@@ -164,7 +197,7 @@ scripts/sync-blog-rag.mjs
 所以我现在这套同步不是“每次全文重传再全文重建”。  
 而是文章目录内容没变，就直接跳过。
 
-## 为什么我要坚持做目录级 bundle
+## 为什么要做目录级 bundle
 
 说到底，还是因为这样更符合博客本身的结构。
 
@@ -213,8 +246,11 @@ GitHub Actions 触发
   ↓
 pnpm sync-rag
   ↓
-POST /api/sync-posts
+POST /api/sync-sessions
 ```
+
+现在 workflow 默认是增量同步。  
+只有手动触发 `workflow_dispatch` 并勾选 `force_rebuild`，才会全量重建。
 
 如果只看使用体验，这件事现在已经被压缩得很轻了。
 
@@ -235,8 +271,10 @@ POST /api/sync-posts
 
 1. 读取博客配置里的默认同步地址和站点地址
 2. 调用 `collectBlogRagPosts(...)`
-3. 拿到所有文章 bundle
-4. 用 `Authorization: Bearer ...` 发到 RAG 侧 `/api/sync-posts`
+3. 创建同步 session
+4. 逐篇上传 bundle 到 `/api/sync-sessions/:sessionId/posts/:postId`
+5. 调用 `finalize` 让 Cloudflare 侧开始编排
+6. 轮询 session 状态，直到拿到终态总结
 
 它同时也支持：
 
@@ -260,151 +298,256 @@ pnpm sync-rag:force
 这一层我没有把它做成很花哨的同步器。  
 反而是尽量保持简单。
 
-因为它本质上只是博客侧的“目录收集 + HTTP 推送”。
+因为它本质上只是博客侧的“目录收集 + session 协议驱动”。
 
-## Cloudflare-RAG 这边，真正接同步请求的是 `/api/sync-posts`
+## Cloudflare-RAG 这边，真正接同步请求的是 `/api/sync-sessions`
 
-博客侧发过去以后，真正接住它的是：
+博客侧现在不再直接把整批文章丢给一个大接口，而是先创建 session，再逐篇上传，再 finalize。
 
-```text
-cloudflare-rag/functions/api/sync-posts.ts
-```
+真正接住这些请求的，分成三层：
 
-这里首先会校验 `RAG_SYNC_TOKEN`。  
-没有 token，或者 token 不对，直接就是 `401`。
+- `cloudflare-rag/functions/api/sync-sessions/index.ts`
+- `cloudflare-rag/functions/api/sync-sessions/[sessionId]/posts/[postId].ts`
+- `cloudflare-rag/functions/api/sync-sessions/[sessionId]/finalize.ts`
 
-然后它会解析 bundle payload。  
-如果格式不对，或者 payload 为空，也会直接拒掉。
+旧的 `/api/sync-posts` 现在已经退成迁移兼容入口，正常链路不再走它。
 
-真正开始同步以后，逻辑大概是这样：
+然后它会把会话转给独立的 ingestion worker：
+
+- `cloudflare-rag-ingestion/src/index.ts`
+- `cloudflare-rag-ingestion/src/workflow.ts`
+- `cloudflare-rag-ingestion/src/queue.ts`
+
+这里的核心变化是：
 
 ```mermaid
-flowchart TD
-    A[收到 posts bundle] --> B[读取 D1 当前已有文章]
-    B --> C[对比 incoming post ids]
-    C --> D[已删除文章 -> 删除 D1 + Vectorize + R2 前缀]
-    C --> E[逐篇判断 contentHash]
-    E --> F[未变化 -> unchanged]
-    E --> G[有变化或新文章 -> preparePostBundle]
-    G --> H[写 R2]
-    H --> I[写 blog_posts / sections / chunks / images]
-    I --> J[生成 embedding]
-    J --> K[写 Vectorize]
+sequenceDiagram
+    participant B as 博客脚本
+    participant P as cloudflare-rag Pages
+    participant W as cloudflare-rag-ingestion
+    participant Q as Queue
+    participant F as Workflow
+
+    B->>P: POST /api/sync-sessions
+    B->>P: POST /api/sync-sessions/:sessionId/posts/:postId
+    B->>P: POST /api/sync-sessions/:sessionId/finalize
+    P->>W: /start-session
+    W->>F: 创建 workflow
+    F->>Q: 投递单篇文章任务
+    Q->>W: 逐篇 ingestion
+    F->>P: 轮询 session 收敛
 ```
 
-也就是说，它不是简单的 append。
+Queue 这一层的结构其实很直观，本质上就是 ingestion worker 既是 producer，也是 consumer，中间由 `cloudflare-rag-sync-queue` 这条队列做解耦。
 
-现在这套同步里，至少有四种结果：
+![Queue 结构图](./2.png)
 
-- `created`
-- `updated`
-- `unchanged`
-- `deleted`
+如果再往里看 Workflow 本身的主干流程，它其实就是一个“投递任务 -> 等待收敛 -> finalize”的循环编排。
 
-这一点挺重要。
+![Workflow 工作流流程图](./3.png)
 
-因为如果你不处理删除，知识库很快就会变成一个和博客仓库不一致的历史堆积层。  
-文章目录明明删掉了，但旧 chunk、旧图片、旧向量还都在，那后面检索出来的结果就会开始脏。
+这次我把它拆开的原因很直接：
 
-我现在这边的做法是比较直接的。  
-只要一篇文章要重建，或者仓库里已经删掉了，它原来的：
+- `Pages` 只负责会话入口和鉴权
+- `Queue` 只负责单篇文章异步处理
+- `Workflow` 只负责整次同步的编排和收敛
 
-- D1 数据
-- Vectorize 向量
-- R2 前缀资源
+这样就不会再把 OCR、embedding、Vectorize upsert 这些重活塞进一个 HTTP 请求里。
 
-都会一起清掉。
+### 这次同步里，R2 的职责分工
 
-## 真正的重活，其实都在 `postBundleIndexing.ts`
+现在我把 R2 拆成了两个层次：
 
-同步入口只是调度。
+- `BLOG_SYNC_STAGING`
+  - 只放这一次同步会话的临时 bundle JSON
+  - 路径是 `sync-staging/<sessionId>/<postId>.json`
+  - 处理完就删
 
-真正把一篇文章目录变成可检索知识库的是：
+- `POST_ASSETS`
+  - 只放长期有效的文章资源
+  - 新路径是 `assets/posts/by-hash/<contentHash>`
+  - 旧的 `posts/<slug>/...` 只是 legacy 路径
+
+在 Cloudflare 控制台里，对应的 bucket 分别是：
+
+- `cloudflare-rag-sync-staging`
+- `cloudflare-rag-post-assets`
+
+这意味着：
+
+- staging 是短期的
+- assets 是长期的
+- 老目录不会继续作为主路径存在
+
+真正跑起来以后，Workflow 在执行中的样子也很有代表性。  
+你会看到它不断在 `reconcile-session-*` 和 `wait-for-queue-*` 之间循环，这一层就是它在等 Queue 全部收敛。
+
+![Workflow 执行中的详细图](./4.png)
+
+而当整次同步彻底完成以后，Workflow 最终会进入 `finalize-session`，输出 `completed` 和清理统计，这时候 GitHub Actions 那边也应该同步拿到终态。
+
+![Workflow 执行完成后的截图](./5.png)
+
+### Queue 和 Workflow 的参数
+
+现在线上默认参数大概是：
+
+- Queue consumer 通过 `BLOG_SYNC_QUEUE` 绑定
+- Workflow 名字是 `blog-sync-workflow`
+- Workflow class 是 `BlogSyncWorkflow`
+- Workflow 轮询间隔是 `5000ms`
+- Workflow 超时窗口是 `15min`
+- 单篇文章最大尝试次数是 `3`
+- processing lease 是 `10min`
+- Queue 侧遇到 lease 过期会延迟 `5s` 重投
+
+这个组合的目标不是极限吞吐，而是稳定收敛。
+
+### 现在同步时到底会发生什么
+
+单篇文章真正的重活现在都在 ingestion worker 里完成：
+
+1. 从 staging R2 取 bundle
+2. 解析 frontmatter / 正文 / 图片引用
+3. 先把正式资源写入 `POST_ASSETS`
+4. 对引用图片做 OCR 缓存命中或生成
+5. 写 D1 的 `blog_posts / blog_post_revisions / blog_post_sections / blog_post_chunks / blog_post_images`
+6. 生成 embedding
+7. upsert 到 Vectorize
+8. 成功后切换 `current_revision_id`
+9. 写回 session post 状态和阶段指标
+
+这样以后文章局部改动时，就不必整篇硬删硬建。
+
+### 增量同步到底怎么判定
+
+这里把话说得直白一点就是：**博客侧每次上传的还是当前公开文章清单，但 Cloudflare 侧不会因此把所有文章都重新入库。**
+
+真正决定“要不要重算”的，不是上传动作本身，而是 Cloudflare 这层按 `session + revision + contentHash + forceRebuild` 做的逐篇判定。
+
+更准确地说，这次同步会按下面的顺序判断：
+
+1. 先用 `activePostIds` 确定这次 session 真正要处理哪些文章
+2. 再读取每篇文章 bundle 里的 `contentHash`
+3. 再查这篇文章当前的 `blog_posts.current_revision_id`
+4. 如果当前 revision 已经是 `completed`，并且 `contentHash` 没变、`forceRebuild=false`，就整篇 `skipped`
+5. 如果是新增文章，或者 `contentHash` 变了，就只对这篇文章重建新的 `revision`
+6. 如果是 `forceRebuild=true`，则不允许整篇跳过，但仍然尽量复用已经稳定的资源和缓存结果
+
+所以这里不是“整站文章全部重新入库”，而是：
 
 ```text
-cloudflare-rag/app/lib/postBundleIndexing.ts
+当前公开文章清单
+  ↓
+Cloudflare 逐篇看 contentHash / current_revision / forceRebuild
+  ↓
+没变且已完成的文章直接跳过
+  ↓
+新增或有改动的文章只重建自己的 revision
 ```
 
-这个文件在我现在这套实现里，基本算核心之一。
+再往下拆一层，真正被重算的也不是“整个知识库”，而只是这篇文章对应的新 revision：
 
-它大概做这些事：
+- 文章正文、sections、chunks 只会对变更文章重新生成
+- 图片如果 `contentHash` 没变，会继续命中 `assets/posts/by-hash/<contentHash>` 和 `POST_ASSETS`
+- OCR 如果图片内容没变，会继续命中 `blog_image_ocr_cache`
+- embedding / Vectorize 也只会对这篇变更文章的有效 chunk 重新写入
 
-1. 解包 bundle 文件
-2. 找到 `entryPath`
-3. 解析 frontmatter
-4. 生成最终 post URL
-5. 把 bundle 里的所有文件先写进 R2
-6. 解析 Markdown section
-7. 抽图片引用
-8. 构建 section / chunk / image 三层索引记录
-9. 给 chunk 生成 embedding
-10. 把向量写进 Vectorize
+也就是说，**Cloudflare 这一层的增量策略，本质上是“文章级增量 + 资源级缓存复用”**，不是每次把全部内容都重新入库。
 
-这个过程里我自己比较看重两点。
+再补一个边界：**我现在这套实现的增量粒度还是“文章级 revision”，不是“文章内部 chunk 级差分更新”。**
 
-### 第一，文件资源先落 R2
+也就是：
 
-我现在不是等用户提问时再去动态找图片资源。
+- 如果文章完全没变，这一篇会整篇跳过
+- 如果文章变了，当前实现还是会把这篇文章的新 revision 整体重建一遍
+- 但这次整体重建只发生在这篇文章身上，不会波及其他没变的文章
+- 而且图片资源、OCR 结果、正式 R2 对象这些能复用的层，仍然会按哈希继续复用
 
-文章目录里的文件在 prepare 阶段就会先写进 `POST_ASSETS` 这个 R2 bucket。  
-路径大概会整理成：
+如果是 `forceRebuild=true`，它的含义也要说清楚：
+
+- 不再允许整篇文章按 `contentHash` 直接跳过
+- 但相同且稳定的资源、OCR 结果、embedding 仍然尽量复用
+- 这次重建只针对 session 里选中的文章，不会把知识库里所有历史文章都硬洗一遍
+
+所以说，**全量重建不是“全库重算”，而是“对本次目标文章逐篇重建 revision，并尽可能复用已有缓存”**。
+
+### 全量重建、增量重建和旧数据清理
+
+实现过程中最注意的一点，其实不是“能不能重建”，而是“重建时会不会把旧索引先删掉”。
+
+现在这套 revision 模型里：
+
+- 增量同步时，`contentHash` 没变就跳过
+- `forceRebuild=true` 时，不再整篇跳过，但资源上传、OCR、embedding 仍然尽量命中缓存
+- 真正切换对外服务的是 `current_revision_id`
+- 只有新 revision 成功以后，旧 revision、旧向量、旧 staging bundle 才进入清理阶段
+
+也就是说，现在的全量重建不是“先删旧数据再建新数据”，而是：
 
 ```text
-posts/<slug>/<relative-path>
+先构建新 revision
+  ↓
+成功后切换 current_revision_id
+  ↓
+再清旧 revision / 旧 vector / 旧 staging
 ```
 
-这样后面：
+这也是为什么这次全量重建做完以后，我可以比较放心地把历史 `posts/<slug>/...` 目录逐步收掉。  
+因为数据库里的活引用已经切到新的 `assets/posts/by-hash/<contentHash>` 了。
 
-- 图片索引里能拿到稳定资源地址
-- 前端可以通过 `/api/assets/posts/...` 去拿对应资源
-- 旧文章重建时，也能按前缀整批删掉
+### 旧方案的缺点和新方案的优势
 
-这一步其实让整套东西更像一个“内容服务”，而不是单纯的文本向量库。
+| 旧方案 | 新方案 |
+| --- | --- |
+| `/api/sync-posts` 一把做完 | session / queue / workflow 分层 |
+| 容易 524 和半成品 | 会话可恢复、可重试、可收敛 |
+| 没有清晰的进度和瓶颈 | 有 session 聚合指标和最慢文章 |
+| 文章改动经常触发整篇 churn | revision 化，能做稳定增量 |
+| R2 / D1 / Vectorize 互相耦合 | 每层职责更单一 |
 
-### 第二，不是只切 chunk，而是先分 section 再切 chunk
+### 迁移后的可观测性
 
-我没有直接对整篇文章无脑切块。
+现在每次同步都会记录：
 
-现在这边的思路是：
+- `bundle_download_ms`
+- `bundle_decode_ms`
+- `asset_upload_ms`
+- `ocr_ms`
+- `chunk_build_ms`
+- `db_write_ms`
+- `embedding_ms`
+- `vectorize_ms`
+- `finalize_ms`
 
-- 先按 Markdown heading 分 section
-- 再对 section 文本做 chunk
+另外我还把 Workers Logs 打开了，ingestion worker 会输出带 `sessionId / postId / stage` 的结构化日志。  
+这样我在 Cloudflare 仪表板里就能直接看出本次慢在 OCR、embedding，还是 vectorize。
 
-这样后面每个 chunk 就天然带着这些上下文：
+## 我现在在 D1 里拆了更多层表
 
-- 属于哪篇文章
-- 属于哪一节
-- heading 是什么
-- anchor 是什么
-- 有没有图片
-- 有没有代码块
-- 关联图片有哪些
-
-这比“只知道这是一段文本”要有用得多。
-
-尤其是教程类博客，用户问的经常不是一个抽象问题，而是：
-
-- 某个步骤怎么做
-- 某个配置项在哪一节
-- 某张图前后那段说明是什么
-
-section 这一层先分开，后面给模型喂上下文的时候也更稳。
-
-## 我现在在 D1 里拆了四张核心表
-
-为了让检索链路更清楚，我这边把博客知识库拆成了这几张表：
+为了让检索链路更清楚，我这边把博客知识库和同步会话拆成了这些表：
 
 - `blog_posts`
+- `blog_post_revisions`
 - `blog_post_sections`
 - `blog_post_chunks`
 - `blog_post_images`
+- `blog_sync_sessions`
+- `blog_sync_session_posts`
+- `blog_image_assets`
+- `blog_image_ocr_cache`
 
 大概可以这么理解：
 
-- `blog_posts` 负责文章级元数据
+- `blog_posts` 负责文章级元数据和当前 revision 指针
+- `blog_post_revisions` 负责一次同步生成的版本快照
 - `blog_post_sections` 负责“这一节讲了什么”
 - `blog_post_chunks` 负责真正喂给检索和生成的最小文本单元
 - `blog_post_images` 负责图片资源和图片上下文
+- `blog_sync_sessions` 负责整次同步会话
+- `blog_sync_session_posts` 负责单篇文章的处理状态和阶段指标
+- `blog_image_assets` 负责正式 R2 资源引用计数
+- `blog_image_ocr_cache` 负责 OCR 结果复用
 
 这套拆法不是为了“看起来规范”。
 
@@ -436,7 +579,7 @@ section 这一层先分开，后面给模型喂上下文的时候也更稳。
 - `anchor`
 - `surroundingText`
 
-如果运行环境支持，还会额外对图片做一层 OCR / 图片转 Markdown 文本，把结果塞进 `ocrText`。
+与此同时，还会额外对图片做一层 OCR / 图片转 Markdown 文本，把结果塞进 `ocrText`。
 
 所以现在图片不只是“能显示”。  
 它在知识库里也会变成一类可以参与匹配的辅助信息。
@@ -445,8 +588,6 @@ section 这一层先分开，后面给模型喂上下文的时候也更稳。
 
 它现在还不是一个成熟的多模态知识库系统。  
 更准确一点的说法应该是，我尽量把博客里原本只适合人眼看的内容，也往“可检索”推了一层。
-
-对教程类内容来说，这一层其实已经很值了。
 
 ## `/api/assets/posts/**` 这一层，是给文章资源做代理的
 
@@ -464,7 +605,13 @@ cloudflare-rag/functions/api/assets/[[path]].ts
 这一层做完以后，图片索引里就可以把资源地址统一写成：
 
 ```text
-/api/assets/posts/<slug>/...
+/api/assets/posts/by-hash/<contentHash>
+```
+
+现在真正长期保留的正式资源是在：
+
+```text
+assets/posts/by-hash/<contentHash>
 ```
 
 这样前端和聊天引用时，不需要直接暴露 R2 bucket 细节。  
@@ -567,7 +714,7 @@ RRF 合完以后，我还会再走一层 rerank。
 
 这样后面真正喂给模型的，就不再是原始检索顺序，而是相关性更高的一组 chunk。
 
-### 4. 我后来又补了“命中不够就别硬答”
+### 4. 后来又补了“命中不够就别硬答”
 
 这一层我自己很在意。
 
@@ -585,7 +732,7 @@ RRF 合完以后，我还会再走一层 rerank。
 
 我宁可它老实一点，也不想它一本正经地胡说。
 
-## 我为什么要单独做 `ask-y` 页面
+## 为什么要单独做 `ask-y` 页面
 
 真正把聊天挂回博客以后，我后来没有只保留右下角悬浮窗。
 
@@ -936,7 +1083,7 @@ edge-functions/config.js
 ```ts
 BLOG_RAG_SERVICE_ORIGIN = "https://rag.ynga.kingcola-icg.cn"
 BLOG_RAG_SITE_ORIGIN = "https://ynga.kingcola-icg.cn"
-BLOG_RAG_SYNC_ENDPOINT = "https://rag.ynga.kingcola-icg.cn/api/sync-posts"
+BLOG_RAG_SYNC_ENDPOINT = "https://rag.ynga.kingcola-icg.cn/api/sync-sessions"
 BLOG_RAG_EMBED_URL = "https://rag.ynga.kingcola-icg.cn/embed"
 BLOG_RAG_TOKEN_ENDPOINT = "/rag-embed-token"
 BLOG_RAG_SITE_URL = "https://ynga.kingcola-icg.cn/"
@@ -995,22 +1142,26 @@ BLOG_RAG_SITE_URL
 其中：
 
 - `BLOG_RAG_SYNC_TOKEN`  
-  这是 GitHub Actions 里用来调用 `/api/sync-posts` 的 Bearer Token  
+  这是 GitHub Actions 里用来调用 `/api/sync-sessions` 的 Bearer Token  
   建议放在 GitHub `Secrets`
 
 - `BLOG_RAG_SYNC_ENDPOINT`  
-  一般就是 `https://rag.ynga.kingcola-icg.cn/api/sync-posts`  
+  一般就是 `https://rag.ynga.kingcola-icg.cn/api/sync-sessions`  
   放在 GitHub `Variables` 就够了
 
 - `BLOG_RAG_SITE_URL`  
   一般就是 `https://ynga.kingcola-icg.cn/`  
   放在 GitHub `Variables`
 
+- `BLOG_RAG_FORCE_REBUILD`  
+  平时默认是 `false`  
+  只有 `workflow_dispatch` 手动触发并勾选 `force_rebuild` 时，才会临时变成 `true`
+
 如果本地要手动跑同步脚本，也可以直接在本地 `.env` 里配：
 
-```env
+```dotenv
 BLOG_RAG_SYNC_TOKEN=your-sync-token
-BLOG_RAG_SYNC_ENDPOINT=https://rag.ynga.kingcola-icg.cn/api/sync-posts
+BLOG_RAG_SYNC_ENDPOINT=https://rag.ynga.kingcola-icg.cn/api/sync-sessions
 BLOG_RAG_SITE_URL=https://ynga.kingcola-icg.cn/
 ```
 
@@ -1026,7 +1177,7 @@ RAG_EMBED_SHARED_SECRET
 它们各自负责的事不一样：
 
 - `RAG_SYNC_TOKEN`  
-  保护 `/api/sync-posts`  
+  保护 `/api/sync-sessions`  
   没有它，博客侧不能往知识库里推文章
 
 - `RAG_EMBED_SHARED_SECRET`  
@@ -1069,18 +1220,26 @@ RERANK_MODEL = "@cf/baai/bge-reranker-base"
 
 这些不是 Secret，但没有的话服务也跑不起来：
 
+- `BLOG_SYNC_QUEUE`
+- `BLOG_SYNC_WORKFLOW`
+- `BLOG_SYNC_INGESTION`
 - `AI`
 - `VECTORIZE_INDEX`
 - `DB`
 - `rate_limiter`
+- `BLOG_SYNC_STAGING`
 - `POST_ASSETS`
 
 可以简单理解成：
 
+- `BLOG_SYNC_QUEUE` 负责单篇文章任务投递
+- `BLOG_SYNC_WORKFLOW` 负责整次 session 编排
+- `BLOG_SYNC_INGESTION` 负责把 Pages 的 finalize 请求转到独立 Worker
 - `AI` 负责 embedding / rerank / chat
 - `VECTORIZE_INDEX` 负责向量检索
 - `DB` 是 D1
 - `rate_limiter` 是 KV
+- `BLOG_SYNC_STAGING` 是临时 bundle 存储
 - `POST_ASSETS` 是 R2
 
 所以如果你后面要复刻这篇文章里的方案，我自己建议按这个顺序检查：
@@ -1089,7 +1248,7 @@ RERANK_MODEL = "@cf/baai/bge-reranker-base"
 2. 两边 `RAG_EMBED_SHARED_SECRET` 是不是同一个值
 3. `RAG_SYNC_TOKEN` 和 GitHub Actions 里的 `BLOG_RAG_SYNC_TOKEN` 是不是配对的
 4. `BLOG_SITE_URL` 是不是正式博客域名
-5. D1 / Vectorize / R2 / KV / AI 这些绑定是不是都已经挂好
+5. D1 / Vectorize / R2 / KV / AI / Queue / Workflow 这些绑定是不是都已经挂好
 
 ## 这套方案现在给我的感受
 

@@ -15,15 +15,21 @@ test("cloudflare-rag integration detail article keeps Mermaid route labels in a 
 	const combinedBlocks = mermaidBlocks.join("\n\n");
 
 	assert.ok(mermaidBlocks.length > 0);
-	assert.match(combinedBlocks, /D --> E\["\/api\/sync-posts"\]/);
-	assert.match(combinedBlocks, /J\["\/rag-embed-token"\]/);
-	assert.match(combinedBlocks, /L\["\/embed\?embed_token=\.\.\."\]/);
-	assert.match(combinedBlocks, /N\["\/embed"\]/);
-	assert.match(combinedBlocks, /O\["\/api\/stream"\]/);
+	assert.match(combinedBlocks, /D --> E\["POST \/api\/sync-sessions"\]/);
+	assert.match(combinedBlocks, /N\[博客前端 \/ask-y 或悬浮窗\] --> O\["\/rag-embed-token"\]/);
+	assert.match(combinedBlocks, /P --> Q\["\/embed\?embed_token=\.\.\."\]/);
+	assert.match(combinedBlocks, /R --> S\["\/api\/stream"\]/);
 	assert.match(
 		combinedBlocks,
 		/D\["路由守卫<br\/>functions\/\[\.\.\.path\]\.ts"\]/,
 	);
 	assert.doesNotMatch(combinedBlocks, /\[[/][^"\]]+\]/);
 	assert.doesNotMatch(combinedBlocks, /functions\/\[\[path\]\]\.ts/);
+});
+
+test("cloudflare-rag integration detail article uses a supported dotenv fence for local env examples", async () => {
+	const source = await readFile(articlePath, "utf8");
+
+	assert.match(source, /```dotenv/);
+	assert.doesNotMatch(source, /```env/);
 });

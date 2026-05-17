@@ -73,6 +73,7 @@ const shouldShowTopHighlight =
 	navbarTransparentMode === "full" || navbarTransparentMode === "semifull";
 const shouldLoadUmamiScript =
 	umamiConfig.enable && (import.meta.env.PROD || umamiConfig.trackInDev);
+const defaultWallpaperMode = siteConfig.wallpaperMode.defaultMode;
 
 // 获取默认banner图片的辅助函数
 const getDefaultBanner = (): string => {
@@ -207,6 +208,36 @@ if (siteConfig.font) {
 			setOGTypeArticle={setOGTypeArticle}
 			configHue={configHue}
 		/>
+
+		<script is:inline define:vars={{ defaultWallpaperMode }}>
+			(() => {
+				const allowedModes = new Set(["banner", "fullscreen", "none"]);
+
+				document.documentElement.setAttribute(
+					"data-wallpaper-init",
+					"pending",
+				);
+
+				try {
+					const storedWallpaperMode =
+						localStorage.getItem("wallpaperMode") || defaultWallpaperMode;
+					const resolvedWallpaperMode = allowedModes.has(
+						storedWallpaperMode,
+					)
+						? storedWallpaperMode
+						: defaultWallpaperMode;
+					document.documentElement.setAttribute(
+						"data-wallpaper-mode",
+						resolvedWallpaperMode,
+					);
+				} catch {
+					document.documentElement.setAttribute(
+						"data-wallpaper-mode",
+						defaultWallpaperMode,
+					);
+				}
+			})();
+		</script>
 
 		{
 			shouldLoadUmamiScript && (

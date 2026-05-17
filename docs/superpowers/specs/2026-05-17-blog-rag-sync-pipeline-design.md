@@ -428,19 +428,51 @@ Queue consumer 的推荐流程如下：
 
 默认模式下：
 
-- content hash 相同且 current revision 完整健康的文章直接 skip
-- 内容有改动的文章生成新 revision
-- 图片、OCR、embedding 尽量走缓存
+- 博客端每次上送的是“当前公开文章清单”，不是“当前有改动的文章清单”
+- Cloudflare 必须对 `activePostIds` 中的文章逐篇做判定，而不是收到 bundle 就默认重建
+- 仅当以下条件同时满足时，才允许 whole-post skip：
+  - `current_revision.status = completed`
+  - `current_revision.vector_status = completed`
+  - `content_hash` 与本次 bundle 一致
+  - `forceRebuild = false`
+- 满足 skip 条件时：
+  - 该篇文章本次 session 直接记为 `skipped`
+  - 不重新写 revision
+  - 不重新跑 OCR / embedding / Vectorize
+- 不满足 skip 条件时：
+  - 只对这篇文章生成新 revision
+  - sections / chunks / images 按新 revision 重算
+  - 但正式 R2 资源、OCR 缓存、embedding 缓存仍按内容哈希尽量复用
+
+也就是说，增量模式的真实语义是：
+
+- 站点级看，博客侧会上送当前公开文章全集
+- 调度级看，Workflow 会对全集做逐篇判定
+- 执行级看，真正重算的只有新增或发生变化的文章
+- 资源级看，相同内容的资源和派生成果仍然复用
+
+因此它不是“整站重新入库”，而是“文章级增量 + 内容寻址缓存复用”。
+
+当前实现边界也要明确：
+
+- 增量粒度目前是“文章级 revision”
+- 不是“文章内部 chunk 级差分 patch”
+- 也就是说，单篇文章一旦被判定为需要重建，当前实现会整体重算该文章的新 revision
+- 但这次重算只局限在该文章，不会波及其他未变化文章
+- 更细的 section/chunk 级增量可以作为后续优化方向，但不应误写成当前能力
 
 ### 全量重建
 
 `forceRebuild = true` 时：
 
 - 不允许 whole-post skip
-- 但允许命中：
+- 当前 session 中的目标文章都要重新走一次 revision 构建
+- 但仍允许命中：
   - 正式 R2 资源缓存
   - OCR 缓存
   - embedding 缓存
+- 也就是说，它强制重建的是“索引和 revision 状态”，不是把所有二进制资源和所有派生成果都重新计算一遍
+- 全量范围也只以本次 session 的 `activePostIds` 为准，不应扩大成对库中全部历史文章的无差别重算
 
 也就是说，全量重建是“重新验证并重建索引”，不是“重新做所有派生计算”。
 

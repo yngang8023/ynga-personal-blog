@@ -32,11 +32,28 @@ const {
 		pageScaling,
 	}}
 >
+	function getResolvedWallpaperMode() {
+		const rawMode =
+			localStorage.getItem("wallpaperMode") || defaultWallpaperMode;
+		return ["banner", "fullscreen", "none"].includes(rawMode)
+			? rawMode
+			: defaultWallpaperMode;
+	}
+
+	function syncWallpaperRootState(wallpaperMode, initState = "ready") {
+		document.documentElement.setAttribute(
+			"data-wallpaper-mode",
+			wallpaperMode,
+		);
+		document.documentElement.setAttribute("data-wallpaper-init", initState);
+	}
+
 	// 立即执行，在页面渲染前应用壁纸模式和布局模式，避免闪烁
 	(function () {
-		const wallpaperMode =
-			localStorage.getItem("wallpaperMode") || defaultWallpaperMode;
+		const wallpaperMode = getResolvedWallpaperMode();
 		const body = document.body;
+
+		syncWallpaperRootState(wallpaperMode, "pending");
 
 		// 立即应用 body 类，确保首次渲染就是正确的状态
 		switch (wallpaperMode) {
@@ -123,13 +140,14 @@ const {
 					}
 				}
 			}
+
+			syncWallpaperRootState(wallpaperMode, "ready");
 		});
 	})();
 
 	// 根据壁纸模式动态设置 banner 和全屏壁纸的显示
 	function applyWallpaperMode() {
-		const wallpaperMode =
-			localStorage.getItem("wallpaperMode") || defaultWallpaperMode;
+		const wallpaperMode = getResolvedWallpaperMode();
 		const bannerWrapper = document.getElementById("banner-wrapper");
 		const fullscreenWallpaper = document.querySelector(
 			"[data-fullscreen-wallpaper]",
@@ -145,6 +163,8 @@ const {
 		const forceReflow = function () {
 			void document.body.offsetHeight;
 		};
+
+		syncWallpaperRootState(wallpaperMode, "pending");
 
 		switch (wallpaperMode) {
 			case "banner":
@@ -261,6 +281,8 @@ const {
 				forceReflow();
 				break;
 		}
+
+		syncWallpaperRootState(wallpaperMode, "ready");
 	}
 
 	// 监听壁纸模式变化，立即应用（不重载页面）

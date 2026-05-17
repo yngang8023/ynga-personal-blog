@@ -31,6 +31,42 @@
 }
 
 /* ==========================================================================
+   壁纸模式首屏预渲染修正
+   ========================================================================== */
+html[data-wallpaper-mode="fullscreen"] #banner-wrapper {
+  display: none !important;
+}
+
+html[data-wallpaper-mode="none"] #banner-wrapper {
+  display: none !important;
+}
+
+html[data-wallpaper-mode="fullscreen"] [data-fullscreen-wallpaper] {
+  display: block !important;
+}
+
+html[data-wallpaper-mode="banner"] [data-fullscreen-wallpaper] {
+  display: none !important;
+}
+
+html[data-wallpaper-mode="none"] [data-fullscreen-wallpaper] {
+  display: none !important;
+}
+
+html[data-wallpaper-mode="fullscreen"] body.enable-banner #main-content-shell,
+html[data-wallpaper-mode="none"] body.enable-banner #main-content-shell {
+  top: 5.5rem !important;
+}
+
+html[data-wallpaper-init="pending"][data-wallpaper-mode="fullscreen"] body.enable-banner #banner-wrapper {
+  visibility: hidden;
+}
+
+html[data-wallpaper-init="pending"][data-wallpaper-mode="none"] body.enable-banner #banner-wrapper {
+  visibility: hidden;
+}
+
+/* ==========================================================================
    无 Banner 模式布局
    ========================================================================== */
 body.no-banner-mode .absolute.w-full.z-30 {

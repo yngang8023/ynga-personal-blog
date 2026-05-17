@@ -33,6 +33,35 @@ const noStoreHeaders = {
 	"Cache-Control": "private, no-store, max-age=0, must-revalidate",
 };
 
+const terminalSessionStatuses = new Set([
+	"completed",
+	"completed_with_warnings",
+	"failed",
+	"cancelled",
+]);
+
+interface InternalSessionSummary {
+	expectedPostCount?: number;
+	uploadedPostCount?: number;
+	processedPostCount?: number;
+	succeededPostCount?: number;
+	failedPostCount?: number;
+	skippedPostCount?: number;
+	allProcessed?: boolean;
+	hasFailures?: boolean;
+}
+
+interface InternalIngestionSessionStatus {
+	ok?: boolean;
+	sessionId?: string;
+	workflowId?: string;
+	sessionStatus?: string;
+	workflowStatus?: string | null;
+	normalizedWorkflowStatus?: string;
+	effectiveStatus?: string;
+	summary?: InternalSessionSummary;
+}
+
 function parseNumericRecord(value: string | null | undefined): NumericRecord {
 	if (!value) {
 		return {};
@@ -80,6 +109,40 @@ function getSlowestStage(timings: NumericRecord): { stage: string | null; ms: nu
 		stage: slowestStage,
 		ms: slowestMs,
 	};
+}
+
+function isTerminalSessionStatus(status: string | null | undefined): boolean {
+	return !!status && terminalSessionStatuses.has(status);
+}
+
+function parseCount(value: unknown): number {
+	const parsed = Number(value || 0);
+	return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+async function readInternalIngestionSessionStatus(
+	ctx: Parameters<PagesFunction<Env>>[0],
+	sessionId: string,
+): Promise<InternalIngestionSessionStatus | null> {
+	if (!ctx.env.BLOG_SYNC_INGESTION?.fetch) {
+		return null;
+	}
+
+	try {
+		const response = await ctx.env.BLOG_SYNC_INGESTION.fetch(
+			`https://blog-sync-ingestion.internal/session-status?sessionId=${encodeURIComponent(sessionId)}`,
+			{
+				method: "GET",
+			},
+		);
+		const text = await response.text();
+		if (!response.ok) {
+			return null;
+		}
+		return text ? JSON.parse(text) : null;
+	} catch {
+		return null;
+	}
 }
 
 export const onRequest: PagesFunction<Env> = async (ctx) => {
@@ -228,17 +291,39 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 		.sort((left, right) => right.totalMs - left.totalMs)
 		.slice(0, 5);
 
-	const expectedPostCount = Math.max(sessionExpectedPostCount, uploadedDerivedCount);
-	const uploadedPostCount = Math.max(sessionUploadedPostCount, uploadedDerivedCount);
-	const processedPostCount = Math.max(sessionProcessedPostCount, processedDerivedCount);
-	const succeededPostCount = Math.max(sessionSucceededPostCount, succeededDerivedCount);
-	const failedPostCount = Math.max(sessionFailedPostCount, failedDerivedCount);
-	const skippedPostCount = Math.max(sessionSkippedPostCount, skippedDerivedCount);
+	let expectedPostCount = Math.max(sessionExpectedPostCount, uploadedDerivedCount);
+	let uploadedPostCount = Math.max(sessionUploadedPostCount, uploadedDerivedCount);
+	let processedPostCount = Math.max(sessionProcessedPostCount, processedDerivedCount);
+	let succeededPostCount = Math.max(sessionSucceededPostCount, succeededDerivedCount);
+	let failedPostCount = Math.max(sessionFailedPostCount, failedDerivedCount);
+	let skippedPostCount = Math.max(sessionSkippedPostCount, skippedDerivedCount);
 	const derivedRunning =
 		(sessionStatus === "finalized" || sessionStatus === "running") &&
 		expectedPostCount > 0 &&
 		(processedPostCount < expectedPostCount || pendingRecoveryCount > 0);
-	const responseStatus = derivedRunning ? "running" : sessionStatus;
+	let responseStatus = derivedRunning ? "running" : sessionStatus;
+	let workflowStatus: string | null = null;
+
+	if (!isTerminalSessionStatus(responseStatus)) {
+		const internalStatus = await readInternalIngestionSessionStatus(ctx, sessionId);
+		if (internalStatus) {
+			const summary = internalStatus.summary || {};
+			expectedPostCount = Math.max(expectedPostCount, parseCount(summary.expectedPostCount));
+			uploadedPostCount = Math.max(uploadedPostCount, parseCount(summary.uploadedPostCount));
+			processedPostCount = Math.max(processedPostCount, parseCount(summary.processedPostCount));
+			succeededPostCount = Math.max(succeededPostCount, parseCount(summary.succeededPostCount));
+			failedPostCount = Math.max(failedPostCount, parseCount(summary.failedPostCount));
+			skippedPostCount = Math.max(skippedPostCount, parseCount(summary.skippedPostCount));
+			workflowStatus =
+				typeof internalStatus.workflowStatus === "string" ? internalStatus.workflowStatus : null;
+
+			if (isTerminalSessionStatus(internalStatus.effectiveStatus)) {
+				responseStatus = String(internalStatus.effectiveStatus);
+			} else if (isTerminalSessionStatus(internalStatus.sessionStatus)) {
+				responseStatus = String(internalStatus.sessionStatus);
+			}
+		}
+	}
 
 	return jsonResponse({
 		ok: true,
@@ -246,6 +331,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 			id: String(sessionRecord.id || sessionId),
 			status: responseStatus,
 			workflowId: `blog-sync-session-${String(sessionRecord.id || sessionId)}`,
+			workflowStatus,
 			expectedPostCount,
 			uploadedPostCount,
 			processedPostCount,

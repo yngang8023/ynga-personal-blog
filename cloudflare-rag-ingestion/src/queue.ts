@@ -45,6 +45,14 @@ interface SessionPostStats {
   resultStatus?: string;
 }
 
+function logQueueEvent(event: string, fields: Record<string, unknown> = {}) {
+  console.info(JSON.stringify({
+    scope: "blog-sync-queue",
+    event,
+    ...fields,
+  }));
+}
+
 function parseSessionPostQueueMessage(message: unknown): SessionPostQueueMessage | null {
   if (!message || typeof message !== "object") {
     return null;
@@ -107,6 +115,9 @@ export async function processSessionPostMessage(
   const db = drizzle(env.DB);
   const parsedMessage = parseSessionPostQueueMessage(message);
   if (!parsedMessage) {
+    logQueueEvent("invalid_message", {
+      messageType: typeof message,
+    });
     return "ack";
   }
   const { sessionId, postId, forceRebuild } = parsedMessage;
@@ -117,10 +128,21 @@ export async function processSessionPostMessage(
   const session =
     (await db.select().from(blogSyncSessions).where(eq(blogSyncSessions.id, sessionId)).limit(1))[0] || null;
   if (!sessionPost || !session) {
+    logQueueEvent("missing_session_state", {
+      sessionId,
+      postId,
+      hasSession: Boolean(session),
+      hasSessionPost: Boolean(sessionPost),
+    });
     return "ack";
   }
 
   if (sessionPost.status === "completed" || sessionPost.status === "skipped") {
+    logQueueEvent("skip_terminal_post", {
+      sessionId,
+      postId,
+      status: sessionPost.status,
+    });
     return "ack";
   }
   if (sessionPost.status === "processing") {
@@ -132,12 +154,24 @@ export async function processSessionPostMessage(
     const leaseExpired =
       !Number.isFinite(processingStartedAt) || Date.now() - processingStartedAt >= leaseMs;
     if (!leaseExpired) {
+      logQueueEvent("lease_active_retry", {
+        sessionId,
+        postId,
+        status: sessionPost.status,
+        attemptCount: sessionPost.attemptCount,
+      });
       return "retry";
     }
   }
 
   const maxAttempts = Number(env.BLOG_SYNC_POST_MAX_ATTEMPTS || BLOG_SYNC_POST_MAX_ATTEMPTS);
   if (sessionPost.status === "failed" && sessionPost.attemptCount >= maxAttempts) {
+    logQueueEvent("max_attempts_reached", {
+      sessionId,
+      postId,
+      attemptCount: sessionPost.attemptCount,
+      maxAttempts,
+    });
     return "ack";
   }
 
@@ -160,6 +194,12 @@ export async function processSessionPostMessage(
     .where(eq(blogSyncSessionPosts.id, rowId));
 
   try {
+    logQueueEvent("processing_started", {
+      sessionId,
+      postId,
+      attemptCount: sessionPost.attemptCount + 1,
+      forceRebuild,
+    });
     const bundleDownloadStartedAt = Date.now();
     const object = await env.BLOG_SYNC_STAGING.get(sessionPost.bundleR2Key);
     if (!object) {
@@ -219,6 +259,15 @@ export async function processSessionPostMessage(
         errorMessage: null,
       })
       .where(eq(blogSyncSessionPosts.id, rowId));
+    logQueueEvent("processing_completed", {
+      sessionId,
+      postId,
+      status,
+      revisionId: result.revisionId || sessionPost.revisionId || "",
+      totalMs: Date.now() - startedAt,
+      chunkCount: result.chunkCount || 0,
+      imageCount: result.imageCount || 0,
+    });
     return "ack";
   } catch (error) {
     const finishedAt = new Date().toISOString();
@@ -247,6 +296,13 @@ export async function processSessionPostMessage(
 
     if (canRetry) {
       await env.BLOG_SYNC_QUEUE.send(parsedMessage);
+      logQueueEvent("processing_requeued", {
+        sessionId,
+        postId,
+        attemptCount: nextAttemptCount,
+        maxAttempts,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       return "ack";
     }
 
@@ -257,6 +313,13 @@ export async function processSessionPostMessage(
         updatedAt: finishedAt,
       })
       .where(eq(blogSyncSessions.id, sessionId));
+    logQueueEvent("processing_failed_terminal", {
+      sessionId,
+      postId,
+      attemptCount: nextAttemptCount,
+      maxAttempts,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
     return "ack";
   }
 }

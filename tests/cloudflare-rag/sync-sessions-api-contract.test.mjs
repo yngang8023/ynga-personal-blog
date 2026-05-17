@@ -37,4 +37,5 @@ test("sync session api is configured and old sync endpoint is deprecated", async
 	assert.match(finalizeSource, /missingPostIds|uploadedPostCount/);
 	assert.match(statusSource, /timingsJson|statsJson|attemptCount|workflowId/);
 	assert.match(statusSource, /aggregate|slowest|sessionMetrics|slowestPosts/i);
+	assert.match(statusSource, /BLOG_SYNC_INGESTION|session-status|workflowStatus|effectiveStatus/);
 });

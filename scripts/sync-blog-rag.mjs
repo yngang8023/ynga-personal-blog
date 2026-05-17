@@ -405,6 +405,7 @@ function buildPollSnapshot(payload) {
 
 	return {
 		status: session.status || "unknown",
+		workflowStatus: session.workflowStatus || "",
 		processed: formatNumber(session.processedPostCount),
 		expected: formatNumber(session.expectedPostCount),
 		succeeded: formatNumber(session.succeededPostCount),
@@ -427,6 +428,7 @@ function shouldLogPollSnapshot(previous, next, pollCount) {
 
 	if (
 		previous.status !== next.status ||
+		previous.workflowStatus !== next.workflowStatus ||
 		previous.processed !== next.processed ||
 		previous.expected !== next.expected ||
 		previous.succeeded !== next.succeeded ||
@@ -442,7 +444,7 @@ function shouldLogPollSnapshot(previous, next, pollCount) {
 		return true;
 	}
 
-	return pollCount % 10 === 0;
+	return pollCount % 20 === 0;
 }
 
 function printFinalSessionSummary(sessionId, session) {
@@ -484,7 +486,7 @@ async function pollSyncSession({
 
 		if (shouldLogPollSnapshot(previousSnapshot, snapshot, pollCount)) {
 			console.log(
-				`同步会话 ${sessionId} 状态：${snapshot.status}，已处理 ${snapshot.processed}/${snapshot.expected}，成功 ${snapshot.succeeded}，失败 ${snapshot.failed}。`,
+				`同步会话 ${sessionId} 状态：${snapshot.status}${snapshot.workflowStatus ? ` (workflow=${snapshot.workflowStatus})` : ""}，已处理 ${snapshot.processed}/${snapshot.expected}，成功 ${snapshot.succeeded}，失败 ${snapshot.failed}。`,
 			);
 			if (snapshot.metricsReady && snapshot.slowestKey) {
 				console.log(

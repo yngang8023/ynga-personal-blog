@@ -29,6 +29,7 @@ export const syncSessionStatusResponseSchema = z.object({
     id: z.string().trim().min(1),
     status: z.enum(BlogSyncSessionStatuses),
     workflowId: z.string().trim().min(1).nullable().optional().default(null),
+    workflowStatus: z.string().trim().min(1).nullable().optional().default(null),
     expectedPostCount: z.number().int().nonnegative().optional().default(0),
     uploadedPostCount: z.number().int().nonnegative().optional().default(0),
     processedPostCount: z.number().int().nonnegative().optional().default(0),

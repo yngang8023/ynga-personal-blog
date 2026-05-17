@@ -4,6 +4,14 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./build/client"
 
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+head_sampling_rate = 1
+
 [placement]
 mode = "smart"
 

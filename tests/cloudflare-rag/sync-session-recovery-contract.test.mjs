@@ -27,3 +27,12 @@ test("workflow reconciler can requeue stale processing posts instead of only tim
 	assert.match(source, /stale|expired|lease/i);
 	assert.match(source, /BLOG_SYNC_QUEUE/);
 });
+
+test("workflow waits long enough for multiple posts and retries before timeout", async () => {
+	const source = await readFile(workflowPath, "utf8");
+
+	assert.match(source, /waitForSessionCompletion/);
+	assert.match(source, /sleep|sleep\(/i);
+	assert.match(source, /maxAttempts/i);
+	assert.match(source, /BLOG_SYNC_WORKFLOW_TIMEOUT_MS|WORKFLOW_TIMEOUT|timeout window/i);
+});

@@ -8,4 +8,6 @@ export interface IngestionEnv {
   BLOG_SYNC_WORKFLOW: Workflow;
   BLOG_SYNC_POST_MAX_ATTEMPTS?: string;
   BLOG_SYNC_PROCESSING_LEASE_MS?: string;
+  BLOG_SYNC_WORKFLOW_POLL_INTERVAL_MS?: string;
+  BLOG_SYNC_WORKFLOW_TIMEOUT_MS?: string;
 }

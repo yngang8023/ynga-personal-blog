@@ -41,4 +41,7 @@ test("session status api exposes aggregated metrics and slowest post summaries",
 	assert.match(source, /bundle_download_ms/);
 	assert.match(source, /bundle_decode_ms/);
 	assert.match(source, /asset_upload_ms|ocr_ms|embedding_ms|vectorize_ms|db_write_ms|finalize_ms/);
+	assert.match(source, /no-store|private,? ?no-store|Cache-Control/i);
+	assert.match(source, /processing_started_at|processingStartedAt/i);
+	assert.match(source, /queued|retry_pending|uploaded/i);
 });

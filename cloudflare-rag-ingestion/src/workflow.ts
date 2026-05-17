@@ -4,6 +4,10 @@ import { drizzle } from "drizzle-orm/d1";
 
 import { BLOG_SYNC_POST_MAX_ATTEMPTS } from "../../cloudflare-rag/app/lib/blogSync/constants";
 import { BLOG_SYNC_PROCESSING_LEASE_MS } from "../../cloudflare-rag/app/lib/blogSync/constants";
+import {
+  BLOG_SYNC_WORKFLOW_POLL_INTERVAL_MS,
+  BLOG_SYNC_WORKFLOW_TIMEOUT_MS,
+} from "../../cloudflare-rag/app/lib/blogSync/constants";
 import { blogSyncSessionPosts, blogSyncSessions } from "../../cloudflare-rag/schema";
 import {
   cleanupSessionArtifacts,
@@ -87,7 +91,33 @@ async function reconcileSession(env: IngestionEnv, sessionId: string) {
   const nowIso = new Date().toISOString();
 
   for (const post of posts) {
+    const updatedAtMs = post.updatedAt ? Date.parse(post.updatedAt) : Number.NaN;
+    const staleQueuedState =
+      (post.status === "uploaded" || post.status === "queued" || post.stage === "retry_pending") &&
+      (!Number.isFinite(updatedAtMs) || Date.now() - updatedAtMs >= processingLeaseMs);
+
     if (post.status !== "processing") {
+      if (!staleQueuedState) {
+        continue;
+      }
+
+      await db
+        .update(blogSyncSessionPosts)
+        .set({
+          status: "queued",
+          stage: "requeued_stale_queue",
+          processingStartedAt: null,
+          updatedAt: nowIso,
+          errorMessage: "Recovered stale queued state; requeued for retry.",
+        })
+        .where(eq(blogSyncSessionPosts.id, post.id));
+
+      await env.BLOG_SYNC_QUEUE.send({
+        sessionId,
+        postId: post.postId,
+        forceRebuild: false,
+        revisionId: post.revisionId || undefined,
+      });
       continue;
     }
     const processingStartedAt = post.processingStartedAt ? Date.parse(post.processingStartedAt) : Number.NaN;
@@ -216,14 +246,20 @@ async function waitForSessionCompletion(
   sessionId: string,
 ) {
   const maxAttempts = Number(env.BLOG_SYNC_POST_MAX_ATTEMPTS || BLOG_SYNC_POST_MAX_ATTEMPTS);
+  const pollIntervalMs = Number(env.BLOG_SYNC_WORKFLOW_POLL_INTERVAL_MS || BLOG_SYNC_WORKFLOW_POLL_INTERVAL_MS);
+  const timeoutMs = Number(env.BLOG_SYNC_WORKFLOW_TIMEOUT_MS || BLOG_SYNC_WORKFLOW_TIMEOUT_MS);
+  const maxRounds = Math.max(
+    maxAttempts * 20,
+    Math.ceil(timeoutMs / Math.max(1000, pollIntervalMs)),
+  );
 
-  for (let round = 0; round < maxAttempts * 20; round += 1) {
+  for (let round = 0; round < maxRounds; round += 1) {
     const summary = await step.do(`reconcile-session-${round}`, async () => reconcileSession(env, sessionId));
     if (summary.allProcessed) {
       return summary;
     }
 
-    await step.sleep(`wait-for-queue-${round}`, "3 seconds");
+    await step.sleep(`wait-for-queue-${round}`, `${Math.max(1, Math.ceil(pollIntervalMs / 1000))} seconds`);
   }
 
   const summary = await reconcileSession(env, sessionId);

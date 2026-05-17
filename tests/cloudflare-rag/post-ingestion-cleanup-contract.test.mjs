@@ -13,12 +13,21 @@ test("legacy ingestion cleans obsolete revisions and removes stale vectors", asy
 
 	assert.match(legacySyncSource, /cleanupObsoleteRevisions/);
 	assert.match(legacySyncSource, /cleanupLegacyOrphanPostData/);
+	assert.match(legacySyncSource, /cleanupLegacyPostAssetPrefix/);
 	assert.match(legacySyncSource, /deleteByIds/);
+	assert.match(legacySyncSource, /100/);
+	assert.match(legacySyncSource, /startsWith\("posts\/"\)/);
+	assert.match(legacySyncSource, /return null/);
+	assert.match(legacySyncSource, /r2Key:\s*file\.r2Key/);
 	assert.match(legacySyncSource, /sectionKey: section\.sectionKey/);
 	assert.match(legacySyncSource, /chunkKey: chunk\.chunkKey/);
 	assert.match(legacySyncSource, /chunkHash: chunk\.chunkHash/);
 	assert.match(cleanupSource, /legacy orphan|orphan legacy|orphan/i);
 	assert.match(cleanupSource, /revisionId[^\\n]*null|revision_id[^\\n]*null/i);
 	assert.match(cleanupSource, /deleteByIds/);
+	assert.match(cleanupSource, /100/);
+	assert.match(cleanupSource, /cleanupLegacyPostAssetPrefix/);
+	assert.match(cleanupSource, /POST_ASSETS\.list/);
+	assert.match(cleanupSource, /startsWith\(LEGACY_POST_ASSET_PREFIX\)|startsWith\("posts\/"\)/);
 	assert.match(cleanupSource, /POST_ASSETS/);
 });

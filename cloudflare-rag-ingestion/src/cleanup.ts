@@ -13,6 +13,9 @@ import {
 } from "../../cloudflare-rag/schema";
 import type { IngestionEnv } from "./env";
 
+const VECTORIZE_DELETE_BATCH_SIZE = 100;
+const LEGACY_POST_ASSET_PREFIX = "posts/";
+
 function parseJsonArray(value: string | null | undefined): string[] {
   if (!value) {
     return [];
@@ -32,6 +35,65 @@ export function parseActivePostIds(value: string | null | undefined): string[] {
 
 function parseAssetContentHashes(value: string | null | undefined): string[] {
   return parseJsonArray(value);
+}
+
+export async function cleanupLegacyPostAssetPrefix(
+  db: ReturnType<typeof drizzle>,
+  env: IngestionEnv,
+  legacyPrefix: string,
+) {
+  if (!legacyPrefix || !legacyPrefix.startsWith(LEGACY_POST_ASSET_PREFIX)) {
+    return { listedCount: 0, deletedCount: 0 };
+  }
+
+  const referencedKeys = new Set<string>();
+  const [assetRows, imageRows] = await Promise.all([
+    db
+      .select({
+        r2Key: blogImageAssets.r2Key,
+      })
+      .from(blogImageAssets),
+    db
+      .select({
+        r2Key: blogPostImages.r2Key,
+      })
+      .from(blogPostImages),
+  ]);
+
+  for (const row of assetRows) {
+    if (row.r2Key.startsWith(legacyPrefix)) {
+      referencedKeys.add(row.r2Key);
+    }
+  }
+  for (const row of imageRows) {
+    if (row.r2Key.startsWith(legacyPrefix)) {
+      referencedKeys.add(row.r2Key);
+    }
+  }
+
+  let cursor: string | undefined;
+  let listedCount = 0;
+  let deletedCount = 0;
+  do {
+    const listed = await env.POST_ASSETS.list({
+      prefix: legacyPrefix,
+      cursor,
+      limit: 1000,
+    });
+    listedCount += listed.objects.length;
+
+    for (const object of listed.objects) {
+      if (referencedKeys.has(object.key)) {
+        continue;
+      }
+      await env.POST_ASSETS.delete(object.key);
+      deletedCount += 1;
+    }
+
+    cursor = listed.truncated ? listed.cursor : undefined;
+  } while (cursor);
+
+  return { listedCount, deletedCount };
 }
 
 async function decrementAssetReferencesForRevision(
@@ -130,8 +192,8 @@ export async function cleanupLegacyOrphanPostData(
   const orphanChunkIds = orphanChunkRows.map((row) => row.id);
   let deletedLegacyOrphanVectorCount = 0;
   if (orphanChunkIds.length > 0) {
-    for (let i = 0; i < orphanChunkIds.length; i += 1000) {
-      const batch = orphanChunkIds.slice(i, i + 1000);
+    for (let i = 0; i < orphanChunkIds.length; i += VECTORIZE_DELETE_BATCH_SIZE) {
+      const batch = orphanChunkIds.slice(i, i + VECTORIZE_DELETE_BATCH_SIZE);
       await env.VECTORIZE_INDEX.deleteByIds(batch);
       deletedLegacyOrphanVectorCount += batch.length;
     }
@@ -256,6 +318,7 @@ export async function purgePendingDeletePosts(
     .select({
       id: blogPostRevisions.id,
       postId: blogPostRevisions.postId,
+      sourcePrefix: blogPostRevisions.sourcePrefix,
     })
     .from(blogPostRevisions)
     .where(inArray(blogPostRevisions.postId, postIds));
@@ -274,8 +337,8 @@ export async function purgePendingDeletePosts(
 
     const chunkIds = chunkRows.map((row) => row.id);
     if (chunkIds.length > 0) {
-      for (let i = 0; i < chunkIds.length; i += 1000) {
-        const batch = chunkIds.slice(i, i + 1000);
+      for (let i = 0; i < chunkIds.length; i += VECTORIZE_DELETE_BATCH_SIZE) {
+        const batch = chunkIds.slice(i, i + VECTORIZE_DELETE_BATCH_SIZE);
         await env.VECTORIZE_INDEX.deleteByIds(batch);
         deletedVectorCount += batch.length;
       }
@@ -289,6 +352,17 @@ export async function purgePendingDeletePosts(
 
   for (const postId of postIds) {
     await db.delete(blogPosts).where(and(eq(blogPosts.id, postId), eq(blogPosts.syncStatus, "pending_delete")));
+  }
+
+  const legacyPrefixes = [
+    ...new Set<string>(
+      revisions
+        .map((revision) => (typeof revision.sourcePrefix === "string" ? revision.sourcePrefix : ""))
+        .filter((prefix) => prefix.startsWith(LEGACY_POST_ASSET_PREFIX)),
+    ),
+  ];
+  for (const legacyPrefix of legacyPrefixes) {
+    await cleanupLegacyPostAssetPrefix(db, env, legacyPrefix);
   }
 
   return {

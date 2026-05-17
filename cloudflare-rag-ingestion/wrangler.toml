@@ -33,3 +33,7 @@ queue = "cloudflare-rag-sync-queue"
 name = "blog-sync-workflow"
 binding = "BLOG_SYNC_WORKFLOW"
 class_name = "BlogSyncWorkflow"
+
+[vars]
+BLOG_SYNC_WORKFLOW_POLL_INTERVAL_MS = "5000"
+BLOG_SYNC_WORKFLOW_TIMEOUT_MS = "900000"

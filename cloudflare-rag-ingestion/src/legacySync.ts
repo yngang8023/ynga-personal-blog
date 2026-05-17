@@ -23,12 +23,13 @@ import {
   blogPosts,
   blogPostSections,
 } from "../../cloudflare-rag/schema";
-import { cleanupLegacyOrphanPostData } from "./cleanup";
+import { cleanupLegacyOrphanPostData, cleanupLegacyPostAssetPrefix } from "./cleanup";
 import type { IngestionEnv } from "./env";
 
 const blogPostImageInsertBatchSize = 5;
 const blogPostSectionInsertBatchSize = 6;
 const blogPostChunkInsertBatchSize = 4;
+const vectorizeDeleteBatchSize = 100;
 
 interface IngestionStageMetrics {
   timings: {
@@ -164,6 +165,10 @@ async function resolveExistingAssetKey(
       .where(eq(blogImageAssets.contentHash, file.hash))
       .limit(1))[0] || null;
 
+  if (existingAsset?.r2Key?.startsWith("posts/")) {
+    return null;
+  }
+
   return existingAsset?.r2Key || null;
 }
 
@@ -190,6 +195,7 @@ async function cleanupObsoleteRevisions(
   const obsoleteRevisions = await db
     .select({
       id: blogPostRevisions.id,
+      sourcePrefix: blogPostRevisions.sourcePrefix,
       assetContentHashesJson: blogPostRevisions.assetContentHashesJson,
     })
     .from(blogPostRevisions)
@@ -216,9 +222,10 @@ async function cleanupObsoleteRevisions(
     .map((row) => row.id);
 
   if (staleChunkIds.length > 0) {
-    const batchSize = 1000;
-    for (let i = 0; i < staleChunkIds.length; i += batchSize) {
-      await env.VECTORIZE_INDEX.deleteByIds(staleChunkIds.slice(i, i + batchSize));
+    for (let i = 0; i < staleChunkIds.length; i += vectorizeDeleteBatchSize) {
+      await env.VECTORIZE_INDEX.deleteByIds(
+        staleChunkIds.slice(i, i + vectorizeDeleteBatchSize),
+      );
     }
   }
 
@@ -229,6 +236,18 @@ async function cleanupObsoleteRevisions(
     await db.delete(blogPostChunks).where(eq(blogPostChunks.revisionId, revisionId));
     await db.delete(blogPostSections).where(eq(blogPostSections.revisionId, revisionId));
     await db.delete(blogPostRevisions).where(eq(blogPostRevisions.id, revisionId));
+  }
+
+  const legacyPrefixes = [
+    ...new Set<string>(
+      obsoleteRevisions
+        .filter((revision) => staleRevisionIds.includes(revision.id))
+        .map((revision) => (typeof revision.sourcePrefix === "string" ? revision.sourcePrefix : ""))
+        .filter((prefix) => prefix.startsWith("posts/")),
+    ),
+  ];
+  for (const legacyPrefix of legacyPrefixes) {
+    await cleanupLegacyPostAssetPrefix(db, env, legacyPrefix);
   }
 }
 
@@ -369,7 +388,7 @@ async function ensureAssetAndOcrCache(
     await db
       .update(blogImageAssets)
       .set({
-        r2Key: existingAsset.r2Key || file.r2Key,
+        r2Key: file.r2Key,
         contentType: existingAsset.contentType || file.contentType,
         byteSize: existingAsset.byteSize || file.size || 0,
         updatedAt: now,

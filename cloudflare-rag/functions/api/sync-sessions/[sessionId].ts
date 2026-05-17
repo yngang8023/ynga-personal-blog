@@ -1,8 +1,4 @@
-import { eq } from "drizzle-orm";
-import { blogSyncSessionPosts, blogSyncSessions } from "schema";
-
 import { jsonResponse, requireSyncAuth } from "../../_shared/blog-sync-auth";
-import { getBlogSyncDb } from "../../_shared/blog-sync-db";
 
 interface NumericRecord {
 	[key: string]: number;
@@ -32,6 +28,10 @@ const sessionMetricStatKeys = [
 	"reused_ocr_count",
 	"reused_embedding_count",
 ] as const;
+
+const noStoreHeaders = {
+	"Cache-Control": "private, no-store, max-age=0, must-revalidate",
+};
 
 function parseNumericRecord(value: string | null | undefined): NumericRecord {
 	if (!value) {
@@ -84,7 +84,7 @@ function getSlowestStage(timings: NumericRecord): { stage: string | null; ms: nu
 
 export const onRequest: PagesFunction<Env> = async (ctx) => {
 	if (ctx.request.method !== "GET") {
-		return jsonResponse({ error: "Expected GET." }, 405);
+		return jsonResponse({ error: "Expected GET." }, 405, noStoreHeaders);
 	}
 
 	const unauthorized = requireSyncAuth(ctx.request, ctx.env.RAG_SYNC_TOKEN);
@@ -94,28 +94,51 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 
 	const sessionId = String(ctx.params.sessionId || "").trim();
 	if (!sessionId) {
-		return jsonResponse({ error: "Missing sessionId." }, 400);
+		return jsonResponse({ error: "Missing sessionId." }, 400, noStoreHeaders);
 	}
 
-	const db = getBlogSyncDb(ctx.env);
+	const sessionDb = ctx.env.DB.withSession("first-primary");
 	const session =
-		(await db.select().from(blogSyncSessions).where(eq(blogSyncSessions.id, sessionId)).limit(1))[0] || null;
+		(await sessionDb
+			.prepare("select * from blog_sync_sessions where id = ? limit 1")
+			.bind(sessionId)
+			.first<Record<string, unknown>>()) || null;
 	if (!session) {
-		return jsonResponse({ error: "Session not found." }, 404);
+		return jsonResponse({ error: "Session not found." }, 404, noStoreHeaders);
 	}
 
-	const sessionPosts = await db
-		.select({
-			postId: blogSyncSessionPosts.postId,
-			status: blogSyncSessionPosts.status,
-			stage: blogSyncSessionPosts.stage,
-			attemptCount: blogSyncSessionPosts.attemptCount,
-			errorMessage: blogSyncSessionPosts.errorMessage,
-			timingsJson: blogSyncSessionPosts.timingsJson,
-			statsJson: blogSyncSessionPosts.statsJson,
-		})
-		.from(blogSyncSessionPosts)
-		.where(eq(blogSyncSessionPosts.sessionId, sessionId));
+	const sessionPosts = (
+		await sessionDb
+			.prepare(
+				[
+					"select",
+					"  post_id as postId,",
+					"  status,",
+					"  stage,",
+					"  attempt_count as attemptCount,",
+					"  error_message as errorMessage,",
+					"  timings_json as timingsJson,",
+					"  stats_json as statsJson,",
+					"  processing_started_at as processingStartedAt,",
+					"  updated_at as updatedAt",
+					"from blog_sync_session_posts",
+					"where session_id = ?",
+				].join(" "),
+			)
+			.bind(sessionId)
+			.all<Record<string, unknown>>()
+	).results;
+
+	const sessionRecord = session as Record<string, unknown>;
+	const sessionExpectedPostCount = Number(sessionRecord.expected_post_count || 0);
+	const sessionUploadedPostCount = Number(sessionRecord.uploaded_post_count || 0);
+	const sessionProcessedPostCount = Number(sessionRecord.processed_post_count || 0);
+	const sessionSucceededPostCount = Number(sessionRecord.succeeded_post_count || 0);
+	const sessionFailedPostCount = Number(sessionRecord.failed_post_count || 0);
+	const sessionSkippedPostCount = Number(sessionRecord.skipped_post_count || 0);
+	const sessionStatus = String(sessionRecord.status || "").trim() || "created";
+	const nowMs = Date.now();
+	const processingLeaseMs = 10 * 60 * 1000;
 
 	const aggregateTimings: NumericRecord = Object.fromEntries(
 		sessionMetricTimingKeys.map((key) => [key, 0]),
@@ -132,30 +155,71 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 		timingsJson: string;
 		statsJson: string;
 	}> = [];
+	let uploadedDerivedCount = 0;
+	let processedDerivedCount = 0;
+	let succeededDerivedCount = 0;
+	let failedDerivedCount = 0;
+	let skippedDerivedCount = 0;
+	let pendingRecoveryCount = 0;
 	const slowestPosts = sessionPosts
 		.map((post) => {
-			const timings = parseNumericRecord(post.timingsJson);
-			const stats = parseNumericRecord(post.statsJson);
+			const postRecord = post as Record<string, unknown>;
+			const timings = parseNumericRecord(String(postRecord.timingsJson || "{}"));
+			const stats = parseNumericRecord(String(postRecord.statsJson || "{}"));
 			sumInto(aggregateTimings, timings);
 			sumInto(aggregateStats, stats);
 
-			if (post.status === "failed") {
+			const status = String(postRecord.status || "");
+			const stage = postRecord.stage == null ? null : String(postRecord.stage);
+			const attemptCount = Number(postRecord.attemptCount || 0);
+			const errorMessage = postRecord.errorMessage == null ? null : String(postRecord.errorMessage);
+			const processingStartedAt = postRecord.processingStartedAt
+				? Date.parse(String(postRecord.processingStartedAt))
+				: Number.NaN;
+			const staleQueuedState =
+				(status === "uploaded" || status === "queued" || stage === "retry_pending") &&
+				postRecord.updatedAt &&
+				Number.isFinite(Date.parse(String(postRecord.updatedAt))) &&
+				nowMs - Date.parse(String(postRecord.updatedAt)) >= processingLeaseMs;
+
+			uploadedDerivedCount += 1;
+			if (status === "completed") {
+				processedDerivedCount += 1;
+				succeededDerivedCount += 1;
+			}
+			if (status === "skipped") {
+				processedDerivedCount += 1;
+				skippedDerivedCount += 1;
+			}
+			if (status === "failed") {
+				processedDerivedCount += 1;
+				failedDerivedCount += 1;
+			}
+			if (
+				(status === "processing" &&
+					(!Number.isFinite(processingStartedAt) || nowMs - processingStartedAt >= processingLeaseMs)) ||
+				staleQueuedState
+			) {
+				pendingRecoveryCount += 1;
+			}
+
+			if (status === "failed") {
 				failedPosts.push({
-					postId: post.postId,
-					status: post.status,
-					stage: post.stage,
-					attemptCount: post.attemptCount,
-					errorMessage: post.errorMessage,
-					timingsJson: post.timingsJson,
-					statsJson: post.statsJson,
+					postId: String(postRecord.postId || ""),
+					status,
+					stage,
+					attemptCount,
+					errorMessage,
+					timingsJson: String(postRecord.timingsJson || "{}"),
+					statsJson: String(postRecord.statsJson || "{}"),
 				});
 			}
 
 			const slowestStage = getSlowestStage(timings);
 			return {
-				postId: post.postId,
-				status: post.status,
-				stage: post.stage,
+				postId: String(postRecord.postId || ""),
+				status,
+				stage,
 				totalMs: timings.total_ms || 0,
 				slowestStage: slowestStage.stage,
 				slowestStageMs: slowestStage.ms,
@@ -164,21 +228,33 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 		.sort((left, right) => right.totalMs - left.totalMs)
 		.slice(0, 5);
 
+	const expectedPostCount = Math.max(sessionExpectedPostCount, uploadedDerivedCount);
+	const uploadedPostCount = Math.max(sessionUploadedPostCount, uploadedDerivedCount);
+	const processedPostCount = Math.max(sessionProcessedPostCount, processedDerivedCount);
+	const succeededPostCount = Math.max(sessionSucceededPostCount, succeededDerivedCount);
+	const failedPostCount = Math.max(sessionFailedPostCount, failedDerivedCount);
+	const skippedPostCount = Math.max(sessionSkippedPostCount, skippedDerivedCount);
+	const derivedRunning =
+		(sessionStatus === "finalized" || sessionStatus === "running") &&
+		expectedPostCount > 0 &&
+		(processedPostCount < expectedPostCount || pendingRecoveryCount > 0);
+	const responseStatus = derivedRunning ? "running" : sessionStatus;
+
 	return jsonResponse({
 		ok: true,
 		session: {
-			id: session.id,
-			status: session.status,
-			workflowId: `blog-sync-session-${session.id}`,
-			expectedPostCount: session.expectedPostCount,
-			uploadedPostCount: session.uploadedPostCount,
-			processedPostCount: session.processedPostCount,
-			succeededPostCount: session.succeededPostCount,
-			failedPostCount: session.failedPostCount,
-			skippedPostCount: session.skippedPostCount,
-			forceRebuild: session.forceRebuild,
-			pruneMissing: session.pruneMissing,
-			errorMessage: session.errorMessage,
+			id: String(sessionRecord.id || sessionId),
+			status: responseStatus,
+			workflowId: `blog-sync-session-${String(sessionRecord.id || sessionId)}`,
+			expectedPostCount,
+			uploadedPostCount,
+			processedPostCount,
+			succeededPostCount,
+			failedPostCount,
+			skippedPostCount,
+			forceRebuild: Boolean(sessionRecord.force_rebuild),
+			pruneMissing: sessionRecord.prune_missing !== 0,
+			errorMessage: sessionRecord.error_message == null ? null : String(sessionRecord.error_message),
 			metrics: {
 				timings: aggregateTimings,
 				stats: aggregateStats,
@@ -186,5 +262,5 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 			slowestPosts,
 		},
 		failedPosts,
-	});
+	}, 200, noStoreHeaders);
 };

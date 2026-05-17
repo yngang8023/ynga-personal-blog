@@ -379,6 +379,72 @@ function formatTimingSummaryLine(timings = {}) {
 	return `bundle_download=${formatNumber(timings.bundle_download_ms)}ms，bundle_decode=${formatNumber(timings.bundle_decode_ms)}ms，asset=${formatNumber(timings.asset_upload_ms)}ms，ocr=${formatNumber(timings.ocr_ms)}ms，chunk=${formatNumber(timings.chunk_build_ms)}ms，db=${formatNumber(timings.db_write_ms)}ms，embedding=${formatNumber(timings.embedding_ms)}ms，vectorize=${formatNumber(timings.vectorize_ms)}ms，finalize=${formatNumber(timings.finalize_ms)}ms。`;
 }
 
+function formatFailedPostsLine(failedPosts) {
+	if (!Array.isArray(failedPosts) || failedPosts.length === 0) {
+		return "";
+	}
+
+	return failedPosts
+		.slice(0, 3)
+		.map((post) => {
+			const postId = post?.postId || "unknown";
+			const stage = post?.stage || "unknown";
+			const attemptCount = formatNumber(post?.attemptCount);
+			const errorMessage = post?.errorMessage || "unknown error";
+			return `${postId} [${stage}, attempt=${attemptCount}] ${errorMessage}`;
+		})
+		.join("；");
+}
+
+function buildPollSnapshot(payload) {
+	const session = payload?.session || {};
+	const slowestTiming = getSlowestTiming(session.metrics);
+	const metricsReady = Object.values(session.metrics?.timings || {}).some((value) => Number(value) > 0);
+	const slowestPostsLine = metricsReady ? formatSlowestPosts(session.slowestPosts) : "";
+	const failedPostsLine = formatFailedPostsLine(payload?.failedPosts);
+
+	return {
+		status: session.status || "unknown",
+		processed: formatNumber(session.processedPostCount),
+		expected: formatNumber(session.expectedPostCount),
+		succeeded: formatNumber(session.succeededPostCount),
+		failed: formatNumber(session.failedPostCount),
+		skipped: formatNumber(session.skippedPostCount),
+		slowestKey: slowestTiming.key || "",
+		slowestValue: formatNumber(slowestTiming.value),
+		metricsReady,
+		slowestPostsLine,
+		failedPostsLine,
+		timingsSignature: JSON.stringify(session.metrics?.timings || {}),
+		statsSignature: JSON.stringify(session.metrics?.stats || {}),
+	};
+}
+
+function shouldLogPollSnapshot(previous, next, pollCount) {
+	if (!previous) {
+		return true;
+	}
+
+	if (
+		previous.status !== next.status ||
+		previous.processed !== next.processed ||
+		previous.expected !== next.expected ||
+		previous.succeeded !== next.succeeded ||
+		previous.failed !== next.failed ||
+		previous.skipped !== next.skipped ||
+		previous.slowestKey !== next.slowestKey ||
+		previous.slowestValue !== next.slowestValue ||
+		previous.slowestPostsLine !== next.slowestPostsLine ||
+		previous.failedPostsLine !== next.failedPostsLine ||
+		previous.timingsSignature !== next.timingsSignature ||
+		previous.statsSignature !== next.statsSignature
+	) {
+		return true;
+	}
+
+	return pollCount % 10 === 0;
+}
+
 function printFinalSessionSummary(sessionId, session) {
 	const slowestTiming = getSlowestTiming(session.metrics);
 	const stats = session.metrics?.stats || {};
@@ -407,23 +473,33 @@ async function pollSyncSession({
 	sessionId,
 	pollIntervalMs,
 }) {
+	let previousSnapshot = null;
+	let pollCount = 0;
+
 	while (true) {
 		const payload = await getSyncSessionStatus({ endpoint, token, sessionId });
 		const session = payload?.session || {};
-		const slowestTiming = getSlowestTiming(session.metrics);
-		console.log(
-			`同步会话 ${sessionId} 状态：${session.status}，已处理 ${session.processedPostCount || 0}/${session.expectedPostCount || 0}，成功 ${session.succeededPostCount || 0}，失败 ${session.failedPostCount || 0}。`,
-		);
-		if (slowestTiming.key) {
+		pollCount += 1;
+		const snapshot = buildPollSnapshot(payload);
+
+		if (shouldLogPollSnapshot(previousSnapshot, snapshot, pollCount)) {
 			console.log(
-				`聚合瓶颈：${slowestTiming.key}=${slowestTiming.value}ms，chunk=${session.metrics?.stats?.chunk_count || 0}，vector=${session.metrics?.stats?.vector_count || 0}，ocr图片=${session.metrics?.stats?.ocr_image_count || 0}。`,
+				`同步会话 ${sessionId} 状态：${snapshot.status}，已处理 ${snapshot.processed}/${snapshot.expected}，成功 ${snapshot.succeeded}，失败 ${snapshot.failed}。`,
 			);
-			console.log(`阶段耗时：${formatTimingSummaryLine(session.metrics?.timings || {})}`);
+			if (snapshot.metricsReady && snapshot.slowestKey) {
+				console.log(
+					`聚合瓶颈：${snapshot.slowestKey}=${snapshot.slowestValue}ms，chunk=${session.metrics?.stats?.chunk_count || 0}，vector=${session.metrics?.stats?.vector_count || 0}，ocr图片=${session.metrics?.stats?.ocr_image_count || 0}。`,
+				);
+				console.log(`阶段耗时：${formatTimingSummaryLine(session.metrics?.timings || {})}`);
+			}
+			if (snapshot.slowestPostsLine) {
+				console.log(`最慢文章：${snapshot.slowestPostsLine}`);
+			}
+			if (snapshot.failedPostsLine) {
+				console.log(`失败文章：${snapshot.failedPostsLine}`);
+			}
 		}
-		const slowestPostsLine = formatSlowestPosts(session.slowestPosts);
-		if (slowestPostsLine) {
-			console.log(`最慢文章：${slowestPostsLine}`);
-		}
+		previousSnapshot = snapshot;
 
 		if (isTerminalSessionStatus(session.status)) {
 			return payload;

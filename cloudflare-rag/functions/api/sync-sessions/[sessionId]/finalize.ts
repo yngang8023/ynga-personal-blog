@@ -62,7 +62,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
   await db
     .update(blogSyncSessions)
     .set({
-      status: "finalized",
+      status: "running",
       forceRebuild: payload.forceRebuild,
       pruneMissing: payload.pruneMissing,
       activePostIdsJson: JSON.stringify(payload.activePostIds),

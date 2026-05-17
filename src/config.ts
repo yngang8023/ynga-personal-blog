@@ -36,7 +36,7 @@ const SITE_TIMEZONE = 8; //设置你的网站时区 from -12 to 12 default in UT
 export const BLOG_RAG_SERVICE_ORIGIN = "https://rag.ynga.kingcola-icg.cn";
 export const BLOG_RAG_SITE_ORIGIN = "https://ynga.kingcola-icg.cn";
 export const BLOG_RAG_SYNC_ENDPOINT =
-	`${BLOG_RAG_SERVICE_ORIGIN}/api/sync-posts`;
+	`${BLOG_RAG_SERVICE_ORIGIN}/api/sync-sessions`;
 // Cloudflare RAG 悬浮聊天窗口地址：右下角 AI 助手 iframe 会嵌入这个 /embed 页面。
 export const BLOG_RAG_EMBED_URL = `${BLOG_RAG_SERVICE_ORIGIN}/embed`;
 // 博客同源临时 token 下发接口：AI 助手首次打开时先请求这里，再用 token 启动受保护的 RAG iframe。

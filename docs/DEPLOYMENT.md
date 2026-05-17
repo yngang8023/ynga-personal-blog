@@ -363,7 +363,7 @@ pnpm sync-rag
 
 需要在 GitHub 仓库中添加 Actions Variables：
 
-- `BLOG_RAG_SYNC_ENDPOINT`: `https://rag.ynga.kingcola-icg.cn/api/sync-posts`
+- `BLOG_RAG_SYNC_ENDPOINT`: `https://rag.ynga.kingcola-icg.cn/api/sync-sessions`
 - `BLOG_RAG_SITE_URL`: `https://ynga.kingcola-icg.cn/`
 
 workflow 会通过变量注入同步接口和站点 URL，避免把部署地址硬编码在 `.github/workflows/deploy.yml`：
@@ -391,13 +391,29 @@ pnpm sync-rag
 
 同步脚本会读取 `src/content/posts/**/*.md`，并把每篇文章所在目录作为原始 bundle 上传，包括 `index.md` 和该文章目录下任意层级的本地图片资源，不要求必须放在 `images/` 目录。脚本只负责上传原文和资源，不再负责 Markdown 清洗、图片解析或分片。
 
+新的同步链路是 `create session -> upload bundles -> finalize -> poll session status`。真正的索引、OCR、D1 写入、向量生成、Vectorize upsert 和 prune/cleanup 都由 Cloudflare ingestion worker 异步完成，不再放在单个 HTTP 请求里，因此可以显著降低 `HTTP 524` 这类超时问题。
+
+脚本会在 finalize 之后轮询会话状态，直到返回以下终态之一：
+
+- `completed`
+- `completed_with_warnings`
+- `failed`
+- `cancelled`
+
+如果需要调节上传并发和轮询节奏，可设置：
+
+```env
+BLOG_RAG_SYNC_UPLOAD_CONCURRENCY=2
+BLOG_RAG_SYNC_POLL_INTERVAL_MS=3000
+```
+
 如果之前同步中途失败，可能出现文章 `contentHash` 已写入但 chunks / vectors 未完整入库的半成品状态。此时可以强制重建全部文章：
 
 ```bash
 pnpm sync-rag:force
 ```
 
-也可以在 GitHub Actions 手动运行 `Sync Cloudflare RAG Knowledge Base` 时勾选 `force_rebuild`。强制重建会忽略 `contentHash` 跳过逻辑，删除旧文章相关的 R2、D1、Vectorize 数据后重新写入。
+也可以在 GitHub Actions 手动运行 `Sync Cloudflare RAG Knowledge Base` 时勾选 `force_rebuild`。强制重建会忽略 whole-post 的 `contentHash` 跳过逻辑，但仍会复用内容寻址的正式资源、OCR 缓存和其他可安全复用的派生结果。
 
 脚本会自动排除：
 
@@ -405,7 +421,7 @@ pnpm sync-rag:force
 - `encrypted: true`
 - 配置了 `password` 的文章
 
-Cloudflare 端按 `contentHash` 增量更新：未变化文章跳过，变化文章会重新写入 R2 并重建 D1 chunks/images 与 Vectorize vectors，已删除文章会从 R2、D1 和 Vectorize 中移除。
+Cloudflare 端按 revision 增量更新：未变化且当前 revision 健康的文章直接跳过；变化文章先构建新 revision，再在成功后切换 `current_revision_id`；已删除文章只会在整次 session 成功收敛后执行 `pruneMissing`。
 
 增量同步在跳过文章前也会检查 D1 中是否已有 chunks；如果只有文章记录但没有分片，会自动重建，避免失败后的半成品数据被误判为正常。
 

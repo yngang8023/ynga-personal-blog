@@ -14,4 +14,6 @@ interface Env {
 	VECTORIZE_INDEX: VectorizeIndex;
 	AI: Ai;
 	POST_ASSETS: R2Bucket;
+	BLOG_SYNC_STAGING: R2Bucket;
+	BLOG_SYNC_INGESTION: Fetcher;
 }

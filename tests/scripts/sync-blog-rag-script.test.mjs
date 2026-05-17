@@ -19,7 +19,7 @@ test("sync blog rag dry run loads default endpoints from src/config.ts", () => {
 	assert.equal(result.status, 0, result.stderr || result.stdout);
 	assert.match(
 		result.stdout,
-		/同步地址：https:\/\/rag\.ynga\.kingcola-icg\.cn\/api\/sync-posts/,
+		/同步地址：https:\/\/rag\.ynga\.kingcola-icg\.cn\/api\/sync-sessions/,
 	);
 	assert.match(result.stdout, /Dry run 模式/);
 });

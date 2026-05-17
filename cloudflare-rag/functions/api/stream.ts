@@ -1,5 +1,5 @@
 import { RoleScopedChatInput } from "@cloudflare/workers-types";
-import { inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { drizzle, DrizzleD1Database } from "drizzle-orm/d1";
 import { blogPostChunks, blogPostImages, blogPostSections, blogPosts } from "schema";
 import { authorizeEmbedStreamRequest } from "../_shared/embed-access.js";
@@ -32,6 +32,7 @@ interface BlogChunkResult {
 interface ChunkRecord {
   id: string;
   postId: string;
+  revisionId?: string | null;
   sectionId?: string;
   sectionIndex?: number;
   title: string;
@@ -204,7 +205,9 @@ async function searchFullText(searchTerms: string[], db: DrizzleD1Database<any>)
         SELECT blog_post_chunks.*, blog_post_chunks_fts.rank
         FROM blog_post_chunks_fts
         JOIN blog_post_chunks ON blog_post_chunks_fts.id = blog_post_chunks.id
+        JOIN blog_posts ON blog_posts.id = blog_post_chunks.post_id
         WHERE blog_post_chunks_fts MATCH ${query}
+          AND blog_post_chunks.revision_id = blog_posts.current_revision_id
         ORDER BY blog_post_chunks_fts.rank
         LIMIT 8
       `)) as { results: BlogChunkResult[] };
@@ -313,6 +316,7 @@ async function getRelevantChunks(ids: string[], db: DrizzleD1Database<any>) {
     .select({
       id: blogPostChunks.id,
       postId: blogPostChunks.postId,
+      revisionId: blogPostChunks.revisionId,
       sectionId: blogPostChunks.sectionId,
       sectionIndex: blogPostChunks.sectionIndex,
       title: blogPostChunks.title,
@@ -332,7 +336,13 @@ async function getRelevantChunks(ids: string[], db: DrizzleD1Database<any>) {
       text: blogPostChunks.text,
     })
     .from(blogPostChunks)
-    .where(inArray(blogPostChunks.id, ids.slice(0, 24)));
+    .innerJoin(blogPosts, eq(blogPosts.id, blogPostChunks.postId))
+    .where(
+      and(
+        inArray(blogPostChunks.id, ids.slice(0, 24)),
+        eq(blogPostChunks.revisionId, blogPosts.currentRevisionId),
+      ),
+    );
 
   const order = new Map(ids.map((id, index) => [id, index]));
   return rows.sort((a, b) => (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER));
@@ -726,12 +736,15 @@ async function buildSources(
   requestOrigin: string,
   preferences: RetrievalPreferences,
 ): Promise<BlogSource[]> {
-  const postIds = Array.from(new Set(chunks.map((chunk) => chunk.postId)));
+  const revisionIds = Array.from(
+    new Set(chunks.map((chunk) => chunk.revisionId).filter((value): value is string => Boolean(value))),
+  );
   const images =
-    postIds.length > 0
+    revisionIds.length > 0
       ? await db
           .select({
             postId: blogPostImages.postId,
+            revisionId: blogPostImages.revisionId,
             relativePath: blogPostImages.relativePath,
             url: blogPostImages.url,
             alt: blogPostImages.alt,
@@ -742,28 +755,29 @@ async function buildSources(
             ocrText: blogPostImages.ocrText,
           })
           .from(blogPostImages)
-          .where(inArray(blogPostImages.postId, postIds))
+          .where(inArray(blogPostImages.revisionId, revisionIds))
       : [];
   const imagesByPostAndPath = new Map(
-    images.map((image) => [`${image.postId}:${image.relativePath}`, image]),
+    images.map((image) => [`${image.revisionId}:${image.postId}:${image.relativePath}`, image]),
   );
-  const imagesByPost = new Map<string, typeof images>();
+  const imagesByRevisionAndPost = new Map<string, typeof images>();
   for (const image of images) {
-    const current = imagesByPost.get(image.postId) || [];
+    const key = `${image.revisionId}:${image.postId}`;
+    const current = imagesByRevisionAndPost.get(key) || [];
     current.push(image);
-    imagesByPost.set(image.postId, current);
+    imagesByRevisionAndPost.set(key, current);
   }
 
   return dedupeSources(
     chunks.map((chunk) => {
       const imageRefs = parseImageRefs(chunk.imageRefs);
       const directImages = imageRefs
-        .map((path) => imagesByPostAndPath.get(`${chunk.postId}:${path}`))
+        .map((path) => imagesByPostAndPath.get(`${chunk.revisionId}:${chunk.postId}:${path}`))
         .filter(Boolean);
       const fallbackImages =
         directImages.length > 0
           ? []
-          : [...(imagesByPost.get(chunk.postId) || [])]
+          : [...(imagesByRevisionAndPost.get(`${chunk.revisionId}:${chunk.postId}`) || [])]
               .map((image) => ({
                 image,
                 score: scoreImageAgainstChunk(chunk, image),
@@ -794,11 +808,11 @@ async function buildSources(
         hasCodeBlocks: chunk.hasCodeBlocks,
         text: chunk.text,
         images: selectedImages.map((image) => ({
-            path: image!.relativePath,
-            url: toAbsoluteUrl(image!.url, requestOrigin),
-            alt: image!.alt,
-            text: image!.ocrText,
-          })),
+          path: image!.relativePath,
+          url: toAbsoluteUrl(image!.url, requestOrigin),
+          alt: image!.alt,
+          text: image!.ocrText,
+        })),
       };
     }),
   );
@@ -958,7 +972,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 
         if (!count) {
           await writeSse(writer, {
-            error: "博客知识库还没有同步文章，请先运行 /api/sync-posts。",
+            error: "博客知识库还没有同步文章，请先运行 pnpm sync-rag 或使用 /api/sync-sessions 完成同步。",
           });
           await writer.close();
           return;

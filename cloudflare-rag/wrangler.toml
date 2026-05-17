@@ -34,3 +34,11 @@ id = "356e2c01849247b6a80458ab0e8f705f"
 [[r2_buckets]]
 binding = "POST_ASSETS"
 bucket_name = "cloudflare-rag-post-assets"
+
+[[r2_buckets]]
+binding = "BLOG_SYNC_STAGING"
+bucket_name = "cloudflare-rag-sync-staging"
+
+[[services]]
+binding = "BLOG_SYNC_INGESTION"
+service = "cloudflare-rag-ingestion"

@@ -133,7 +133,7 @@ const blogBundleFileInputSchema = z.object({
   size: z.number().int().nonnegative().optional(),
 });
 
-const blogPostBundleInputSchema = z.object({
+export const blogPostBundleInputSchema = z.object({
   id: z.string().trim().min(1),
   slug: z.string().trim().min(1).optional(),
   entryPath: z.string().trim().min(1),
@@ -174,14 +174,18 @@ export function parseSyncPayload(value: unknown): BlogPostInput[] {
   const parsed = syncPayloadSchema.parse(value);
   const posts = Array.isArray(parsed) ? parsed : parsed.posts;
 
-  return posts.map((post) => ({
-    ...post,
+  return posts.map((post): BlogPostInput => ({
+    id: post.id,
     slug: post.slug || post.id,
+    title: post.title,
     description: post.description || "",
+    url: post.url,
     tags: post.tags || [],
     category: post.category || null,
+    body: post.body,
     published: post.published || null,
     updated: post.updated || null,
+    contentHash: post.contentHash,
   }));
 }
 
@@ -189,9 +193,11 @@ export function parseBundleSyncPayload(value: unknown): BlogPostBundleInput[] {
   const parsed = bundleSyncPayloadSchema.parse(value);
   const posts = Array.isArray(parsed) ? parsed : parsed.posts;
 
-  return posts.map((post) => ({
-    ...post,
+  return posts.map((post): BlogPostBundleInput => ({
+    id: post.id,
     slug: post.slug || post.id.replace(/\.(md|mdx|markdown)$/i, "").replace(/\/index$/, ""),
+    entryPath: post.entryPath,
+    url: post.url,
     metadata: {
       title: post.metadata?.title || "",
       description: post.metadata?.description || "",
@@ -202,6 +208,15 @@ export function parseBundleSyncPayload(value: unknown): BlogPostBundleInput[] {
       topic: post.metadata?.topic || null,
       series: post.metadata?.series || null,
     },
+    files: post.files.map((file): BlogBundleFileInput => ({
+      path: file.path,
+      contentType: file.contentType,
+      encoding: file.encoding,
+      content: file.content,
+      hash: file.hash,
+      size: file.size,
+    })),
+    contentHash: post.contentHash,
   }));
 }
 

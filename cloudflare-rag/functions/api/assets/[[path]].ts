@@ -15,7 +15,7 @@ function extractObjectKey(request: Request): string | null {
 
     if (
       !key ||
-      !key.startsWith("posts/") ||
+      (!key.startsWith("posts/") && !key.startsWith("assets/posts/by-hash/")) ||
       key.split("/").some((segment) => segment === "." || segment === "..")
     ) {
       return null;

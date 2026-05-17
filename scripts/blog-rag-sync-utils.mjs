@@ -193,6 +193,17 @@ function hashBundle(files) {
 		.digest("hex");
 }
 
+function hashBundleManifest(files) {
+	return crypto
+		.createHash("sha256")
+		.update(JSON.stringify(files.map((file) => ({
+			path: file.path,
+			hash: file.hash,
+			size: file.size,
+		}))))
+		.digest("hex");
+}
+
 async function collectPostFiles(postDir) {
 	const files = await listFiles(postDir);
 	const payloadFiles = [];
@@ -215,7 +226,96 @@ async function collectPostFiles(postDir) {
 	return payloadFiles;
 }
 
-export async function collectBlogRagPosts({ rootDir = process.cwd(), siteURL }) {
+async function collectPostFileManifest(postDir) {
+	const files = await listFiles(postDir);
+	const manifestFiles = [];
+
+	for (const file of files) {
+		const relativePath = path.relative(postDir, file).replace(/\\/g, "/");
+		const buffer = await readFile(file);
+		manifestFiles.push({
+			path: relativePath,
+			absolutePath: file,
+			contentType: getContentType(file),
+			isText: isTextFile(file),
+			hash: hashBuffer(buffer),
+			size: buffer.byteLength,
+		});
+	}
+
+	return manifestFiles;
+}
+
+function createPostManifest({ siteURL, postsDir, file, data, manifestFiles }) {
+	const id = path.relative(postsDir, file).replace(/\\/g, "/");
+	const postDir = path.dirname(file);
+	const entryPath = path.relative(postDir, file).replace(/\\/g, "/");
+	const contentHash = hashBundleManifest(manifestFiles);
+
+	return {
+		id,
+		slug: defaultSlugFromId(id),
+		entryPath,
+		url: buildPostUrl({ siteURL, id, data }),
+		metadata: {
+			title: String(data.title || defaultSlugFromId(id)),
+			description: String(data.description || ""),
+			published: normalizeDate(data.published),
+			updated: normalizeDate(data.updated),
+			tags: normalizeTags(data.tags),
+			category: data.category ? String(data.category) : null,
+		},
+		contentHash,
+		files: manifestFiles,
+		async createBundle() {
+			return buildBlogRagPostBundle({
+				id,
+				slug: defaultSlugFromId(id),
+				entryPath,
+				url: buildPostUrl({ siteURL, id, data }),
+				metadata: {
+					title: String(data.title || defaultSlugFromId(id)),
+					description: String(data.description || ""),
+					published: normalizeDate(data.published),
+					updated: normalizeDate(data.updated),
+					tags: normalizeTags(data.tags),
+					category: data.category ? String(data.category) : null,
+				},
+				contentHash,
+				files: manifestFiles,
+			});
+		},
+	};
+}
+
+export async function buildBlogRagPostBundle(manifest) {
+	const files = [];
+
+	for (const file of manifest.files) {
+		const buffer = await readFile(file.absolutePath);
+		const text = file.isText ? buffer.toString("utf8") : null;
+		files.push({
+			path: file.path,
+			contentType: file.contentType,
+			encoding: text === null ? "base64" : "utf8",
+			content: text === null ? buffer.toString("base64") : text,
+			hash: file.hash,
+			size: file.size,
+		});
+	}
+
+	return {
+		id: manifest.id,
+		slug: manifest.slug,
+		entryPath: manifest.entryPath,
+		url: manifest.url,
+		metadata: manifest.metadata,
+		files,
+		contentHash: manifest.contentHash || hashBundle(files),
+	};
+}
+
+export async function collectBlogRagPostManifests({ rootDir = process.cwd(), siteURL }) {
 	if (!siteURL) {
 		throw new Error("siteURL is required.");
 	}
@@ -236,30 +336,20 @@ export async function collectBlogRagPosts({ rootDir = process.cwd(), siteURL }) 
 			continue;
 		}
 
-		const id = path.relative(postsDir, file).replace(/\\/g, "/");
 		const postDir = path.dirname(file);
-		const entryPath = path.relative(postDir, file).replace(/\\/g, "/");
-		const bundleFiles = await collectPostFiles(postDir);
-		const post = {
-			id,
-			slug: defaultSlugFromId(id),
-			entryPath,
-			url: buildPostUrl({ siteURL, id, data }),
-			metadata: {
-				title: String(data.title || defaultSlugFromId(id)),
-				description: String(data.description || ""),
-				published: normalizeDate(data.published),
-				updated: normalizeDate(data.updated),
-				tags: normalizeTags(data.tags),
-				category: data.category ? String(data.category) : null,
-			},
-			files: bundleFiles,
-		};
+		const manifestFiles = await collectPostFileManifest(postDir);
+		posts.push(createPostManifest({ siteURL, postsDir, file, data, manifestFiles }));
+	}
 
-		posts.push({
-			...post,
-			contentHash: hashBundle(bundleFiles),
-		});
+	return posts;
+}
+
+export async function collectBlogRagPosts({ rootDir = process.cwd(), siteURL }) {
+	const manifests = await collectBlogRagPostManifests({ rootDir, siteURL });
+	const posts = [];
+
+	for (const manifest of manifests) {
+		posts.push(await manifest.createBundle());
 	}
 
 	return posts;

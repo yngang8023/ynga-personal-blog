@@ -1,0 +1,6 @@
+export const BLOG_SYNC_STAGING_PREFIX = "sync-staging";
+export const BLOG_SYNC_STATUS_POLL_INTERVAL_MS = 3000;
+export const BLOG_SYNC_UPLOAD_CONCURRENCY = 2;
+export const BLOG_SYNC_MAX_UPLOAD_RETRIES = 3;
+export const BLOG_SYNC_POST_MAX_ATTEMPTS = 3;
+export const BLOG_SYNC_PROCESSING_LEASE_MS = 10 * 60 * 1000;

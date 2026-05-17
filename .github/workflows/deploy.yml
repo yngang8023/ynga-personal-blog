@@ -50,7 +50,9 @@ jobs:
           BLOG_RAG_SYNC_TOKEN: ${{ secrets.BLOG_RAG_SYNC_TOKEN }}
           BLOG_RAG_SYNC_ENDPOINT: ${{ vars.BLOG_RAG_SYNC_ENDPOINT }}
           BLOG_RAG_SITE_URL: ${{ vars.BLOG_RAG_SITE_URL }}
-          BLOG_RAG_FORCE_REBUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.force_rebuild || false }}
+          # 临时固定为 true：把旧链路下已入库的文章完整迁移到新的 session/revision ingestion 模型。
+          # 这次全量重建完成后，再改回基于 workflow_dispatch input 的按需控制。
+          BLOG_RAG_FORCE_REBUILD: true
 
       # 当前博客正式部署由 EdgeOne Pages 负责，这里默认不执行 GitHub Pages 部署。
       # 如果其他开发者需要恢复 GitHub Pages 发布，可取消下面这段注释：

@@ -34,6 +34,8 @@ export interface ImageIndexRecord {
 export interface ChunkIndexRecord {
   id: string;
   sectionId: string;
+  chunkKey: string;
+  chunkHash: string;
   chunkIndex: number;
   sectionIndex: number;
   title: string;
@@ -55,6 +57,7 @@ export interface ChunkIndexRecord {
 
 export interface SectionIndexRecord {
   id: string;
+  sectionKey: string;
   sectionIndex: number;
   title: string;
   url: string;
@@ -91,6 +94,24 @@ export interface PreparedPostBundle {
   images: ImageIndexRecord[];
   sections: SectionIndexRecord[];
   chunks: ChunkIndexRecord[];
+  metrics: PreparePostBundleMetrics;
+}
+
+export interface PreparePostBundleMetrics {
+  timings: {
+    asset_upload_ms: number;
+    ocr_ms: number;
+    chunk_build_ms: number;
+  };
+  stats: {
+    file_count: number;
+    referenced_image_count: number;
+    ocr_image_count: number;
+    section_count: number;
+    chunk_count: number;
+    reused_asset_count: number;
+    reused_ocr_count: number;
+  };
 }
 
 interface SectionImageRef {
@@ -140,6 +161,14 @@ const blogRagTextSplitter = new RecursiveCharacterTextSplitter({
   keepSeparator: true,
   separators: blogRagChunkSeparators,
 });
+
+export const BLOG_POST_BUNDLE_NORMALIZATION_VERSION = "v2";
+
+export interface PreparePostBundleOptions {
+  resolveExistingAssetKey?: (file: StoredBundleFile) => Promise<string | null | undefined>;
+  resolveCachedImageOcrText?: (file: StoredBundleFile) => Promise<string | null | undefined>;
+  includeUnreferencedImages?: boolean;
+}
 
 function parseScalar(value: string): unknown {
   const trimmed = value.trim();
@@ -376,19 +405,79 @@ async function sha256(bytes: Uint8Array | string): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function decodeBundleFile(post: BlogPostBundleInput, file: BlogPostBundleInput["files"][number]): StoredBundleFile {
+function buildContentAddressedAssetKey(contentHash: string): string {
+  return `assets/posts/by-hash/${contentHash}`;
+}
+
+function normalizeIdentityText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+export function buildPostRevisionId(
+  postId: string,
+  contentHash: string,
+  normalizationVersion = BLOG_POST_BUNDLE_NORMALIZATION_VERSION,
+): string {
+  return `${postId}::${contentHash}::${normalizationVersion}`;
+}
+
+async function buildRevisionScopedId(
+  revisionId: string,
+  recordType: "image" | "section" | "chunk",
+  stableKey: string,
+): Promise<string> {
+  return sha256(`${revisionId}\n${recordType}\n${stableKey}`);
+}
+
+async function buildStableSectionKey(
+  postId: string,
+  section: MarkdownSection,
+  sectionText: string,
+): Promise<string> {
+  return sha256(
+    [
+      postId,
+      "section",
+      section.anchor || "",
+      section.heading || "",
+      normalizeIdentityText(sectionText),
+    ].join("\n"),
+  );
+}
+
+async function buildStableChunkKey(
+  postId: string,
+  sectionKey: string,
+  chunkText: string,
+): Promise<{ chunkKey: string; chunkHash: string }> {
+  const chunkHash = await sha256(normalizeIdentityText(chunkText));
+  return {
+    chunkKey: await sha256([postId, "chunk", sectionKey, chunkHash].join("\n")),
+    chunkHash,
+  };
+}
+
+async function decodeBundleFile(
+  post: BlogPostBundleInput,
+  file: BlogPostBundleInput["files"][number],
+): Promise<StoredBundleFile> {
   const relativePath = normalizeFilePath(file.path);
   const bytes =
     file.encoding === "utf8"
       ? new TextEncoder().encode(file.content)
       : Uint8Array.from(atob(file.content), (char) => char.charCodeAt(0));
+  const hash = file.hash || await sha256(bytes);
 
   return {
     path: relativePath,
-    r2Key: `posts/${post.slug}/${relativePath}`,
+    r2Key: buildContentAddressedAssetKey(hash),
     contentType: file.contentType || "application/octet-stream",
     bytes,
-    hash: file.hash || "",
+    hash,
     size: file.size || bytes.byteLength,
   };
 }
@@ -557,12 +646,25 @@ function extractMarkdownTextFromConversion(value: unknown): string {
 
 async function buildImageRecords(
   env: Env,
+  revisionId: string,
   postUrl: string,
   filesByPath: Map<string, StoredBundleFile>,
   sections: MarkdownSection[],
   frontmatterImages: SectionImageRef[],
-): Promise<ImageIndexRecord[]> {
+  options: PreparePostBundleOptions = {},
+): Promise<{
+  images: ImageIndexRecord[];
+  metrics: {
+    ocr_ms: number;
+    referenced_image_count: number;
+    ocr_image_count: number;
+    reused_ocr_count: number;
+  };
+}> {
   const imagesByPath = new Map<string, ImageIndexRecord>();
+  let ocrMs = 0;
+  let ocrImageCount = 0;
+  let reusedOcrCount = 0;
   const allRefs = [
     ...frontmatterImages.map((image) => ({ ...image, heading: "文章封面", anchor: null, surroundingText: "" })),
     ...sections.flatMap((section) =>
@@ -573,16 +675,18 @@ async function buildImageRecords(
         surroundingText: section.lines.join("\n").slice(0, 600),
       })),
     ),
-    ...[...filesByPath.values()]
-      .filter((file) => imageExtensionPattern.test(file.path))
-      .map((file) => ({
-        relativePath: file.path,
-        alt: "",
-        title: "",
-        heading: null,
-        anchor: null,
-        surroundingText: "",
-      })),
+    ...(options.includeUnreferencedImages
+      ? [...filesByPath.values()]
+          .filter((file) => imageExtensionPattern.test(file.path))
+          .map((file) => ({
+            relativePath: file.path,
+            alt: "",
+            title: "",
+            heading: null,
+            anchor: null,
+            surroundingText: "",
+          }))
+      : []),
   ];
 
   for (const ref of allRefs) {
@@ -604,8 +708,19 @@ async function buildImageRecords(
       continue;
     }
 
+    const imageKey = await sha256(`${ref.relativePath}\n${file.hash}`);
+    const cachedOcrText = await options.resolveCachedImageOcrText?.(file);
+    let ocrText = cachedOcrText ?? "";
+    if (cachedOcrText) {
+      reusedOcrCount += 1;
+    } else {
+      const ocrStartedAt = Date.now();
+      ocrText = await runImageOcr(env, file);
+      ocrMs += Date.now() - ocrStartedAt;
+      ocrImageCount += 1;
+    }
     imagesByPath.set(ref.relativePath, {
-      id: await sha256(`${postUrl}\n${ref.relativePath}`),
+      id: await buildRevisionScopedId(revisionId, "image", imageKey),
       relativePath: ref.relativePath,
       r2Key: file.r2Key,
       url: getAssetProxyUrl(file.r2Key),
@@ -614,23 +729,34 @@ async function buildImageRecords(
       heading: ref.heading,
       anchor: ref.anchor,
       surroundingText: ref.surroundingText,
-      ocrText: await runImageOcr(env, file),
+      ocrText,
       contentType: file.contentType,
-      contentHash: file.hash || await sha256(file.bytes),
+      contentHash: file.hash,
     });
   }
 
-  return [...imagesByPath.values()];
+  return {
+    images: [...imagesByPath.values()],
+    metrics: {
+      ocr_ms: ocrMs,
+      referenced_image_count: imagesByPath.size,
+      ocr_image_count: ocrImageCount,
+      reused_ocr_count: reusedOcrCount,
+    },
+  };
 }
 
 async function buildSectionsAndChunks(
   post: PreparedPostBundle["post"],
+  revisionId: string,
   sections: MarkdownSection[],
   images: ImageIndexRecord[],
 ): Promise<{ sections: SectionIndexRecord[]; chunks: ChunkIndexRecord[] }> {
   const sectionRecords: SectionIndexRecord[] = [];
   const chunks: ChunkIndexRecord[] = [];
   const referencedImagePaths = new Set<string>();
+  const sectionKeyCounts = new Map<string, number>();
+  const chunkKeyCounts = new Map<string, number>();
 
   for (const section of sections) {
     const sectionImages = images.filter((image) =>
@@ -660,9 +786,17 @@ async function buildSectionsAndChunks(
     }
 
     const sectionIndex = sectionRecords.length;
-    const sectionId = await sha256(`${post.id}\nsection\n${sectionIndex}\n${section.anchor || section.heading || "root"}`);
+    const baseSectionKey = await buildStableSectionKey(post.id, section, sectionText);
+    const sectionDuplicateCount = sectionKeyCounts.get(baseSectionKey) || 0;
+    sectionKeyCounts.set(baseSectionKey, sectionDuplicateCount + 1);
+    const sectionKey =
+      sectionDuplicateCount === 0
+        ? baseSectionKey
+        : await sha256(`${baseSectionKey}\nduplicate\n${sectionDuplicateCount}`);
+    const sectionId = await buildRevisionScopedId(revisionId, "section", sectionKey);
     sectionRecords.push({
       id: sectionId,
+      sectionKey,
       sectionIndex,
       title: post.title,
       url: section.anchor ? `${post.url}#${section.anchor}` : post.url,
@@ -677,9 +811,18 @@ async function buildSectionsAndChunks(
 
     const pieces = await splitTextIntoChunks(sectionText);
     for (const piece of pieces) {
+      const { chunkKey: baseChunkKey, chunkHash } = await buildStableChunkKey(post.id, sectionKey, piece);
+      const chunkDuplicateCount = chunkKeyCounts.get(baseChunkKey) || 0;
+      chunkKeyCounts.set(baseChunkKey, chunkDuplicateCount + 1);
+      const chunkKey =
+        chunkDuplicateCount === 0
+          ? baseChunkKey
+          : await sha256(`${baseChunkKey}\nduplicate\n${chunkDuplicateCount}`);
       chunks.push({
-        id: await sha256(`${post.id}\n${chunks.length}\n${piece}`),
+        id: await buildRevisionScopedId(revisionId, "chunk", chunkKey),
         sectionId,
+        chunkKey,
+        chunkHash,
         chunkIndex: chunks.length,
         sectionIndex,
         title: post.title,
@@ -720,9 +863,24 @@ async function buildSectionsAndChunks(
     }
 
     const sectionIndex = sectionRecords.length;
-    const sectionId = await sha256(`${post.id}\nimage-section\n${image.relativePath}`);
+    const syntheticSection: MarkdownSection = {
+      heading: image.heading || `图片资源：${image.alt || image.relativePath}`,
+      anchor: image.anchor,
+      lines: [imageChunkText],
+      images: [{ relativePath: image.relativePath, alt: image.alt, title: image.title }],
+      codeBlocks: [],
+    };
+    const baseSectionKey = await buildStableSectionKey(post.id, syntheticSection, imageChunkText);
+    const sectionDuplicateCount = sectionKeyCounts.get(baseSectionKey) || 0;
+    sectionKeyCounts.set(baseSectionKey, sectionDuplicateCount + 1);
+    const sectionKey =
+      sectionDuplicateCount === 0
+        ? baseSectionKey
+        : await sha256(`${baseSectionKey}\nduplicate\n${sectionDuplicateCount}`);
+    const sectionId = await buildRevisionScopedId(revisionId, "section", sectionKey);
     sectionRecords.push({
       id: sectionId,
+      sectionKey,
       sectionIndex,
       title: post.title,
       url: image.anchor ? `${post.url}#${image.anchor}` : post.url,
@@ -735,9 +893,18 @@ async function buildSectionsAndChunks(
       imageRefs: [image.relativePath],
     });
 
+    const { chunkKey: baseChunkKey, chunkHash } = await buildStableChunkKey(post.id, sectionKey, imageChunkText);
+    const chunkDuplicateCount = chunkKeyCounts.get(baseChunkKey) || 0;
+    chunkKeyCounts.set(baseChunkKey, chunkDuplicateCount + 1);
+    const chunkKey =
+      chunkDuplicateCount === 0
+        ? baseChunkKey
+        : await sha256(`${baseChunkKey}\nduplicate\n${chunkDuplicateCount}`);
     chunks.push({
-      id: await sha256(`${post.id}\nimage\n${image.relativePath}\n${imageChunkText}`),
+      id: await buildRevisionScopedId(revisionId, "chunk", chunkKey),
       sectionId,
+      chunkKey,
+      chunkHash,
       chunkIndex: chunks.length,
       sectionIndex,
       title: post.title,
@@ -765,8 +932,9 @@ export async function preparePostBundle(
   env: Env,
   bundle: BlogPostBundleInput,
   siteURL?: string,
+  options: PreparePostBundleOptions = {},
 ): Promise<PreparedPostBundle> {
-  const files = bundle.files.map((file) => decodeBundleFile(bundle, file));
+  const files = await Promise.all(bundle.files.map((file) => decodeBundleFile(bundle, file)));
   const filesByPath = new Map(files.map((file) => [file.path, file]));
   const entryPath = normalizeFilePath(bundle.entryPath);
   const entryFile = filesByPath.get(entryPath);
@@ -800,10 +968,26 @@ export async function preparePostBundle(
     sectionCount: 0,
     imageCount: 0,
     contentHash: bundle.contentHash || await sha256(files.map((file) => `${file.path}:${file.hash}`).join("\n")),
-    sourcePrefix,
+    sourcePrefix: "assets/posts/by-hash/",
   };
+  const revisionId = buildPostRevisionId(post.id, post.contentHash);
+  const uploadedAssetKeys = new Set<string>();
+  let assetUploadMs = 0;
+  let reusedAssetCount = 0;
 
   for (const file of files) {
+    const existingAssetKey = await options.resolveExistingAssetKey?.(file);
+    if (existingAssetKey) {
+      file.r2Key = existingAssetKey;
+      reusedAssetCount += 1;
+      continue;
+    }
+
+    if (uploadedAssetKeys.has(file.r2Key)) {
+      continue;
+    }
+
+    const assetUploadStartedAt = Date.now();
     await env.POST_ASSETS.put(file.r2Key, file.bytes, {
       httpMetadata: {
         contentType: file.contentType,
@@ -815,12 +999,25 @@ export async function preparePostBundle(
         hash: file.hash,
       },
     });
+    assetUploadMs += Date.now() - assetUploadStartedAt;
+    uploadedAssetKeys.add(file.r2Key);
   }
 
   const sections = parseMarkdownSections(markdown, entryPath);
   const frontmatterImages = collectFrontmatterImages(data, entryPath);
-  const images = await buildImageRecords(env, post.url, filesByPath, sections, frontmatterImages);
-  const { sections: sectionRecords, chunks } = await buildSectionsAndChunks(post, sections, images);
+  const imageBuildStartedAt = Date.now();
+  const imageBuildResult = await buildImageRecords(
+    env,
+    revisionId,
+    post.url,
+    filesByPath,
+    sections,
+    frontmatterImages,
+    options,
+  );
+  const { images, metrics: imageMetrics } = imageBuildResult;
+  const { sections: sectionRecords, chunks } = await buildSectionsAndChunks(post, revisionId, sections, images);
+  const chunkBuildMs = Date.now() - imageBuildStartedAt;
   post.hasImages = images.length > 0;
   post.hasCodeBlocks = sections.some((section) => section.codeBlocks.length > 0);
   post.sectionCount = sectionRecords.length;
@@ -832,6 +1029,22 @@ export async function preparePostBundle(
     images,
     sections: sectionRecords,
     chunks,
+    metrics: {
+      timings: {
+        asset_upload_ms: assetUploadMs,
+        ocr_ms: imageMetrics.ocr_ms,
+        chunk_build_ms: chunkBuildMs,
+      },
+      stats: {
+        file_count: files.length,
+        referenced_image_count: imageMetrics.referenced_image_count,
+        ocr_image_count: imageMetrics.ocr_image_count,
+        section_count: sectionRecords.length,
+        chunk_count: chunks.length,
+        reused_asset_count: reusedAssetCount,
+        reused_ocr_count: imageMetrics.reused_ocr_count,
+      },
+    },
   };
 }
 

@@ -162,7 +162,14 @@ https://56395e26.cloudflare-rag-1mw.pages.dev/embed
 
 ## Sync Blog Post Bundles
 
-`POST /api/sync-posts` accepts either an array or `{ "siteURL": "...", "posts": [...] }`.
+`POST /api/sync-posts` is deprecated. The supported sync flow is now session-based:
+
+1. `POST /api/sync-sessions`
+2. `POST /api/sync-sessions/:sessionId/posts/:postId`
+3. `POST /api/sync-sessions/:sessionId/finalize`
+4. `GET /api/sync-sessions/:sessionId`
+
+`finalize` persists the full `activePostIds`, `forceRebuild`, and `pruneMissing` manifest, then triggers the standalone ingestion worker workflow. The workflow is responsible for queue dispatch, progress reconciliation, final prune, and cleanup.
 
 Each post is a raw source bundle generated from one `src/content/posts/<slug>/` directory:
 
@@ -205,20 +212,30 @@ Authorization: Bearer <RAG_SYNC_TOKEN>
 
 Sync is incremental:
 
-- unchanged `contentHash` posts are skipped
-- changed posts have their old R2 files, D1 rows, and Vectorize vectors replaced
-- removed posts are deleted from R2, D1, and Vectorize
+- unchanged `contentHash` posts are skipped when the current revision is healthy
+- changed posts build a new revision first and only switch `current_revision_id` after indexing succeeds
+- removed posts are only pruned after the workflow sees that all session posts completed or skipped without failure
+- session cleanup removes staging bundles after terminal convergence
+- old revisions and stale vectors are cleaned only after a successful revision switch
 
 Cloudflare RAG owns parsing and indexing:
 
-- stores raw markdown and images in R2 under `posts/<slug>/...`
-- exposes uploaded article assets through `https://<your-rag-domain>/api/assets/posts/<slug>/<file>`
+- stores formal assets in R2 under content-addressed keys like `assets/posts/by-hash/<contentHash>`
+- continues to accept legacy `posts/<slug>/...` asset URLs at the proxy layer for compatibility
+- exposes uploaded article assets through `https://<your-rag-domain>/api/assets/...`
 - parses frontmatter and Markdown on Cloudflare
 - resolves local relative image paths such as `./images/1.png`
 - supports images anywhere inside the article directory, not only `images/`
-- runs Workers AI `toMarkdown()` for image OCR/description when available
+- reuses cached image uploads and OCR results by content hash when available
+- runs Workers AI `toMarkdown()` for image OCR/description when cache miss occurs
 - chunks by Markdown sections and keeps `heading`, `anchor`, and `imageRefs`
-- writes article/chunk/image metadata to D1 and embeddings to Vectorize
+- writes revision-scoped article/chunk/image metadata to D1 and embeddings to Vectorize
 - returns Cloudflare asset URLs in chat sources so the embed UI does not depend on the blog build output file names
+
+Session terminal statuses:
+
+- `completed`: all posts converged and cleanup finished
+- `completed_with_warnings`: indexing completed, but cleanup/prune reported a warning
+- `failed`: at least one post exhausted retries or workflow reconciliation failed
 
 Draft, encrypted, and password-protected posts should be filtered by the blog-side sync script before calling this endpoint.

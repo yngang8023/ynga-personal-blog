@@ -6,7 +6,9 @@ import test from "node:test";
 
 import {
 	buildPostUrl,
+	buildBlogRagPostBundle,
 	collectBlogRagPosts,
+	collectBlogRagPostManifests,
 	parseFrontmatter,
 	shouldSyncPost,
 } from "../../scripts/blog-rag-sync-utils.mjs";
@@ -120,4 +122,47 @@ draft: true
 	assert.equal(posts[0].files.find((file) => file.path === "index.md").encoding, "utf8");
 	assert.equal(posts[0].files.find((file) => file.path === "images/cover.png").encoding, "base64");
 	assert.match(posts[0].contentHash, /^[a-f0-9]{64}$/);
+});
+
+test("collectBlogRagPostManifests lists syncable posts without eagerly materializing bundle files", async () => {
+	const tempRoot = await mkdtemp(path.join(os.tmpdir(), "blog-rag-manifest-"));
+	const postsDir = path.join(tempRoot, "src", "content", "posts");
+	await mkdir(path.join(postsDir, "public-post", "images"), { recursive: true });
+
+	await writeFile(
+		path.join(postsDir, "public-post", "index.md"),
+		`---
+title: Manifest 文章
+description: 只返回 manifest
+published: 2026-05-07
+tags: [Cloudflare]
+category: 同步
+---
+
+![](./images/cover.png)
+`,
+		"utf8"
+	);
+	await writeFile(
+		path.join(postsDir, "public-post", "images", "cover.png"),
+		Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+	);
+
+	const manifests = await collectBlogRagPostManifests({
+		rootDir: tempRoot,
+		siteURL: "https://example.com/",
+	});
+
+	assert.equal(manifests.length, 1);
+	assert.equal(manifests[0].id, "public-post/index.md");
+	assert.equal(manifests[0].entryPath, "index.md");
+	assert.equal(Array.isArray(manifests[0].files), true);
+	assert.equal(typeof manifests[0].createBundle, "function");
+	assert.equal("content" in manifests[0].files[0], false);
+
+	const bundle = await buildBlogRagPostBundle(manifests[0]);
+	assert.equal(bundle.id, "public-post/index.md");
+	assert.equal(bundle.files.length, 2);
+	assert.equal(bundle.files.find((file) => file.path === "index.md").encoding, "utf8");
+	assert.equal(bundle.files.find((file) => file.path === "images/cover.png").encoding, "base64");
 });

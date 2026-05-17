@@ -1,0 +1,35 @@
+name = "cloudflare-rag-ingestion"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cloudflare-rag"
+database_id = "95e371b9-de4e-4a7e-a38d-2805d7152122"
+
+[[r2_buckets]]
+binding = "POST_ASSETS"
+bucket_name = "cloudflare-rag-post-assets"
+
+[[r2_buckets]]
+binding = "BLOG_SYNC_STAGING"
+bucket_name = "cloudflare-rag-sync-staging"
+
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "cloudflare-rag-index"
+
+[ai]
+binding = "AI"
+
+[[queues.producers]]
+binding = "BLOG_SYNC_QUEUE"
+queue = "cloudflare-rag-sync-queue"
+
+[[queues.consumers]]
+queue = "cloudflare-rag-sync-queue"
+
+[[workflows]]
+name = "blog-sync-workflow"
+binding = "BLOG_SYNC_WORKFLOW"
+class_name = "BlogSyncWorkflow"

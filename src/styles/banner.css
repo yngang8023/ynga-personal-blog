@@ -33,6 +33,11 @@
 /* ==========================================================================
    壁纸模式首屏预渲染修正
    ========================================================================== */
+html[data-wallpaper-mode="fullscreen"],
+html[data-wallpaper-mode="fullscreen"] body {
+  background: transparent !important;
+}
+
 html[data-wallpaper-mode="fullscreen"] #banner-wrapper {
   display: none !important;
 }

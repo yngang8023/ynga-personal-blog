@@ -83,11 +83,11 @@ function deriveEffectiveSessionStatus(
     return "failed";
   }
 
-  if (workflowStatus === "completed" && summary.allProcessed) {
+  if (workflowStatus === "completed" && summary.allProcessed && summary.pendingRecoveryCount === 0) {
     return summary.hasFailures ? "failed" : "completed";
   }
 
-  if (summary.hasFailures) {
+  if (summary.hasFailures && summary.allProcessed && summary.pendingRecoveryCount === 0) {
     return "failed";
   }
 

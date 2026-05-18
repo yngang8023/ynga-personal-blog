@@ -30,7 +30,12 @@ const sessionMetricStatKeys = [
 ] as const;
 
 const noStoreHeaders = {
-	"Cache-Control": "private, no-store, max-age=0, must-revalidate",
+	"Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
+	"CDN-Cache-Control": "no-store, no-cache, max-age=0",
+	"Cloudflare-CDN-Cache-Control": "no-store, no-cache, max-age=0",
+	Pragma: "no-cache",
+	Expires: "0",
+	Vary: "Authorization",
 };
 
 const terminalSessionStatuses = new Set([
@@ -47,6 +52,7 @@ interface InternalSessionSummary {
 	succeededPostCount?: number;
 	failedPostCount?: number;
 	skippedPostCount?: number;
+	pendingRecoveryCount?: number;
 	allProcessed?: boolean;
 	hasFailures?: boolean;
 }
@@ -118,6 +124,50 @@ function isTerminalSessionStatus(status: string | null | undefined): boolean {
 function parseCount(value: unknown): number {
 	const parsed = Number(value || 0);
 	return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function parseOptionalBoolean(value: unknown): boolean | null {
+	if (typeof value === "boolean") {
+		return value;
+	}
+	if (value === "true") {
+		return true;
+	}
+	if (value === "false") {
+		return false;
+	}
+	return null;
+}
+
+function deriveConvergenceStatus({
+	expectedPostCount,
+	uploadedPostCount,
+	processedPostCount,
+	pendingRecoveryCount,
+	allProcessed,
+	hasFailures,
+}: {
+	expectedPostCount: number;
+	uploadedPostCount: number;
+	processedPostCount: number;
+	pendingRecoveryCount: number;
+	allProcessed: boolean;
+	hasFailures: boolean;
+}): "pending" | "recovering" | "converged_success" | "converged_failure" {
+	const countsConverged =
+		expectedPostCount > 0 &&
+		uploadedPostCount >= expectedPostCount &&
+		processedPostCount >= expectedPostCount;
+
+	if (!allProcessed || !countsConverged) {
+		return pendingRecoveryCount > 0 ? "recovering" : "pending";
+	}
+
+	if (pendingRecoveryCount > 0) {
+		return "recovering";
+	}
+
+	return hasFailures ? "converged_failure" : "converged_success";
 }
 
 async function readInternalIngestionSessionStatus(
@@ -303,6 +353,11 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 		(processedPostCount < expectedPostCount || pendingRecoveryCount > 0);
 	let responseStatus = derivedRunning ? "running" : sessionStatus;
 	let workflowStatus: string | null = null;
+	let effectiveStatus = responseStatus;
+	let statusSource =
+		responseStatus === sessionStatus ? "session_db" : "derived_counts";
+	let internalAllProcessed: boolean | null = null;
+	let internalHasFailures: boolean | null = null;
 
 	if (!isTerminalSessionStatus(responseStatus)) {
 		const internalStatus = await readInternalIngestionSessionStatus(ctx, sessionId);
@@ -314,14 +369,51 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 			succeededPostCount = Math.max(succeededPostCount, parseCount(summary.succeededPostCount));
 			failedPostCount = Math.max(failedPostCount, parseCount(summary.failedPostCount));
 			skippedPostCount = Math.max(skippedPostCount, parseCount(summary.skippedPostCount));
+			pendingRecoveryCount = Math.max(
+				pendingRecoveryCount,
+				parseCount(summary.pendingRecoveryCount),
+			);
+			internalAllProcessed = parseOptionalBoolean(summary.allProcessed);
+			internalHasFailures = parseOptionalBoolean(summary.hasFailures);
 			workflowStatus =
 				typeof internalStatus.workflowStatus === "string" ? internalStatus.workflowStatus : null;
+			if (typeof internalStatus.effectiveStatus === "string" && internalStatus.effectiveStatus) {
+				effectiveStatus = internalStatus.effectiveStatus;
+			}
 
 			if (isTerminalSessionStatus(internalStatus.effectiveStatus)) {
 				responseStatus = String(internalStatus.effectiveStatus);
+				effectiveStatus = responseStatus;
+				statusSource = "ingestion_effective_status";
 			} else if (isTerminalSessionStatus(internalStatus.sessionStatus)) {
 				responseStatus = String(internalStatus.sessionStatus);
+				effectiveStatus = responseStatus;
+				statusSource = "ingestion_session_status";
 			}
+		}
+	}
+
+	const allProcessed =
+		internalAllProcessed ?? (expectedPostCount > 0 && processedPostCount >= expectedPostCount);
+	const hasFailures = internalHasFailures ?? failedPostCount > 0;
+	const convergenceStatus = deriveConvergenceStatus({
+		expectedPostCount,
+		uploadedPostCount,
+		processedPostCount,
+		pendingRecoveryCount,
+		allProcessed,
+		hasFailures,
+	});
+
+	if (!isTerminalSessionStatus(responseStatus)) {
+		if (convergenceStatus === "converged_success") {
+			responseStatus = "completed";
+			effectiveStatus = "completed";
+			statusSource = statusSource === "session_db" ? "derived_convergence" : statusSource;
+		} else if (convergenceStatus === "converged_failure") {
+			responseStatus = "failed";
+			effectiveStatus = "failed";
+			statusSource = statusSource === "session_db" ? "derived_convergence" : statusSource;
 		}
 	}
 
@@ -330,6 +422,9 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 		session: {
 			id: String(sessionRecord.id || sessionId),
 			status: responseStatus,
+			effectiveStatus,
+			statusSource,
+			convergenceStatus,
 			workflowId: `blog-sync-session-${String(sessionRecord.id || sessionId)}`,
 			workflowStatus,
 			expectedPostCount,
@@ -338,6 +433,9 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 			succeededPostCount,
 			failedPostCount,
 			skippedPostCount,
+			pendingRecoveryCount,
+			allProcessed,
+			hasFailures,
 			forceRebuild: Boolean(sessionRecord.force_rebuild),
 			pruneMissing: sessionRecord.prune_missing !== 0,
 			errorMessage: sessionRecord.error_message == null ? null : String(sessionRecord.error_message),

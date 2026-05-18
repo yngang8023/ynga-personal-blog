@@ -52,6 +52,7 @@ const worker = {
         processedPostCount: result.summary.processedPostCount,
         expectedPostCount: result.summary.expectedPostCount,
         failedPostCount: result.summary.failedPostCount,
+        pendingRecoveryCount: result.summary.pendingRecoveryCount,
       });
       return new Response(JSON.stringify({ ok: true, ...result }), {
         headers: {

@@ -42,6 +42,13 @@ test("session status api exposes aggregated metrics and slowest post summaries",
 	assert.match(source, /bundle_decode_ms/);
 	assert.match(source, /asset_upload_ms|ocr_ms|embedding_ms|vectorize_ms|db_write_ms|finalize_ms/);
 	assert.match(source, /no-store|private,? ?no-store|Cache-Control/i);
+	assert.match(source, /CDN-Cache-Control|Cloudflare-CDN-Cache-Control|Pragma|Expires|Vary/i);
 	assert.match(source, /processing_started_at|processingStartedAt/i);
 	assert.match(source, /queued|retry_pending|uploaded/i);
+	assert.match(source, /allProcessed/);
+	assert.match(source, /hasFailures/);
+	assert.match(source, /pendingRecoveryCount/);
+	assert.match(source, /effectiveStatus/);
+	assert.match(source, /statusSource/);
+	assert.match(source, /convergenceStatus/);
 });

@@ -18,8 +18,10 @@ test("sync blog rag uses session protocol with upload, finalize, and polling", a
 			const raw = Buffer.concat(chunks).toString("utf8");
 			const payload = raw ? JSON.parse(raw) : null;
 			requests.push({
+				headers: req.headers,
 				method: req.method,
 				pathname: url.pathname,
+				searchParams: new URLSearchParams(url.search),
 				payload,
 			});
 
@@ -176,7 +178,11 @@ test("sync blog rag uses session protocol with upload, finalize, and polling", a
 		assert.equal(exitCode, 0, stderr || stdout);
 		assert.equal(requests[0].pathname, "/api/sync-sessions");
 		assert.ok(requests.some((request) => request.pathname === "/api/sync-sessions/session-test-1/finalize"));
-		assert.ok(requests.some((request) => request.pathname === "/api/sync-sessions/session-test-1"));
+		const statusRequests = requests.filter((request) => request.pathname === "/api/sync-sessions/session-test-1");
+		assert.ok(statusRequests.length > 0);
+		assert.ok(statusRequests.every((request) => request.searchParams.has("_ts")));
+		assert.ok(statusRequests.every((request) => request.headers["cache-control"] === "no-cache"));
+		assert.ok(statusRequests.every((request) => request.headers.pragma === "no-cache"));
 		assert.ok(requests.some((request) => /\/api\/sync-sessions\/session-test-1\/posts\/.+/.test(request.pathname)));
 		assert.match(stdout, /聚合瓶颈/);
 		assert.match(stdout, /ocr_ms|embedding_ms|vectorize_ms/);
@@ -202,8 +208,10 @@ test("sync blog rag suppresses duplicate polling spam and prints a terminal summ
 			const raw = Buffer.concat(chunks).toString("utf8");
 			const payload = raw ? JSON.parse(raw) : null;
 			requests.push({
+				headers: req.headers,
 				method: req.method,
 				pathname: url.pathname,
+				searchParams: new URLSearchParams(url.search),
 				payload,
 			});
 
@@ -316,6 +324,147 @@ test("sync blog rag suppresses duplicate polling spam and prints a terminal summ
 		assert.equal((stdout.match(/同步终态总结/g) || []).length, 1);
 		assert.equal((stdout.match(/最慢文章：/g) || []).length, 1);
 		assert.equal((stdout.match(/聚合瓶颈：/g) || []).length, 0);
+	} finally {
+		await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+	}
+});
+
+test("sync blog rag exits when session counts converge even if session status writeback lags", async () => {
+	const requests = [];
+	let pollCount = 0;
+	const server = createServer((req, res) => {
+		const chunks = [];
+		req.on("data", (chunk) => chunks.push(chunk));
+		req.on("end", () => {
+			const url = new URL(req.url, "http://127.0.0.1");
+			const raw = Buffer.concat(chunks).toString("utf8");
+			const payload = raw ? JSON.parse(raw) : null;
+			requests.push({
+				headers: req.headers,
+				method: req.method,
+				pathname: url.pathname,
+				searchParams: new URLSearchParams(url.search),
+				payload,
+			});
+
+			if (req.method === "POST" && url.pathname === "/api/sync-sessions") {
+				res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+				res.end(JSON.stringify({ ok: true, sessionId: "session-test-3", status: "created" }));
+				return;
+			}
+
+			if (req.method === "POST" && /\/api\/sync-sessions\/session-test-3\/posts\/.+/.test(url.pathname)) {
+				res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+				res.end(JSON.stringify({ ok: true, status: "uploaded" }));
+				return;
+			}
+
+			if (req.method === "POST" && url.pathname === "/api/sync-sessions/session-test-3/finalize") {
+				res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+				res.end(JSON.stringify({ ok: true, status: "running" }));
+				return;
+			}
+
+			if (req.method === "GET" && url.pathname === "/api/sync-sessions/session-test-3") {
+				pollCount += 1;
+				res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+				res.end(
+					JSON.stringify({
+						ok: true,
+						session: {
+							id: "session-test-3",
+							status: "running",
+							workflowStatus: null,
+							effectiveStatus: "running",
+							statusSource: "session_db",
+							convergenceStatus: "converged_success",
+							expectedPostCount: 6,
+							uploadedPostCount: 6,
+							processedPostCount: 6,
+							succeededPostCount: 5,
+							failedPostCount: 0,
+							skippedPostCount: 1,
+							allProcessed: true,
+							hasFailures: false,
+							pendingRecoveryCount: 0,
+							metrics: {
+								timings: {
+									asset_upload_ms: 200,
+									ocr_ms: 500,
+									chunk_build_ms: 100,
+									db_write_ms: 300,
+									embedding_ms: 900,
+									vectorize_ms: 400,
+									finalize_ms: 100,
+									total_ms: 2500,
+								},
+								stats: {
+									file_count: 18,
+									referenced_image_count: 4,
+									ocr_image_count: 3,
+									section_count: 11,
+									chunk_count: 22,
+									vector_count: 22,
+								},
+							},
+							slowestPosts: [
+								{
+									postId: "post-d/index.md",
+									status: "completed",
+									stage: "done",
+									totalMs: 1200,
+									slowestStage: "embedding_ms",
+									slowestStageMs: 600,
+								},
+							],
+						},
+					}),
+				);
+				return;
+			}
+
+			res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+			res.end(JSON.stringify({ error: "not found" }));
+		});
+	});
+
+	await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+	const address = server.address();
+	assert.ok(address && typeof address === "object");
+	const endpoint = `http://127.0.0.1:${address.port}/api/sync-sessions`;
+
+	try {
+		const child = spawn(process.execPath, ["scripts/sync-blog-rag.mjs"], {
+			cwd: rootDir,
+			env: {
+				...process.env,
+				BLOG_RAG_SYNC_TOKEN: "test-token",
+				BLOG_RAG_SYNC_ENDPOINT: endpoint,
+				BLOG_RAG_SITE_URL: "https://ynga.kingcola-icg.cn/",
+				BLOG_RAG_SYNC_UPLOAD_CONCURRENCY: "1",
+				BLOG_RAG_SYNC_POLL_INTERVAL_MS: "10",
+				BLOG_RAG_SYNC_CONVERGENCE_POLLS: "2",
+			},
+		});
+
+		let stdout = "";
+		let stderr = "";
+		child.stdout.setEncoding("utf8");
+		child.stderr.setEncoding("utf8");
+		child.stdout.on("data", (chunk) => {
+			stdout += chunk;
+		});
+		child.stderr.on("data", (chunk) => {
+			stderr += chunk;
+		});
+
+		const [exitCode] = await once(child, "close");
+
+		assert.equal(exitCode, 0, stderr || stdout);
+		assert.ok(pollCount <= 3, `expected convergence fallback to stop quickly, got ${pollCount} polls`);
+		assert.match(stdout, /收敛|converged|稳定/i);
+		assert.match(stdout, /同步终态总结/);
+		assert.match(stdout, /session-test-3/);
 	} finally {
 		await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 	}

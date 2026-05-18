@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 
+import { BLOG_SYNC_PROCESSING_LEASE_MS } from "../../cloudflare-rag/app/lib/blogSync/constants";
 import {
   blogImageAssets,
   blogPostChunks,
@@ -381,6 +382,7 @@ export async function collectSessionPostSummary(
   succeededPostCount: number;
   failedPostCount: number;
   skippedPostCount: number;
+  pendingRecoveryCount: number;
   allProcessed: boolean;
   hasFailures: boolean;
 }> {
@@ -395,6 +397,7 @@ export async function collectSessionPostSummary(
       succeededPostCount: 0,
       failedPostCount: 0,
       skippedPostCount: 0,
+      pendingRecoveryCount: 0,
       allProcessed: true,
       hasFailures: true,
     };
@@ -403,10 +406,15 @@ export async function collectSessionPostSummary(
   const posts = await db
     .select({
       status: blogSyncSessionPosts.status,
+      stage: blogSyncSessionPosts.stage,
+      updatedAt: blogSyncSessionPosts.updatedAt,
+      processingStartedAt: blogSyncSessionPosts.processingStartedAt,
     })
     .from(blogSyncSessionPosts)
     .where(eq(blogSyncSessionPosts.sessionId, sessionId));
 
+  const processingLeaseMs = Number(env.BLOG_SYNC_PROCESSING_LEASE_MS || BLOG_SYNC_PROCESSING_LEASE_MS);
+  const nowMs = Date.now();
   const uploadedPostCount = posts.length;
   const succeededPostCount = posts.filter((post) => post.status === "completed").length;
   const skippedPostCount = posts.filter((post) => post.status === "skipped").length;
@@ -414,6 +422,21 @@ export async function collectSessionPostSummary(
   const processedPostCount = posts.filter((post) =>
     post.status === "completed" || post.status === "skipped" || post.status === "failed"
   ).length;
+  const pendingRecoveryCount = posts.filter((post) => {
+    const processingStartedAtMs = post.processingStartedAt
+      ? Date.parse(post.processingStartedAt)
+      : Number.NaN;
+    const updatedAtMs = post.updatedAt ? Date.parse(post.updatedAt) : Number.NaN;
+    const staleQueuedState =
+      (post.status === "uploaded" || post.status === "queued" || post.stage === "retry_pending") &&
+      (!Number.isFinite(updatedAtMs) || nowMs - updatedAtMs >= processingLeaseMs);
+
+    return (
+      (post.status === "processing" &&
+        (!Number.isFinite(processingStartedAtMs) || nowMs - processingStartedAtMs >= processingLeaseMs)) ||
+      staleQueuedState
+    );
+  }).length;
   const expectedPostCount = session.expectedPostCount || posts.length;
 
   return {
@@ -423,6 +446,7 @@ export async function collectSessionPostSummary(
     succeededPostCount,
     failedPostCount,
     skippedPostCount,
+    pendingRecoveryCount,
     allProcessed: processedPostCount >= expectedPostCount,
     hasFailures: failedPostCount > 0,
   };

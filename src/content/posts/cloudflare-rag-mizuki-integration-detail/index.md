@@ -338,6 +338,254 @@ sequenceDiagram
     F->>P: 轮询 session 收敛
 ```
 
+如果只看一遍图还不够直观，那其实可以把这条链路再拆成四个公开接口来看。  
+这样 GitHub Actions、Cloudflare Pages、独立 ingestion worker、Queue、Workflow 分别在做什么，就会一下子清楚很多。
+
+### 把同步链路拆开看，其实就是 4 个接口
+
+第一步，博客侧脚本先创建 session：
+
+- `POST /api/sync-sessions`
+
+这一层做的事情很轻，只是在 D1 里先写一条 `blog_sync_sessions`，然后把 `sessionId` 返回给 `sync-blog-rag.mjs`。  
+它的意义不是“开始重活”，而是**先给整次同步建立一个明确的会话边界**。
+
+第二步，脚本逐篇上传文章目录 bundle：
+
+- `POST /api/sync-sessions/:sessionId/posts/:postId`
+
+这一层会做两件事：
+
+- 把文章 bundle JSON 暂存到 `BLOG_SYNC_STAGING`
+- 在 `blog_sync_session_posts` 里登记一条 `uploaded` 记录
+
+也就是说，这一步还没有真正开始 OCR、embedding、Vectorize。  
+它只是先把“本次要处理什么”稳定写下来。
+
+第三步，全部上传完以后，再调用：
+
+- `POST /api/sync-sessions/:sessionId/finalize`
+
+这一步才会把 session 正式切到 `running`，写入：
+
+- `expectedPostCount`
+- `activePostIds`
+- `forceRebuild`
+- `pruneMissing`
+
+然后再通过内部 `service binding` 调独立 ingestion worker 的：
+
+- `POST https://blog-sync-ingestion.internal/start-session`
+
+这里要特别强调一下，这个 `.internal` 不是公网地址。  
+它是 `cloudflare-rag` 通过 `BLOG_SYNC_INGESTION` 这个 service binding，直接去调用 `cloudflare-rag-ingestion` worker 的内部入口。  
+也就是说，**公网 API 负责接住博客脚本，内部 service binding 负责把重活转给 ingestion worker**。
+
+第四步，也是 GitHub Actions 最关键的一步，就是它不会直接盯着 Cloudflare Workflow 控制台。  
+它真正一直在轮询的是：
+
+- `GET /api/sync-sessions/:sessionId`
+
+这个公开状态接口会先读：
+
+- `blog_sync_sessions`
+- `blog_sync_session_posts`
+
+如果当前还没到终态，再通过内部 service binding 去问 ingestion worker：
+
+- `GET https://blog-sync-ingestion.internal/session-status?sessionId=...`
+
+而 ingestion worker 这边的 `/session-status`，会继续把：
+
+- Workflow 当前状态
+- 单篇文章处理进度
+- 会话聚合统计
+- pending recovery 数量
+
+这些内容一起汇总回来。  
+最后 `cloudflare-rag` 再把它们聚合成公开的 `/api/sync-sessions/:sessionId` 响应，返回给 GitHub Actions。
+
+所以从本质上看，Actions 和 Cloudflare 的状态同步，不是靠 Workflow UI，也不是靠 Queue 面板，而是靠这条链路：
+
+```text
+Workflow / Queue / ingestion worker
+  ↓
+D1 + 内部 /session-status
+  ↓
+公开 /api/sync-sessions/:sessionId
+  ↓
+GitHub Actions 轮询直到判定完成
+```
+
+这也是为什么我后面修复 GitHub Actions 卡住时，不是去改 Workflow 页面，而是去强化这条状态汇总链路。  
+因为真正负责“外部世界怎么看见 Cloudflare 当前同步状态”的，就是这个公开 session 状态接口。
+
+### 现在 GitHub Actions 到底是怎么知道该停下来的
+
+以前最容易出问题的点，是 GitHub Actions 只盯着 `session.status`。  
+这样一来，只要 Workflow 实际完成了，但终态写回 D1 有一点延迟，Actions 就会继续在那里刷 `running`。
+
+现在我把它改成了“双保险”：
+
+- 服务端公开 `/api/sync-sessions/:sessionId` 时，不再只给一个 `status`
+- 脚本 `sync-blog-rag.mjs` 也不再只认 `status`
+
+现在它会同时看这些聚合字段：
+
+- `effectiveStatus`
+- `convergenceStatus`
+- `allProcessed`
+- `hasFailures`
+- `pendingRecoveryCount`
+
+这几个字段组合起来以后，GitHub Actions 判断终态的逻辑就变成了：
+
+- 如果服务端已经明确返回终态，那就直接停
+- 如果原始 `status` 还没切终态，但聚合统计已经连续几轮都显示“全部文章处理完、没有待恢复任务、结果稳定”，那也会稳定退出
+
+这样就不会再出现“Cloudflare Workflow 实际上已经完成了，但 GitHub Actions 还在傻轮询”的错位感。
+
+### 用一张时序图看 4 个接口和状态回流
+
+```mermaid
+sequenceDiagram
+    participant A as GitHub Actions<br/>sync-blog-rag.mjs
+    participant P as Public API<br/>cloudflare-rag
+    participant S as BLOG_SYNC_STAGING<br/>R2
+    participant I as Internal Worker<br/>cloudflare-rag-ingestion
+    participant W as Workflow
+    participant Q as Queue
+    participant D as D1 / Vectorize / R2 / AI
+
+    A->>P: POST /api/sync-sessions
+    P->>D: 创建 blog_sync_sessions
+    P-->>A: sessionId
+
+    loop 每篇文章
+        A->>P: POST /api/sync-sessions/:sessionId/posts/:postId
+        P->>S: 写 bundle JSON
+        P->>D: 写 blog_sync_session_posts = uploaded
+        P-->>A: uploaded
+    end
+
+    A->>P: POST /api/sync-sessions/:sessionId/finalize
+    P->>D: 更新 session = running
+    P->>I: POST /start-session
+    I->>W: 创建 workflow
+    W->>Q: 投递单篇任务
+    Q->>I: 逐篇消费
+    I->>S: 读取 staging bundle
+    I->>D: OCR / D1 / embedding / Vectorize / R2
+
+    loop 轮询同步状态
+        A->>P: GET /api/sync-sessions/:sessionId
+        P->>D: 读取 session + session_posts
+        alt 当前还不是终态
+            P->>I: GET /session-status?sessionId=...
+            I->>W: 读取 workflow 状态
+            I->>D: 汇总会话统计
+            I-->>P: effectiveStatus / convergenceStatus / allProcessed ...
+        end
+        P-->>A: 聚合后的公开 session 状态
+    end
+```
+
+### 再用一张架构图看公网 API 和内部 service binding 的边界
+
+这张图是我自己后来最喜欢的一种理解方式。  
+因为它把“谁是公开入口，谁是内部调度，谁在真正干重活”拆得非常清楚。
+
+```mermaid
+flowchart LR
+    subgraph BLOG["博客侧 / GitHub Actions"]
+        A[GitHub Actions<br/>pnpm sync-rag]
+        B[blog-rag-sync-utils.mjs<br/>收集目录级 bundle]
+        C[sync-blog-rag.mjs<br/>驱动 session 协议]
+    end
+
+    subgraph PUBLIC["公网 API · cloudflare-rag"]
+        D["POST /api/sync-sessions"]
+        E["POST /api/sync-sessions/:sessionId/posts/:postId"]
+        F["POST /api/sync-sessions/:sessionId/finalize"]
+        G["GET /api/sync-sessions/:sessionId"]
+    end
+
+    subgraph STAGING["临时存储"]
+        H[BLOG_SYNC_STAGING<br/>sync-staging/<sessionId>/<postId>.json]
+    end
+
+    subgraph INTERNAL["内部调度 · service binding"]
+        I["POST /start-session"]
+        J["GET /session-status"]
+    end
+
+    subgraph INGEST["cloudflare-rag-ingestion"]
+        K[Workflow<br/>blog-sync-workflow]
+        L[Queue<br/>cloudflare-rag-sync-queue]
+        M[Queue Consumer<br/>单篇文章 ingestion]
+    end
+
+    subgraph DATA["Cloudflare 资源层"]
+        N[D1<br/>sessions / revisions / chunks]
+        O[POST_ASSETS<br/>assets/posts/by-hash/*]
+        P[Workers AI<br/>OCR / embedding / rerank]
+        Q[Vectorize]
+    end
+
+    B --> C
+    A --> C
+    C --> D
+    C --> E
+    C --> F
+    C --> G
+
+    E --> H
+    D --> N
+    E --> N
+    F --> N
+    G --> N
+
+    F --> I
+    G --> J
+
+    I --> K
+    K --> L
+    L --> M
+    M --> H
+    M --> N
+    M --> O
+    M --> P
+    M --> Q
+    J --> K
+    J --> N
+```
+
+如果按职责把这张图说明白一点，其实就是：
+
+- `cloudflare-rag` 这一层是**公网入口**
+- `cloudflare-rag-ingestion` 这一层是**内部调度和重活执行**
+- `BLOG_SYNC_STAGING` 是**临时中转**
+- `POST_ASSETS` 是**长期资产库**
+- `Queue` 负责**单篇解耦**
+- `Workflow` 负责**整次同步收敛**
+
+这样再回头看，就会明白这次升级不是单纯把旧接口换了个名字。  
+而是把原来一个大请求里塞满的所有事情，拆成了：
+
+- 会话入口
+- 单篇上传
+- 编排启动
+- 状态汇总
+
+四个公开协议步骤，再加上内部的：
+
+- service binding
+- Queue
+- Workflow
+- ingestion worker
+
+这一整套异步入库管线。
+
 Queue 这一层的结构其实很直观，本质上就是 ingestion worker 既是 producer，也是 consumer，中间由 `cloudflare-rag-sync-queue` 这条队列做解耦。
 
 ![Queue 结构图](./2.png)

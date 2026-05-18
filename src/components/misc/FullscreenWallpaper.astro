@@ -61,16 +61,6 @@ const renderGroups = [
 	style={`z-index: ${zIndex}; opacity: ${opacity}; transform: translateZ(0); perspective: 1000px;`}
 	data-fullscreen-wallpaper
 >
-	<script is:inline>
-	// 立即执行脚本：防止闪烁
-	(function() {
-		const mode = localStorage.getItem('wallpaperMode') || 'banner';
-		if (mode !== 'fullscreen') {
-			document.currentScript.parentElement.style.display = 'none';
-		}
-	})();
-	</script>
-
 	{isCarouselEnabled ? (
 		renderGroups.map(group => group.hasImages && (
 			<div class={`${group.containerClass} w-full h-full relative`} style="transform: translateZ(0);">

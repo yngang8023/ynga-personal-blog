@@ -158,6 +158,10 @@ function readConfig() {
 		process.env.BLOG_RAG_SYNC_POLL_INTERVAL_MS,
 		3000,
 	);
+	const convergencePolls = readPositiveInteger(
+		process.env.BLOG_RAG_SYNC_CONVERGENCE_POLLS,
+		4,
+	);
 	const dryRun = hasFlag("--dry-run");
 	const forceRebuild =
 		hasFlag("--force") ||
@@ -170,6 +174,7 @@ function readConfig() {
 		siteURL,
 		uploadConcurrency,
 		pollIntervalMs,
+		convergencePolls,
 		dryRun,
 		forceRebuild,
 	};
@@ -295,10 +300,14 @@ async function finalizeSyncSession({
 }
 
 async function getSyncSessionStatus({ endpoint, token, sessionId }) {
-	return requestJson(`${endpoint}/${encodeURIComponent(sessionId)}`, {
+	const url = new URL(`${endpoint}/${encodeURIComponent(sessionId)}`);
+	url.searchParams.set("_ts", String(Date.now()));
+	return requestJson(url.toString(), {
 		method: "GET",
 		headers: {
 			Authorization: `Bearer ${token}`,
+			"Cache-Control": "no-cache",
+			Pragma: "no-cache",
 		},
 	});
 }
@@ -375,6 +384,61 @@ function formatNumber(value) {
 	return Number.isFinite(Number(value)) ? Number(value) : 0;
 }
 
+function parseOptionalBoolean(value) {
+	if (typeof value === "boolean") {
+		return value;
+	}
+	if (value === "true") {
+		return true;
+	}
+	if (value === "false") {
+		return false;
+	}
+	return null;
+}
+
+function deriveConvergenceDecision(session = {}) {
+	const expected = formatNumber(session.expectedPostCount);
+	const uploaded = formatNumber(session.uploadedPostCount);
+	const processed = formatNumber(session.processedPostCount);
+	const failed = formatNumber(session.failedPostCount);
+	const pendingRecoveryCount = formatNumber(session.pendingRecoveryCount);
+	const allProcessed =
+		parseOptionalBoolean(session.allProcessed) ??
+		(expected > 0 && processed >= expected);
+	const hasFailures =
+		parseOptionalBoolean(session.hasFailures) ?? failed > 0;
+	const effectiveStatus =
+		typeof session.effectiveStatus === "string" ? session.effectiveStatus : "";
+	const convergenceStatus =
+		typeof session.convergenceStatus === "string" ? session.convergenceStatus : "";
+	const countsConverged =
+		expected > 0 &&
+		uploaded >= expected &&
+		processed >= expected;
+
+	let syntheticTerminalStatus = "";
+	if (isTerminalSessionStatus(effectiveStatus)) {
+		syntheticTerminalStatus = effectiveStatus;
+	} else if (convergenceStatus === "converged_success") {
+		syntheticTerminalStatus = "completed";
+	} else if (convergenceStatus === "converged_failure") {
+		syntheticTerminalStatus = "failed";
+	} else if (allProcessed && countsConverged && pendingRecoveryCount === 0) {
+		syntheticTerminalStatus = hasFailures ? "failed" : "completed";
+	}
+
+	return {
+		allProcessed,
+		hasFailures,
+		pendingRecoveryCount,
+		effectiveStatus,
+		convergenceStatus,
+		countsConverged,
+		syntheticTerminalStatus,
+	};
+}
+
 function formatTimingSummaryLine(timings = {}) {
 	return `bundle_download=${formatNumber(timings.bundle_download_ms)}ms，bundle_decode=${formatNumber(timings.bundle_decode_ms)}ms，asset=${formatNumber(timings.asset_upload_ms)}ms，ocr=${formatNumber(timings.ocr_ms)}ms，chunk=${formatNumber(timings.chunk_build_ms)}ms，db=${formatNumber(timings.db_write_ms)}ms，embedding=${formatNumber(timings.embedding_ms)}ms，vectorize=${formatNumber(timings.vectorize_ms)}ms，finalize=${formatNumber(timings.finalize_ms)}ms。`;
 }
@@ -398,6 +462,7 @@ function formatFailedPostsLine(failedPosts) {
 
 function buildPollSnapshot(payload) {
 	const session = payload?.session || {};
+	const convergence = deriveConvergenceDecision(session);
 	const slowestTiming = getSlowestTiming(session.metrics);
 	const metricsReady = Object.values(session.metrics?.timings || {}).some((value) => Number(value) > 0);
 	const slowestPostsLine = metricsReady ? formatSlowestPosts(session.slowestPosts) : "";
@@ -408,9 +473,17 @@ function buildPollSnapshot(payload) {
 		workflowStatus: session.workflowStatus || "",
 		processed: formatNumber(session.processedPostCount),
 		expected: formatNumber(session.expectedPostCount),
+		uploaded: formatNumber(session.uploadedPostCount),
 		succeeded: formatNumber(session.succeededPostCount),
 		failed: formatNumber(session.failedPostCount),
 		skipped: formatNumber(session.skippedPostCount),
+		effectiveStatus: convergence.effectiveStatus || "",
+		statusSource: typeof session.statusSource === "string" ? session.statusSource : "",
+		convergenceStatus: convergence.convergenceStatus || "",
+		allProcessed: convergence.allProcessed,
+		hasFailures: convergence.hasFailures,
+		pendingRecoveryCount: convergence.pendingRecoveryCount,
+		syntheticTerminalStatus: convergence.syntheticTerminalStatus || "",
 		slowestKey: slowestTiming.key || "",
 		slowestValue: formatNumber(slowestTiming.value),
 		metricsReady,
@@ -421,9 +494,9 @@ function buildPollSnapshot(payload) {
 	};
 }
 
-function shouldLogPollSnapshot(previous, next, pollCount) {
+function getPollSnapshotLogMode(previous, next, pollCount) {
 	if (!previous) {
-		return true;
+		return "changed";
 	}
 
 	if (
@@ -431,9 +504,17 @@ function shouldLogPollSnapshot(previous, next, pollCount) {
 		previous.workflowStatus !== next.workflowStatus ||
 		previous.processed !== next.processed ||
 		previous.expected !== next.expected ||
+		previous.uploaded !== next.uploaded ||
 		previous.succeeded !== next.succeeded ||
 		previous.failed !== next.failed ||
 		previous.skipped !== next.skipped ||
+		previous.effectiveStatus !== next.effectiveStatus ||
+		previous.statusSource !== next.statusSource ||
+		previous.convergenceStatus !== next.convergenceStatus ||
+		previous.allProcessed !== next.allProcessed ||
+		previous.hasFailures !== next.hasFailures ||
+		previous.pendingRecoveryCount !== next.pendingRecoveryCount ||
+		previous.syntheticTerminalStatus !== next.syntheticTerminalStatus ||
 		previous.slowestKey !== next.slowestKey ||
 		previous.slowestValue !== next.slowestValue ||
 		previous.slowestPostsLine !== next.slowestPostsLine ||
@@ -441,10 +522,28 @@ function shouldLogPollSnapshot(previous, next, pollCount) {
 		previous.timingsSignature !== next.timingsSignature ||
 		previous.statsSignature !== next.statsSignature
 	) {
-		return true;
+		return "changed";
 	}
 
-	return pollCount % 20 === 0;
+	return pollCount % 30 === 0 ? "heartbeat" : "skip";
+}
+
+function formatPollStatusLine(sessionId, snapshot, prefix = "同步会话") {
+	const extraLabels = [];
+	if (snapshot.workflowStatus) {
+		extraLabels.push(`workflow=${snapshot.workflowStatus}`);
+	}
+	if (snapshot.effectiveStatus && snapshot.effectiveStatus !== snapshot.status) {
+		extraLabels.push(`effective=${snapshot.effectiveStatus}`);
+	}
+	if (snapshot.convergenceStatus && snapshot.convergenceStatus !== "pending") {
+		extraLabels.push(`convergence=${snapshot.convergenceStatus}`);
+	}
+	if (snapshot.pendingRecoveryCount > 0) {
+		extraLabels.push(`pendingRecovery=${snapshot.pendingRecoveryCount}`);
+	}
+
+	return `${prefix} ${sessionId} 状态：${snapshot.status}${extraLabels.length > 0 ? ` (${extraLabels.join(", ")})` : ""}，已处理 ${snapshot.processed}/${snapshot.expected}，成功 ${snapshot.succeeded}，失败 ${snapshot.failed}。`;
 }
 
 function printFinalSessionSummary(sessionId, session) {
@@ -474,19 +573,27 @@ async function pollSyncSession({
 	token,
 	sessionId,
 	pollIntervalMs,
+	convergencePolls,
 }) {
 	let previousSnapshot = null;
 	let pollCount = 0;
+	let convergenceStreak = 0;
+	let lastConvergenceSignature = "";
 
 	while (true) {
 		const payload = await getSyncSessionStatus({ endpoint, token, sessionId });
 		const session = payload?.session || {};
 		pollCount += 1;
 		const snapshot = buildPollSnapshot(payload);
+		const logMode = getPollSnapshotLogMode(previousSnapshot, snapshot, pollCount);
 
-		if (shouldLogPollSnapshot(previousSnapshot, snapshot, pollCount)) {
+		if (logMode === "changed" || logMode === "heartbeat") {
 			console.log(
-				`同步会话 ${sessionId} 状态：${snapshot.status}${snapshot.workflowStatus ? ` (workflow=${snapshot.workflowStatus})` : ""}，已处理 ${snapshot.processed}/${snapshot.expected}，成功 ${snapshot.succeeded}，失败 ${snapshot.failed}。`,
+				formatPollStatusLine(
+					sessionId,
+					snapshot,
+					logMode === "heartbeat" ? "同步会话状态未变化，继续等待" : "同步会话",
+				),
 			);
 			if (snapshot.metricsReady && snapshot.slowestKey) {
 				console.log(
@@ -505,6 +612,51 @@ async function pollSyncSession({
 
 		if (isTerminalSessionStatus(session.status)) {
 			return payload;
+		}
+
+		if (snapshot.syntheticTerminalStatus) {
+			const convergenceSignature = JSON.stringify({
+				syntheticTerminalStatus: snapshot.syntheticTerminalStatus,
+				processed: snapshot.processed,
+				expected: snapshot.expected,
+				uploaded: snapshot.uploaded,
+				succeeded: snapshot.succeeded,
+				failed: snapshot.failed,
+				skipped: snapshot.skipped,
+				pendingRecoveryCount: snapshot.pendingRecoveryCount,
+				effectiveStatus: snapshot.effectiveStatus,
+				convergenceStatus: snapshot.convergenceStatus,
+			});
+
+			if (convergenceSignature === lastConvergenceSignature) {
+				convergenceStreak += 1;
+			} else {
+				lastConvergenceSignature = convergenceSignature;
+				convergenceStreak = 1;
+			}
+
+			if (convergenceStreak >= convergencePolls) {
+				const terminalStatus = snapshot.syntheticTerminalStatus;
+				console.log(
+					`同步会话 ${sessionId} 已连续 ${convergenceStreak} 次满足收敛条件，按聚合统计稳定判定为${terminalStatus === "failed" ? "失败" : "完成"}。`,
+				);
+				return {
+					...payload,
+					session: {
+						...session,
+						rawStatus: session.status || "unknown",
+						status: terminalStatus,
+						effectiveStatus: terminalStatus,
+						statusSource: "client_convergence_fallback",
+						convergenceStatus:
+							terminalStatus === "failed" ? "converged_failure" : "converged_success",
+						convergencePolls: convergenceStreak,
+					},
+				};
+			}
+		} else {
+			convergenceStreak = 0;
+			lastConvergenceSignature = "";
 		}
 
 		await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
@@ -588,6 +740,7 @@ async function main() {
 		token: config.token,
 		sessionId,
 		pollIntervalMs: config.pollIntervalMs,
+		convergencePolls: config.convergencePolls,
 	});
 	const sessionStatus = finalStatus?.session?.status;
 	if (sessionStatus !== "completed" && sessionStatus !== "completed_with_warnings") {

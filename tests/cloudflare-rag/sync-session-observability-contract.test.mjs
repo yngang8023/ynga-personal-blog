@@ -6,6 +6,8 @@ import test from "node:test";
 const queuePath = path.resolve("cloudflare-rag-ingestion/src/queue.ts");
 const workflowPath = path.resolve("cloudflare-rag-ingestion/src/workflow.ts");
 const cleanupPath = path.resolve("cloudflare-rag-ingestion/src/cleanup.ts");
+const apiStatusPath = path.resolve("cloudflare-rag/functions/api/sync-sessions/[sessionId].ts");
+const ingestionStatusPath = path.resolve("cloudflare-rag-ingestion/src/sessionStatus.ts");
 
 test("ingestion queue records timing and stats fields for session posts", async () => {
 	const source = await readFile(queuePath, "utf8");
@@ -34,7 +36,7 @@ test("workflow coordinates reconcile and cleanup through explicit helpers", asyn
 });
 
 test("session status api exposes aggregated metrics and slowest post summaries", async () => {
-	const source = await readFile(path.resolve("cloudflare-rag/functions/api/sync-sessions/[sessionId].ts"), "utf8");
+	const source = await readFile(apiStatusPath, "utf8");
 
 	assert.match(source, /aggregate|aggregated|sessionMetrics/i);
 	assert.match(source, /slowestPosts|slowestStage|slowestPost/i);
@@ -51,4 +53,16 @@ test("session status api exposes aggregated metrics and slowest post summaries",
 	assert.match(source, /effectiveStatus/);
 	assert.match(source, /statusSource/);
 	assert.match(source, /convergenceStatus/);
+});
+
+test("session status aligns displayed workflow status with terminal convergence while preserving observed backend state", async () => {
+	const [apiSource, ingestionSource] = await Promise.all([
+		readFile(apiStatusPath, "utf8"),
+		readFile(ingestionStatusPath, "utf8"),
+	]);
+
+	assert.match(apiSource, /workflowObservedStatus/);
+	assert.match(apiSource, /alignTerminalWorkflowStatus/);
+	assert.match(ingestionSource, /workflowObservedStatus/);
+	assert.match(ingestionSource, /alignTerminalWorkflowStatus/);
 });

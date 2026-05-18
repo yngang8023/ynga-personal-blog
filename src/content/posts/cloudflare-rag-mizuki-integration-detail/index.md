@@ -1,7 +1,7 @@
 ---
 title: 把 Cloudflare-RAG 真正接进 Mizuki 博客
 published: 2026-05-14
-updated: 2026-05-17T20:58:00+08:00
+updated: 2026-05-18T12:52:00+08:00
 description: 这一篇专门记录实现细节。包括我怎么把 Mizuki + Astro 的文章目录升级成 session 化 bundle，同步到 Cloudflare-RAG 的 Queue / Workflow / revision 链路，再通过 Edge Functions 和 Cloudflare Functions 做受保护的 embed token 分发与 session 鉴权，让 AI 对话只能被指定博客域名安全内嵌使用。
 tags: [Cloudflare, RAG, Mizuki, Workers AI]
 category: AI
@@ -260,6 +260,12 @@ POST /api/sync-sessions
 这里我自己挺在意的一点是，文章的真实来源还是仓库。  
 知识库只是消费仓库，不是反过来成为另一套内容主库。
 
+这套链路接进 GitHub Actions 以后，CI 日志也不再只是一个“成功”或者“失败”。  
+现在它会把本次 session 的创建、逐篇上传、Workflow 状态、聚合瓶颈、阶段耗时、最慢文章和终态总结直接打出来。  
+这样就算我还没打开 Cloudflare 控制台，也能先在 Actions 里判断这次同步到底慢在 `bundle` 下载、`embedding`、`Vectorize`，还是某一篇文章本身。
+
+![GitHub Actions 中的 sync-rag 执行过程](./6.png)
+
 ## `sync-blog-rag.mjs` 真正干了什么
 
 这个脚本的角色其实很单纯。
@@ -404,6 +410,13 @@ sequenceDiagram
 
 这些内容一起汇总回来。  
 最后 `cloudflare-rag` 再把它们聚合成公开的 `/api/sync-sessions/:sessionId` 响应，返回给 GitHub Actions。
+
+不过我后来还是把 `cloudflare-rag-ingestion` 的 Workers Observability 打开了。  
+因为 GitHub Actions 看到的是“对外聚合后的 session 状态”，而 Observability 看到的是 Worker 内部的真实执行轨迹。  
+比如 `POST /start-session` 什么时候被打进来、`GET /session-status` 被轮询了几次、Queue 什么时候开始消费、Workflow 什么时候进入收敛阶段，这些都能直接在日志里看到。  
+所以真遇到问题时，我不用再靠猜，就能更快判断到底是外部轮询没收敛，还是内部编排本身卡住了。
+
+![cloudflare-rag-ingestion 的 Workers Observability 日志](./7.png)
 
 所以从本质上看，Actions 和 Cloudflare 的状态同步，不是靠 Workflow UI，也不是靠 Queue 面板，而是靠这条链路：
 

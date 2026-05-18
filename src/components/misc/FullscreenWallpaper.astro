@@ -20,9 +20,10 @@ const hasMobileImages = imageSources.mobile.length > 0;
 if (!hasDesktopImages && !hasMobileImages) {return null;}
 
 // 轮播配置
-const isCarouselEnabled = config.carousel?.enable && 
+const isCarouselEnabled = config.carousel?.enable &&
 	(imageSources.desktop.length > 1 || imageSources.mobile.length > 1);
 const carouselInterval = config.carousel?.interval || 5;
+const carouselFadeDurationMs = 1000;
 
 // 样式配置
 const position = config.position || "center";
@@ -39,30 +40,30 @@ const positionClass = (() => {
 
 const renderGroups = [
 	{
-		key: 'desktop',
+		key: "desktop",
 		images: imageSources.desktop,
 		containerClass: "hidden md:block",
-		hasImages: hasDesktopImages
+		hasImages: hasDesktopImages,
 	},
 	{
-		key: 'mobile',
+		key: "mobile",
 		images: imageSources.mobile,
 		containerClass: "block md:hidden",
-		hasImages: hasMobileImages
-	}
+		hasImages: hasMobileImages,
+	},
 ];
 ---
 
-<div 
+<div
 	class:list={[
 		"fixed inset-0 w-full h-full overflow-hidden pointer-events-none",
-		className
+		className,
 	]}
-	style={`z-index: ${zIndex}; opacity: ${opacity}; transform: translateZ(0); perspective: 1000px;`}
+	style={`z-index: ${zIndex}; opacity: ${opacity}; transform: translateZ(0); perspective: 1000px; background-color: var(--page-bg); transition: background-color var(--theme-switch-duration, 220ms) var(--theme-switch-easing, cubic-bezier(0.22, 1, 0.36, 1));`}
 	data-fullscreen-wallpaper
 >
 	{isCarouselEnabled ? (
-		renderGroups.map(group => group.hasImages && (
+		renderGroups.map((group) => group.hasImages && (
 			<div class={`${group.containerClass} w-full h-full relative`} style="transform: translateZ(0);">
 				{group.images.map((src, index) => (
 					<img
@@ -70,10 +71,10 @@ const renderGroups = [
 						alt={`${group.key} wallpaper ${index + 1}`}
 						class={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${positionClass}`}
 						data-carousel-item={index}
-						style={`transform: translateZ(0); backface-visibility: hidden; will-change: opacity; ${blurAmount > 0 ? `filter: blur(${blurAmount}px);` : ''}; opacity: ${index === 0 ? 1 : 0};`}
+						style={`transform: translateZ(0); backface-visibility: hidden; will-change: opacity; ${blurAmount > 0 ? `filter: blur(${blurAmount}px);` : ""}; opacity: ${index === 0 ? 1 : 0};`}
 						decoding="async"
-						loading={index === 0 ? "eager" : "lazy"}
-						fetchpriority={index === 0 ? "high" : undefined}
+						loading={index < 2 ? "eager" : "lazy"}
+						fetchpriority={index < 2 ? "high" : undefined}
 					/>
 				))}
 			</div>
@@ -85,33 +86,33 @@ const renderGroups = [
 					const getRandomImage = (images, storageKey) => {
 						if (images.length === 0) {return null;}
 						if (images.length === 1) {return images[0];}
-						
+
 						const lastIndex = sessionStorage.getItem(storageKey);
 						let newIndex;
-						
+
 						do {
 							newIndex = Math.floor(Math.random() * images.length);
-						} while (newIndex === parseInt(lastIndex || '-1'));
-						
+						} while (newIndex === parseInt(lastIndex || "-1"));
+
 						sessionStorage.setItem(storageKey, newIndex.toString());
 						return images[newIndex];
 					};
-					
-					const desktopSrc = getRandomImage(desktopImages, 'wallpaper_desktop_index');
-					const mobileSrc = getRandomImage(mobileImages, 'wallpaper_mobile_index');
-					
-					const container = document.getElementById('wallpaper-single-container');
-					
+
+					const desktopSrc = getRandomImage(desktopImages, "wallpaper_desktop_index");
+					const mobileSrc = getRandomImage(mobileImages, "wallpaper_mobile_index");
+
+					const container = document.getElementById("wallpaper-single-container");
+
 					if (desktopSrc) {
-						const desktopDiv = document.createElement('div');
-						desktopDiv.className = 'hidden lg:block w-full h-full relative';
-						desktopDiv.style.transform = 'translateZ(0)';
+						const desktopDiv = document.createElement("div");
+						desktopDiv.className = "hidden lg:block w-full h-full relative";
+						desktopDiv.style.transform = "translateZ(0)";
 						desktopDiv.innerHTML = `
 							<img
 								src="${desktopSrc}"
 								alt="desktop wallpaper"
 								class="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${positionClass}"
-								style="transform: translateZ(0); backface-visibility: hidden; will-change: opacity; ${blurAmount > 0 ? `filter: blur(${blurAmount}px);` : ''} opacity: 1;"
+								style="transform: translateZ(0); backface-visibility: hidden; will-change: opacity; ${blurAmount > 0 ? `filter: blur(${blurAmount}px);` : ""} opacity: 1;"
 								decoding="async"
 								loading="eager"
 								fetchpriority="high"
@@ -119,17 +120,17 @@ const renderGroups = [
 						`;
 						container.appendChild(desktopDiv);
 					}
-					
+
 					if (mobileSrc) {
-						const mobileDiv = document.createElement('div');
-						mobileDiv.className = 'block lg:hidden w-full h-full relative';
-						mobileDiv.style.transform = 'translateZ(0)';
+						const mobileDiv = document.createElement("div");
+						mobileDiv.className = "block lg:hidden w-full h-full relative";
+						mobileDiv.style.transform = "translateZ(0)";
 						mobileDiv.innerHTML = `
 							<img
 								src="${mobileSrc}"
 								alt="mobile wallpaper"
 								class="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${positionClass}"
-								style="transform: translateZ(0); backface-visibility: hidden; will-change: opacity; ${blurAmount > 0 ? `filter: blur(${blurAmount}px);` : ''} opacity: 1;"
+								style="transform: translateZ(0); backface-visibility: hidden; will-change: opacity; ${blurAmount > 0 ? `filter: blur(${blurAmount}px);` : ""} opacity: 1;"
 								decoding="async"
 								loading="eager"
 								fetchpriority="high"
@@ -144,9 +145,9 @@ const renderGroups = [
 </div>
 
 {isCarouselEnabled && (
-	<script is:inline define:vars={{ carouselInterval }}>
+	<script is:inline define:vars={{ carouselInterval, carouselFadeDurationMs }}>
 		function initFullscreenWallpaperCarousel() {
-			const container = document.querySelector('[data-fullscreen-wallpaper]');
+			const container = document.querySelector("[data-fullscreen-wallpaper]");
 			if (!container) {return;}
 
 			if (window.__wallpaper_cleanup) {
@@ -154,65 +155,191 @@ const renderGroups = [
 				window.__wallpaper_cleanup = null;
 			}
 
-			const STORAGE_KEY = 'mizuki_wallpaper_index';
-			const savedIndex = parseInt(sessionStorage.getItem(STORAGE_KEY) || '0');
+			const STORAGE_KEY = "mizuki_wallpaper_index";
+			const PRELOAD_AHEAD_COUNT = 2;
+			const savedIndex = parseInt(sessionStorage.getItem(STORAGE_KEY) || "0");
+			let themeTransitioning = false;
 
 			const groups = [
-				container.querySelectorAll('.hidden.md\\:block [data-carousel-item]'),
-				container.querySelectorAll('.block.md\\:hidden [data-carousel-item]')
+				container.querySelectorAll(".hidden.md\\:block [data-carousel-item]"),
+				container.querySelectorAll(".block.md\\:hidden [data-carousel-item]"),
 			];
 
-			const state = groups.map(items => {
+			const state = groups.map((items) => {
 				const safeIndex = (savedIndex >= 0 && savedIndex < items.length) ? savedIndex : 0;
 				return {
 					items,
 					currentIndex: safeIndex,
 					timer: null,
-					active: items.length > 1
+					active: items.length > 1,
+					transitioning: false,
 				};
 			});
 
-			// 初始化显示：根据 savedIndex 立即修正图片显示
-			function initImage(stateItem) {
+			function isImageReady(item) {
+				return !!item && item.complete && item.naturalWidth > 0;
+			}
+
+			function warmImage(item) {
+				if (!item) {return;}
+				item.loading = "eager";
+				item.setAttribute("loading", "eager");
+				item.setAttribute("fetchpriority", "high");
+			}
+
+			function waitForImageEvent(item) {
+				return new Promise((resolve) => {
+					if (!item) {
+						resolve();
+						return;
+					}
+
+					const cleanup = () => {
+						item.removeEventListener("load", onLoad);
+						item.removeEventListener("error", onLoad);
+					};
+
+					const onLoad = () => {
+						cleanup();
+						resolve();
+					};
+
+					item.addEventListener("load", onLoad, { once: true });
+					item.addEventListener("error", onLoad, { once: true });
+				});
+			}
+
+			async function ensureImageReady(item) {
+				if (!item) {return false;}
+
+				warmImage(item);
+				if (isImageReady(item)) {
+					if (typeof item.decode === "function") {
+						try {
+							await item.decode();
+						} catch {}
+					}
+					return true;
+				}
+
+				const source = item.currentSrc || item.getAttribute("src") || "";
+				if (source) {
+					try {
+						const preloader = new Image();
+						preloader.decoding = "async";
+						preloader.fetchPriority = "high";
+						preloader.src = source;
+						if (!preloader.complete || preloader.naturalWidth === 0) {
+							await new Promise((resolve) => {
+								preloader.addEventListener("load", resolve, { once: true });
+								preloader.addEventListener("error", resolve, { once: true });
+							});
+						}
+					} catch {}
+				}
+
+				if (!isImageReady(item)) {
+					await Promise.race([
+						waitForImageEvent(item),
+						new Promise((resolve) => window.setTimeout(resolve, 1500)),
+					]);
+				}
+
+				if (typeof item.decode === "function") {
+					try {
+						await item.decode();
+					} catch {}
+				}
+
+				return isImageReady(item);
+			}
+
+			function resolveInitialIndex(items, preferredIndex) {
+				if (items.length === 0) {return 0;}
+				if (preferredIndex >= 0 && preferredIndex < items.length && isImageReady(items[preferredIndex])) {
+					return preferredIndex;
+				}
+				const readyIndex = items.findIndex((item) => isImageReady(item));
+				if (readyIndex >= 0) {
+					return readyIndex;
+				}
+				return preferredIndex >= 0 && preferredIndex < items.length ? preferredIndex : 0;
+			}
+
+			function primeUpcomingImages(stateItem) {
 				const { items, currentIndex } = stateItem;
-				// 立即设置样式，防止视觉上跳回第一张
-				for (let i = 0; i < items.length; i++) {
-					items[i].style.opacity = i === currentIndex ? '1' : '0';
+				for (let offset = 1; offset <= Math.min(PRELOAD_AHEAD_COUNT, Math.max(items.length - 1, 0)); offset++) {
+					warmImage(items[(currentIndex + offset) % items.length]);
 				}
 			}
 
-			// 切换下一张
-			function switchNextImage(stateItem) {
-				const { items, currentIndex } = stateItem;
-				const nextIndex = (currentIndex + 1) % items.length;
-				
-				items[currentIndex].style.opacity = '0';
-				items[nextIndex].style.opacity = '1';
-				
-				stateItem.currentIndex = nextIndex;
+			// 初始化显示：优先展示已经 decode 完成的图片，避免恢复到未加载索引时短暂露底色
+			async function initImage(stateItem) {
+				const { items } = stateItem;
+				stateItem.currentIndex = resolveInitialIndex(items, stateItem.currentIndex);
 
+				for (let i = 0; i < items.length; i++) {
+					items[i].style.opacity = "0";
+				}
+
+				const currentItem = items[stateItem.currentIndex];
+				if (!currentItem) {return;}
+
+				primeUpcomingImages(stateItem);
+				if (isImageReady(currentItem) || await ensureImageReady(currentItem)) {
+					currentItem.style.opacity = "1";
+				}
+			}
+
+			// 切换下一张：只有在下一张 ready 后才交接，避免自动轮播时出现白屏或黑屏
+			async function switchNextImage(stateItem) {
+				const { items, currentIndex } = stateItem;
+				if (themeTransitioning || stateItem.transitioning || items.length < 2) {return;}
+
+				const nextIndex = (currentIndex + 1) % items.length;
+				const currentItem = items[currentIndex];
+				const nextItem = items[nextIndex];
+
+				stateItem.transitioning = true;
+				primeUpcomingImages(stateItem);
+				if (!(await ensureImageReady(nextItem))) {
+					stateItem.transitioning = false;
+					return;
+				}
+
+				nextItem.style.opacity = "1";
+				if (currentItem) {
+					currentItem.style.opacity = "0";
+				}
+
+				stateItem.currentIndex = nextIndex;
 				sessionStorage.setItem(STORAGE_KEY, nextIndex.toString());
+				primeUpcomingImages(stateItem);
+
+				window.setTimeout(() => {
+					stateItem.transitioning = false;
+				}, carouselFadeDurationMs + 80);
 			}
 
 			function start() {
-				state.forEach(s => {
-					if (s.active && !s.timer) {
-						s.timer = setInterval(() => {
-							if (!document.body.contains(s.items[0])) {
+				state.forEach((stateItem) => {
+					if (stateItem.active && !stateItem.timer) {
+						stateItem.timer = setInterval(() => {
+							if (!document.body.contains(stateItem.items[0])) {
 								stop();
 								return;
 							}
-							switchNextImage(s);
+							void switchNextImage(stateItem);
 						}, carouselInterval * 1000);
 					}
 				});
 			}
 
 			function stop() {
-				state.forEach(s => {
-					if (s.timer) {
-						clearInterval(s.timer);
-						s.timer = null;
+				state.forEach((stateItem) => {
+					if (stateItem.timer) {
+						clearInterval(stateItem.timer);
+						stateItem.timer = null;
 					}
 				});
 			}
@@ -221,29 +348,44 @@ const renderGroups = [
 				if (document.hidden) {
 					stop();
 				} else {
-					const exists = state.some(s => s.items.length > 0 && document.body.contains(s.items[0]));
+					const exists = state.some((stateItem) => stateItem.items.length > 0 && document.body.contains(stateItem.items[0]));
 					if (exists) {start();}
 				}
 			};
 
-			// 初始化状态
-			state.forEach(s => {
-				if (s.items.length > 0) {initImage(s);}
+			const handleThemeSwitchStart = () => {
+				themeTransitioning = true;
+				stop();
+			};
+
+			const handleThemeSwitchEnd = () => {
+				themeTransitioning = false;
+				const exists = state.some((stateItem) => stateItem.items.length > 0 && document.body.contains(stateItem.items[0]));
+				if (exists) {start();}
+			};
+
+			state.forEach((stateItem) => {
+				if (stateItem.items.length > 0) {
+					void initImage(stateItem);
+				}
 			});
 
 			start();
 
-			document.addEventListener('visibilitychange', handleVisibilityChange);
+			document.addEventListener("visibilitychange", handleVisibilityChange);
+			window.addEventListener("theme-switch:start", handleThemeSwitchStart);
+			window.addEventListener("theme-switch:end", handleThemeSwitchEnd);
 
 			window.__wallpaper_cleanup = () => {
 				stop();
-				document.removeEventListener('visibilitychange', handleVisibilityChange);
+				document.removeEventListener("visibilitychange", handleVisibilityChange);
+				window.removeEventListener("theme-switch:start", handleThemeSwitchStart);
+				window.removeEventListener("theme-switch:end", handleThemeSwitchEnd);
 			};
 		}
 
-		// 页面加载完成后初始化轮播
-		if (document.readyState === 'loading') {
-			document.addEventListener('DOMContentLoaded', initFullscreenWallpaperCarousel);
+		if (document.readyState === "loading") {
+			document.addEventListener("DOMContentLoaded", initFullscreenWallpaperCarousel);
 		} else {
 			initFullscreenWallpaperCarousel();
 		}

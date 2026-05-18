@@ -63,6 +63,7 @@ interface InternalIngestionSessionStatus {
 	workflowId?: string;
 	sessionStatus?: string;
 	workflowStatus?: string | null;
+	workflowObservedStatus?: string | null;
 	normalizedWorkflowStatus?: string;
 	effectiveStatus?: string;
 	summary?: InternalSessionSummary;
@@ -168,6 +169,41 @@ function deriveConvergenceStatus({
 	}
 
 	return hasFailures ? "converged_failure" : "converged_success";
+}
+
+function getTerminalWorkflowStatusLabel(status: string | null | undefined): string | null {
+	switch (String(status || "").trim().toLowerCase()) {
+		case "completed":
+		case "completed_with_warnings":
+			return "completed";
+		case "failed":
+			return "failed";
+		case "cancelled":
+		case "canceled":
+			return "cancelled";
+		default:
+			return null;
+	}
+}
+
+function alignTerminalWorkflowStatus({
+	workflowStatus,
+	status,
+	effectiveStatus,
+}: {
+	workflowStatus: string | null;
+	status: string;
+	effectiveStatus: string;
+}): string | null {
+	const terminalStatus =
+		getTerminalWorkflowStatusLabel(effectiveStatus) ||
+		getTerminalWorkflowStatusLabel(status);
+
+	if (terminalStatus) {
+		return terminalStatus;
+	}
+
+	return workflowStatus;
 }
 
 async function readInternalIngestionSessionStatus(
@@ -353,6 +389,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 		(processedPostCount < expectedPostCount || pendingRecoveryCount > 0);
 	let responseStatus = derivedRunning ? "running" : sessionStatus;
 	let workflowStatus: string | null = null;
+	let workflowObservedStatus: string | null = null;
 	let effectiveStatus = responseStatus;
 	let statusSource =
 		responseStatus === sessionStatus ? "session_db" : "derived_counts";
@@ -377,6 +414,10 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 			internalHasFailures = parseOptionalBoolean(summary.hasFailures);
 			workflowStatus =
 				typeof internalStatus.workflowStatus === "string" ? internalStatus.workflowStatus : null;
+			workflowObservedStatus =
+				typeof internalStatus.workflowObservedStatus === "string"
+					? internalStatus.workflowObservedStatus
+					: workflowObservedStatus;
 			if (typeof internalStatus.effectiveStatus === "string" && internalStatus.effectiveStatus) {
 				effectiveStatus = internalStatus.effectiveStatus;
 			}
@@ -417,6 +458,12 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 		}
 	}
 
+	workflowStatus = alignTerminalWorkflowStatus({
+		workflowStatus,
+		status: responseStatus,
+		effectiveStatus,
+	});
+
 	return jsonResponse({
 		ok: true,
 		session: {
@@ -427,6 +474,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
 			convergenceStatus,
 			workflowId: `blog-sync-session-${String(sessionRecord.id || sessionId)}`,
 			workflowStatus,
+			workflowObservedStatus,
 			expectedPostCount,
 			uploadedPostCount,
 			processedPostCount,

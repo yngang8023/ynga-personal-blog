@@ -44,6 +44,51 @@ function normalizeWorkflowStatus(value: unknown): InternalWorkflowStatus {
   return "running";
 }
 
+function getTerminalWorkflowStatusLabel(status: string | null | undefined): string | null {
+  switch (String(status || "").trim().toLowerCase()) {
+    case "completed":
+    case "completed_with_warnings":
+      return "completed";
+    case "failed":
+      return "failed";
+    case "cancelled":
+    case "canceled":
+      return "cancelled";
+    default:
+      return null;
+  }
+}
+
+function alignTerminalWorkflowStatus({
+  workflowStatus,
+  normalizedWorkflowStatus,
+  sessionStatus,
+  effectiveStatus,
+}: {
+  workflowStatus: string | null;
+  normalizedWorkflowStatus: InternalWorkflowStatus;
+  sessionStatus: string;
+  effectiveStatus: string;
+}): string | null {
+  const terminalStatus =
+    getTerminalWorkflowStatusLabel(effectiveStatus) ||
+    getTerminalWorkflowStatusLabel(sessionStatus);
+
+  if (terminalStatus) {
+    return terminalStatus;
+  }
+
+  if (normalizedWorkflowStatus === "completed") {
+    return "completed";
+  }
+
+  if (normalizedWorkflowStatus === "failed") {
+    return getTerminalWorkflowStatusLabel(workflowStatus) || "failed";
+  }
+
+  return workflowStatus;
+}
+
 async function readWorkflowStatus(
   env: IngestionEnv,
   workflowId: string,
@@ -103,6 +148,12 @@ export async function getInternalSessionStatus(env: IngestionEnv, sessionId: str
   const workflow = await readWorkflowStatus(env, workflowId);
   const sessionStatus = session?.status || "created";
   const effectiveStatus = deriveEffectiveSessionStatus(sessionStatus, workflow.normalizedStatus, summary);
+  const alignedWorkflowStatus = alignTerminalWorkflowStatus({
+    workflowStatus: workflow.rawStatus,
+    normalizedWorkflowStatus: workflow.normalizedStatus,
+    sessionStatus,
+    effectiveStatus,
+  });
 
   if (
     session &&
@@ -130,8 +181,9 @@ export async function getInternalSessionStatus(env: IngestionEnv, sessionId: str
     sessionId,
     workflowId,
     sessionStatus,
-    workflowStatus: workflow.rawStatus,
-    normalizedWorkflowStatus: workflow.normalizedStatus,
+    workflowStatus: alignedWorkflowStatus,
+    workflowObservedStatus: workflow.rawStatus,
+    normalizedWorkflowStatus: normalizeWorkflowStatus(alignedWorkflowStatus || workflow.rawStatus),
     effectiveStatus,
     summary,
   };
